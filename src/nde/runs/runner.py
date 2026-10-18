@@ -140,14 +140,17 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
     )
 
 
-def _run_call(  # noqa: PLR0913, PLR0917 - one call's full context
-    gateway: Gateway,
-    prepared: PreparedRun,
-    call: CallSpec,
-    binding: ModelBinding,
-    repetition: int,
-    state: RunState,
-) -> None:
+@dataclass(frozen=True)
+class CallRun:
+    """One execution of a call: which call, on which model, which repetition."""
+
+    call: CallSpec
+    binding: ModelBinding
+    repetition: int
+
+
+def _run_call(gateway: Gateway, prepared: PreparedRun, run: CallRun, state: RunState) -> None:
+    call, binding, repetition = run.call, run.binding, run.repetition
     config = prepared.loaded.config
     template = prepared.templates[call.prompt.label]
     prompt = Prompt(template.name, template.version, template.render(call.variables))
@@ -249,7 +252,7 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
                 # Benchmark candidates take turns, so a budget stop leaves comparable samples.
                 for binding in config.bindings_for(call):
                     state.current_call = call.id
-                    _run_call(gateway, prepared, call, binding, repetition, state)
+                    _run_call(gateway, prepared, CallRun(call, binding, repetition), state)
         manifest.status = "succeeded"
     except BudgetExceededError as error:
         manifest.status = "aborted"
