@@ -11,10 +11,12 @@ from pathlib import Path
 from typing import Literal, Self
 
 import yaml
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 
 from nde.llm.config import ModelBinding, ProviderConfig, Strict
 from nde.llm.ledger import DEFAULT_ASSUMED_OUTPUT_TOKENS, Price
+from nde.llm.structured import DEFAULT_MAX_REPAIRS
+from nde.schema import RESPONSE_MODELS
 
 type RoleName = Literal["annotator", "planner", "prose", "critic", "judge"]
 
@@ -38,6 +40,21 @@ class CallSpec(Strict):
     prompt: PromptRef
     variables: dict[str, str] = Field(default_factory=dict[str, str])
     repeat: int = Field(default=1, ge=1)
+    # Name of a registered Pydantic response model (see nde.schema); None for free text.
+    response_model: str | None = None
+
+    @field_validator("response_model")
+    @classmethod
+    def _response_model_is_registered(cls, name: str | None) -> str | None:
+        if name is not None and name not in RESPONSE_MODELS:
+            known = ", ".join(sorted(RESPONSE_MODELS))
+            raise ValueError(f"unknown response model {name!r}; known models: {known}")
+        return name
+
+
+class StructuredConfig(Strict):
+    # Repair requests allowed after an invalid first response.
+    max_repairs: int = Field(default=DEFAULT_MAX_REPAIRS, ge=0)
 
 
 class BudgetConfig(Strict):
@@ -61,6 +78,7 @@ class ExperimentConfig(Strict):
     # USD per million tokens, keyed by "provider/model".
     prices: dict[str, Price] = Field(default_factory=dict[str, Price])
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
+    structured: StructuredConfig = Field(default_factory=StructuredConfig)
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:

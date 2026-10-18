@@ -1,5 +1,6 @@
 """Generate a run's Markdown report from its run directory."""
 
+import json
 from pathlib import Path
 
 from nde.files import write_text_lf
@@ -7,6 +8,7 @@ from nde.runs.records import (
     REPORT,
     CallRecord,
     Manifest,
+    OutputRecord,
     read_calls,
     read_manifest,
     read_outputs,
@@ -51,18 +53,19 @@ def render_report(run_dir: Path) -> str:
         lines += [
             f"### {output.call} #{output.repetition + 1} ({output.provider}/{output.model})",
             "",
-            *_quote(output.text),
+            *_output_body(output),
             "",
         ]
+    lines += _structured_section(manifest)
     lines += _cost_section(manifest, calls)
     lines += [
         "## Calls",
         "",
-        "| Call | Model | Template | Seed | Cached | Input tokens | Output tokens "
+        "| Call | Attempt | Model | Template | Seed | Cached | Input tokens | Output tokens "
         "| Cost | Latency (s) |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         *(
-            f"| {call.call} #{call.repetition + 1} | {call.response_model} "
+            f"| {call.call} #{call.repetition + 1} | {call.attempt + 1} | {call.reported_model} "
             f"| {call.template}@{call.template_version} | {call.seed} "
             f"| {'yes' if call.cached else 'no'} "
             f"| {call.input_tokens} | {call.output_tokens} | {_usd(call.cost_usd)} "
@@ -116,6 +119,48 @@ def _cost_section(manifest: Manifest, calls: list[CallRecord]) -> list[str]:
     if manifest.warnings:
         lines += ["### Warnings", "", *(f"- {warning}" for warning in manifest.warnings), ""]
     return lines
+
+
+def _output_body(output: OutputRecord) -> list[str]:
+    if output.response_model is None:
+        return _quote(output.text)
+    if output.parsed is not None:
+        return [
+            f"Parsed `{output.response_model}`:",
+            "",
+            "```json",
+            json.dumps(output.parsed, indent=2, ensure_ascii=False),
+            "```",
+        ]
+    return [
+        f"No valid `{output.response_model}` after repairs: {output.error}",
+        "",
+        "Final response:",
+        "",
+        *_quote(output.text),
+    ]
+
+
+def _percent(value: float) -> str:
+    return f"{value:.1%}"
+
+
+def _structured_section(manifest: Manifest) -> list[str]:
+    if not manifest.structured:
+        return []
+    return [
+        "## Structured output",
+        "",
+        "| Model | Calls | First-attempt validity | Validity after repair | Repair rate | Failed |",
+        "| --- | --- | --- | --- | --- | --- |",
+        *(
+            f"| {label} | {m.calls} | {_percent(m.first_attempt_validity)} "
+            f"| {_percent(m.validity_after_repair)} | {_percent(m.repair_rate)} "
+            f"| {m.failed_calls} |"
+            for label, m in manifest.structured.items()
+        ),
+        "",
+    ]
 
 
 def _quote(text: str) -> list[str]:

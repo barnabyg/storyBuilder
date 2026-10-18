@@ -115,6 +115,10 @@ class FakeOpenAI:
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
+            # Headers and body go out as separate writes; without this, Nagle plus
+            # delayed ACKs stall every response on loopback by tens of milliseconds.
+            disable_nagle_algorithm = True
+
             def do_POST(self) -> None:
                 length = int(self.headers.get("Content-Length", "0"))
                 raw = self.rfile.read(length)

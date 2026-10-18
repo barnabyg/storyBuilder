@@ -8,8 +8,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
-from nde.llm.gateway import Gateway, Prompt
+from nde.llm.gateway import Completion, Gateway, Prompt
 from nde.llm.ledger import DEFAULT_LEDGER_PATH, BudgetExceededError, CostLedger, Pricing
+from nde.llm.structured import StructuredOutputError
 from nde.runs.config import CallSpec, ConfigError, LoadedConfig, RoleName, load_config
 from nde.runs.prompts import PromptTemplate, load_template
 from nde.runs.records import (
@@ -21,11 +22,13 @@ from nde.runs.records import (
     Manifest,
     ModelUse,
     OutputRecord,
+    StructuredMetrics,
     TemplateUse,
     write_jsonl,
     write_manifest,
 )
 from nde.runs.report import write_report
+from nde.schema import RESPONSE_MODELS
 
 type Clock = Callable[[], datetime]
 
@@ -54,6 +57,7 @@ class PreparedRun:
 class RunState:
     outputs: list[OutputRecord] = field(default_factory=list[OutputRecord])
     calls: list[CallRecord] = field(default_factory=list[CallRecord])
+    structured: dict[str, StructuredMetrics] = field(default_factory=dict[str, StructuredMetrics])
 
 
 def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
@@ -140,36 +144,65 @@ def _run_call(
     template = prepared.templates[call.prompt.label]
     prompt = Prompt(template.name, template.version, template.render(call.variables))
     seed = config.seed + repetition
-    completion = gateway.complete(binding, prompt, seed=seed)
-    state.outputs.append(
-        OutputRecord(
-            call=call.id,
-            repetition=repetition,
-            role=call.role,
-            provider=binding.provider,
-            model=binding.model,
-            seed=seed,
-            text=completion.text,
-        )
+    output = OutputRecord(
+        call=call.id,
+        repetition=repetition,
+        role=call.role,
+        provider=binding.provider,
+        model=binding.model,
+        seed=seed,
+        text="",
+        response_model=call.response_model,
     )
+    first_attempt = len(gateway.history)
+    try:
+        if call.response_model is None:
+            output.text = gateway.complete(binding, prompt, seed=seed).text
+        else:
+            metrics = state.structured.setdefault(binding.label, StructuredMetrics())
+            try:
+                result = gateway.structured(
+                    binding,
+                    prompt,
+                    RESPONSE_MODELS[call.response_model],
+                    seed=seed,
+                    max_repairs=config.structured.max_repairs,
+                )
+            except StructuredOutputError as failure:
+                output.text = failure.attempts[-1].text
+                output.error = "; ".join(failure.errors)
+                metrics.record(attempts=len(failure.attempts), valid=False)
+            else:
+                output.text = result.attempts[-1].text
+                output.parsed = result.value.model_dump(mode="json")
+                metrics.record(attempts=len(result.attempts), valid=True)
+        state.outputs.append(output)
+    finally:
+        # Record every provider call made, even when a budget cap stopped a repair loop.
+        for attempt, completion in enumerate(gateway.history[first_attempt:]):
+            state.calls.append(_call_record(gateway, call, repetition, attempt, completion))
+
+
+def _call_record(
+    gateway: Gateway, call: CallSpec, repetition: int, attempt: int, completion: Completion
+) -> CallRecord:
     result = completion.result
-    state.calls.append(
-        CallRecord(
-            call=call.id,
-            repetition=repetition,
-            provider=binding.provider,
-            model=binding.model,
-            response_model=result.model,
-            template=template.name,
-            template_version=template.version,
-            seed=seed,
-            input_tokens=result.input_tokens,
-            output_tokens=result.output_tokens,
-            latency_s=result.latency_s,
-            cached=completion.cached,
-            cost_usd=completion.cost_usd,
-            token_cost_usd=gateway.token_cost(completion),
-        )
+    return CallRecord(
+        call=call.id,
+        repetition=repetition,
+        attempt=attempt,
+        provider=completion.binding.provider,
+        model=completion.binding.model,
+        reported_model=result.model,
+        template=completion.prompt.template,
+        template_version=completion.prompt.version,
+        seed=completion.seed,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        latency_s=result.latency_s,
+        cached=completion.cached,
+        cost_usd=completion.cost_usd,
+        token_cost_usd=gateway.token_cost(completion),
     )
 
 
@@ -215,6 +248,7 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
             manifest.cost.day_spent_usd = gateway.ledger.day_spent()
         gateway.close()
         _summarise_costs(manifest.cost, state.calls)
+        manifest.structured = state.structured
         manifest.cache.hits = gateway.cache_stats.hits
         manifest.cache.misses = gateway.cache_stats.misses
         if manifest.status == "running":

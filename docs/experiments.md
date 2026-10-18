@@ -71,6 +71,58 @@ uv run nde prompts lock
 `nde prompts lock` never re-records a changed version; it reports it and
 exits 2.
 
+## Structured output
+
+A call can ask for a response that conforms to a Pydantic model:
+
+```yaml
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    json_schema: false        # does the provider accept JSON-schema response mode?
+
+roles:
+  planner:
+    provider: deepseek
+    model: deepseek-chat
+    json_schema: null         # optional per-model override of the provider's flag
+
+calls:
+  - id: premise
+    role: planner
+    prompt: {template: premise, version: 1}
+    response_model: story_premise   # registered in nde.schema.RESPONSE_MODELS
+
+structured:
+  max_repairs: 2              # repair requests after an invalid first response
+```
+
+- When the model's provider (or the model's own override) has `json_schema:
+  true`, the request sets `response_format` to the model's JSON schema.
+  Otherwise the schema is appended to the final user message.
+- The response is validated with Pydantic (Markdown code fences are
+  stripped first). If it fails, the invalid response and the specific
+  validation errors (for example `protagonist.goal: Field required`) are sent
+  back in a repair request, up to `max_repairs` times.
+- In code, `Gateway.structured(binding, prompt, Model, seed=...)` returns a
+  `StructuredResult` holding the validated instance and every attempt, or
+  raises `StructuredOutputError` with the last errors once repairs run out.
+- In a run, a call whose repairs run out does not fail the run: its output
+  records the error and counts against the model's validity.
+- Every attempt is an ordinary gateway call: it is cached, costed and capped,
+  so a re-run makes no calls. `calls.jsonl` has one line per attempt
+  (`attempt` 0 is the first request).
+- The manifest's `structured` section and the report's **Structured output**
+  table give, per model: first-attempt validity, validity after repair,
+  repair rate (calls that needed at least one repair) and failed calls. The
+  report shows each parsed object.
+
+To add a response model, define it under `src/nde/schema/` and register it in
+`RESPONSE_MODELS`.
+
+`configs/structured-smoke.yaml` asks for a small nested `StoryPremise` three
+times.
+
 ## Response cache
 
 Every call is cached by everything that can change its response: provider,

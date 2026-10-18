@@ -1,0 +1,46 @@
+# Structured-output smoke experiment: ask for a small nested object
+# (nde.schema.smoke.StoryPremise), validate it and repair invalid responses.
+#
+#   uv run nde run configs/structured-smoke.yaml
+#
+# Needs DEEPSEEK_API_KEY in the environment or in `.env` (see .env.example).
+name: structured-smoke
+seed: 20261018
+prompts_dir: ../prompts
+
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    base_url_env: NDE_DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    # Set true only for providers that accept response_format of type json_schema;
+    # otherwise the schema is put in the prompt.
+    json_schema: false
+
+roles:
+  planner:
+    provider: deepseek
+    model: deepseek-chat
+    params:
+      temperature: 0.7
+      max_tokens: 400
+
+calls:
+  - id: premise
+    role: planner
+    prompt: {template: premise, version: 1}
+    variables:
+      setting: a lighthouse in a storm
+    response_model: story_premise
+    repeat: 3
+
+structured:
+  max_repairs: 2
+
+# USD per million tokens. Check the provider's current price list.
+prices:
+  deepseek/deepseek-chat: {input_per_mtok: 0.27, output_per_mtok: 1.10}
+
+budget:
+  per_run_usd: 0.05
+  per_day_usd: 1.00

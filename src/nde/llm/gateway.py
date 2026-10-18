@@ -2,11 +2,16 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any
 
+from pydantic import BaseModel, ValidationError
+
+from nde.llm import structured
 from nde.llm.cache import CacheMode, CacheStats, ResponseCache, cache_key
 from nde.llm.client import ChatRequest, ChatResult, Message, OpenAICompatibleClient
 from nde.llm.config import ModelBinding, ProviderConfig
 from nde.llm.ledger import CostLedger, Pricing
+from nde.llm.structured import StructuredOutputError, StructuredResult
 
 
 @dataclass(frozen=True)
@@ -42,6 +47,8 @@ class Gateway:
     cache_stats: CacheStats = field(default_factory=CacheStats)
     pricing: Pricing = field(default_factory=lambda: Pricing({}))
     ledger: CostLedger | None = None
+    # Every completion this gateway has returned, in order, including repair attempts.
+    history: list[Completion] = field(default_factory=list[Completion])
     _clients: dict[str, OpenAICompatibleClient] = field(
         default_factory=dict[str, OpenAICompatibleClient]
     )
@@ -66,17 +73,43 @@ class Gateway:
             )
         return self._clients[provider]
 
-    def complete(self, binding: ModelBinding, prompt: Prompt, *, seed: int) -> Completion:
+    def complete(
+        self,
+        binding: ModelBinding,
+        prompt: Prompt,
+        *,
+        seed: int,
+        response_format: Mapping[str, Any] | None = None,
+    ) -> Completion:
         request = ChatRequest(
-            model=binding.model, messages=prompt.messages, seed=seed, params=binding.params
+            model=binding.model,
+            messages=prompt.messages,
+            seed=seed,
+            params=binding.params,
+            response_format=response_format,
         )
-        key = cache_key(binding.provider, prompt.template, prompt.version, request)
-        cache = self.cache if self.cache_mode != "bypass" else None
-        if cache is not None and self.cache_mode == "use":
-            stored = cache.get(key)
-            if stored is not None:
-                self.cache_stats.hits += 1
-                return Completion(binding, prompt, seed, stored, cached=True, cost_usd=0.0)
+        completion = self._cached(binding, prompt, seed, request) or self._call(
+            binding, prompt, seed, request
+        )
+        self.history.append(completion)
+        return completion
+
+    def _cached(
+        self, binding: ModelBinding, prompt: Prompt, seed: int, request: ChatRequest
+    ) -> Completion | None:
+        if self.cache is None or self.cache_mode != "use":
+            return None
+        stored = self.cache.get(
+            cache_key(binding.provider, prompt.template, prompt.version, request)
+        )
+        if stored is None:
+            return None
+        self.cache_stats.hits += 1
+        return Completion(binding, prompt, seed, stored, cached=True, cost_usd=0.0)
+
+    def _call(
+        self, binding: ModelBinding, prompt: Prompt, seed: int, request: ChatRequest
+    ) -> Completion:
         self.cache_stats.misses += 1
         reservation = (
             self.ledger.reserve(self.pricing.estimate(binding.label, request))
@@ -90,13 +123,53 @@ class Gateway:
         finally:
             if self.ledger is not None and reservation is not None:
                 self.ledger.settle(reservation, cost)
-        if cache is not None:
-            cache.put(key, request, result)
+        if self.cache is not None and self.cache_mode != "bypass":
+            key = cache_key(binding.provider, prompt.template, prompt.version, request)
+            self.cache.put(key, request, result)
         return Completion(binding, prompt, seed, result, cached=False, cost_usd=cost)
 
     def _token_cost(self, binding: ModelBinding, result: ChatResult) -> float:
         return self.pricing.cost(binding.label, result.input_tokens, result.output_tokens)
 
-    def token_cost(self, completion: "Completion") -> float:
+    def token_cost(self, completion: Completion) -> float:
         """What a completion's tokens cost at list price, whether or not it was cached."""
         return self._token_cost(completion.binding, completion.result)
+
+    def supports_json_schema(self, binding: ModelBinding) -> bool:
+        if binding.json_schema is not None:
+            return binding.json_schema
+        return self.providers[binding.provider].json_schema
+
+    def structured[T: BaseModel](
+        self,
+        binding: ModelBinding,
+        prompt: Prompt,
+        model: type[T],
+        *,
+        seed: int,
+        max_repairs: int = structured.DEFAULT_MAX_REPAIRS,
+    ) -> StructuredResult[T]:
+        """Ask for a response conforming to `model`, repairing invalid ones.
+
+        Raises StructuredOutputError once `max_repairs` repairs have failed.
+        """
+        response_format: dict[str, Any] | None = None
+        if self.supports_json_schema(binding):
+            response_format = structured.response_format(model)
+            messages = prompt.messages
+        else:
+            messages = structured.with_schema_instruction(prompt.messages, model)
+        attempts: list[Completion] = []
+        errors: list[str] = []
+        for _ in range(max_repairs + 1):
+            attempt = Prompt(prompt.template, prompt.version, messages)
+            completion = self.complete(binding, attempt, seed=seed, response_format=response_format)
+            attempts.append(completion)
+            try:
+                value = structured.parse(completion.text, model)
+            except ValidationError as error:
+                errors = structured.describe_errors(error)
+                messages = (*messages, *structured.repair_messages(completion.text, errors))
+            else:
+                return StructuredResult(value, attempts)
+        raise StructuredOutputError(binding.label, errors, attempts)

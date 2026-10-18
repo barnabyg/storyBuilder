@@ -8,6 +8,7 @@ import pytest
 
 from nde.cli import main
 from nde.runs import prompts
+from nde.runs.runner import prepare
 from tests.conftest import REPO, base_config, write_config
 from tests.fake_openai import FakeOpenAI, completion
 
@@ -172,3 +173,15 @@ def test_api_key_can_come_from_a_dotenv_file(fake_llm: FakeOpenAI, tmp_path: Pat
 
     assert main(["run", str(config), "--runs-dir", str(tmp_path / "runs")]) == 0
     assert fake_llm.requests[0].headers["authorization"] == "Bearer from-dotenv"
+
+
+@pytest.mark.parametrize("config", sorted((REPO / "configs").glob("*.yaml")), ids=lambda p: p.name)
+def test_committed_configs_are_valid(config: Path) -> None:
+    keys = {
+        "DEEPSEEK_API_KEY": "k",
+        "OPENAI_API_KEY": "k",
+    }  # pragma: allowlist secret - fake values
+
+    prepared = prepare(config, keys)
+
+    assert prepared.loaded.config.calls

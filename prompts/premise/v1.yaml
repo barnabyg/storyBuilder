@@ -1,0 +1,4 @@
+system: You are a story developer. You answer with JSON only.
+user: >-
+  Invent a premise for a short story set in $setting: a title, a protagonist
+  with a name and a goal, and three to five plot beats.

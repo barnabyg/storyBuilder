@@ -10,7 +10,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from nde.files import write_text_lf
 
@@ -58,6 +58,30 @@ class CostSummary(_Record):
     day_spent_usd: float | None = None
 
 
+class StructuredMetrics(_Record):
+    """Schema-validity counts and rates for one model's structured calls."""
+
+    calls: int = 0
+    valid_first_attempt: int = 0
+    valid_after_repair: int = 0
+    # Calls that needed at least one repair request, whether or not it succeeded.
+    repaired_calls: int = 0
+    failed_calls: int = 0
+    first_attempt_validity: float = 0.0
+    validity_after_repair: float = 0.0
+    repair_rate: float = 0.0
+
+    def record(self, *, attempts: int, valid: bool) -> None:
+        self.calls += 1
+        self.valid_first_attempt += valid and attempts == 1
+        self.valid_after_repair += valid
+        self.repaired_calls += attempts > 1
+        self.failed_calls += not valid
+        self.first_attempt_validity = self.valid_first_attempt / self.calls
+        self.validity_after_repair = self.valid_after_repair / self.calls
+        self.repair_rate = self.repaired_calls / self.calls
+
+
 class Manifest(_Record):
     name: str
     status: RunStatus
@@ -76,6 +100,8 @@ class Manifest(_Record):
     abort_reason: str | None = None
     abort_message: str | None = None
     warnings: list[str] = Field(default_factory=list[str])
+    # Per "provider/model": validity of structured (response-model) calls.
+    structured: dict[str, StructuredMetrics] = Field(default_factory=dict[str, StructuredMetrics])
     files: dict[str, str] = Field(
         default_factory=lambda: {"outputs": OUTPUTS, "calls": CALLS, "report": REPORT}
     )
@@ -88,16 +114,23 @@ class OutputRecord(_Record):
     provider: str
     model: str
     seed: int
+    # The final attempt's raw text.
     text: str
+    # For structured calls: the response model, the validated object, or why it failed.
+    response_model: str | None = None
+    parsed: JsonValue = None
+    error: str | None = None
 
 
 class CallRecord(_Record):
     call: str
     repetition: int
+    # 0 for the first request; 1, 2, ... for structured-output repair requests.
+    attempt: int = 0
     provider: str
     model: str
     # The model ID the provider reported.
-    response_model: str
+    reported_model: str
     template: str
     template_version: int
     seed: int
