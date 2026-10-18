@@ -79,9 +79,12 @@ def test_cache_hits_cost_nothing(
     assert "New spend this run: $0.0000" in (rerun / "report.md").read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("limit", ["max_tokens", "max_completion_tokens"])
 def test_a_run_cap_below_one_call_stops_before_calling(
-    fake_llm: FakeOpenAI, priced: dict[str, Any], tmp_path: Path
+    fake_llm: FakeOpenAI, priced: dict[str, Any], tmp_path: Path, limit: str
 ) -> None:
+    # Newer OpenAI models take max_completion_tokens; both bound the estimate.
+    priced["roles"]["prose"]["params"] = {limit: 100}
     priced["budget"] = {"per_run_usd": 0.05}
 
     code, run_dir = _run(tmp_path, priced, "--no-cache")
