@@ -5,6 +5,7 @@ with a default completion. Every request body is recorded for assertions.
 """
 
 import json
+import sys
 import threading
 import time
 from collections import deque
@@ -72,13 +73,26 @@ class RecordedRequest:
     body: Json
 
 
+class _Server(ThreadingHTTPServer):
+    # Join handler threads on close, so a delayed reply never outlives its test.
+    daemon_threads = False
+
+    @override
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        # Timeout and dropped-connection tests disconnect on purpose; writing a
+        # late reply then fails, and the default handler prints a traceback.
+        if isinstance(sys.exception(), ConnectionError):
+            return
+        super().handle_error(request, client_address)
+
+
 class FakeOpenAI:
     def __init__(self) -> None:
         self.script: deque[Reply] = deque()
         self.requests: list[RecordedRequest] = []
         self.default: Callable[[Json], Reply] = self._echo
         self._lock = threading.Lock()
-        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler_class())
+        self._server = _Server(("127.0.0.1", 0), self._handler_class())
         self._thread = threading.Thread(
             target=self._server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
         )
