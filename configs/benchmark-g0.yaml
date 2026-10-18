@@ -1,0 +1,83 @@
+# Model smoke benchmark: evidence for gate G0 (docs/benchmark.md).
+#
+# Each candidate model plans `repeat` story outlines per brief against the
+# nested StoryOutline schema (nde.schema.benchmark). The report compares
+# validity, repair rate, latency and cost, and flags models that reach the
+# threshold validity after repair.
+#
+#   uv run nde run configs/benchmark-g0.yaml
+#
+# BEFORE RUNNING: check every candidate's model ID and price against the
+# provider's current model and price lists, and set API keys in `.env`.
+name: benchmark-g0
+seed: 7000
+prompts_dir: ../prompts
+
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    base_url_env: NDE_DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: false        # schema goes in the prompt
+    timeout_s: 120
+  openai:
+    base_url: https://api.openai.com/v1
+    base_url_env: NDE_OPENAI_BASE_URL
+    api_key_env: OPENAI_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: true         # response_format: json_schema
+    timeout_s: 120
+  # local:
+  #   base_url: http://localhost:11434/v1
+  #   json_schema: true
+  #   timeout_s: 300
+
+benchmark:
+  role: planner
+  threshold: 0.95             # validity after repair needed to pass G0
+  candidates:
+    - provider: deepseek
+      model: deepseek-chat
+      params: {temperature: 0.7, max_tokens: 3000}
+    - provider: openai
+      model: gpt-6.1-luna
+      params: {temperature: 0.7, max_tokens: 3000}
+    # - provider: local
+    #   model: llama3.1:8b
+    #   params: {temperature: 0.7, max_tokens: 3000}
+
+calls:
+  # Same seeds for every candidate: repetition i uses seed + i.
+  - id: outline-lighthouse
+    role: planner
+    prompt: {template: g0_outline, version: 1}
+    variables:
+      brief: >-
+        A lighthouse keeper must keep the lamp lit through a storm while a
+        smuggler tries to lure a ship onto the rocks.
+    response_model: story_outline
+    repeat: 10
+  - id: outline-archive
+    role: planner
+    prompt: {template: g0_outline, version: 1}
+    variables:
+      brief: >-
+        A junior archivist discovers that the city's founding records were
+        forged, and the forger is her mentor.
+    response_model: story_outline
+    repeat: 10
+
+structured:
+  max_repairs: 2
+
+# USD per million tokens, per provider/model. CHECK BEFORE RUNNING.
+prices:
+  deepseek/deepseek-chat: {input_per_mtok: 0.27, output_per_mtok: 1.10}
+  # Placeholder: replace with the provider's published price.
+  openai/gpt-6.1-luna: {input_per_mtok: 0.50, output_per_mtok: 2.00}
+  # local/llama3.1:8b: {input_per_mtok: 0, output_per_mtok: 0}
+
+budget:
+  # A worst-case estimate is reserved before every request, so the run stops
+  # before it can spend more than this.
+  per_run_usd: 1.00
+  per_day_usd: 5.00

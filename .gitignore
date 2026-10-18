@@ -40,3 +40,7 @@ data/*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# nde local state: response cache, cost ledger and run directories
+/.nde/
+/runs/

@@ -1,0 +1,42 @@
+# The smoke experiment against a local OpenAI-compatible server, by config alone.
+#
+# Ollama:     ollama pull llama3.1:8b   (the server listens on localhost:11434)
+# llama.cpp:  llama-server -m model.gguf --port 8080
+#             then set NDE_LOCAL_BASE_URL=http://localhost:8080/v1 and use the
+#             model name the server reports at /v1/models.
+#
+#   uv run nde run configs/local-ollama.yaml
+name: local-ollama
+seed: 20261018
+prompts_dir: ../prompts
+
+providers:
+  local:
+    base_url: http://localhost:11434/v1
+    base_url_env: NDE_LOCAL_BASE_URL
+    # No api_key_env: local servers need no key.
+    timeout_s: 300            # first calls load the model into memory
+    json_schema: true         # Ollama and llama.cpp both accept JSON-schema response mode
+    retry:
+      max_retries: 2
+      base_delay_s: 1.0
+      max_delay_s: 10.0
+
+roles:
+  prose:
+    provider: local
+    model: llama3.1:8b
+    params:
+      temperature: 0.7
+      max_tokens: 200
+
+calls:
+  - id: opening-line
+    role: prose
+    prompt: {template: smoke, version: 1}
+    variables:
+      setting: a lighthouse in a storm
+
+# Local inference has no per-token price.
+prices:
+  local/llama3.1:8b: {input_per_mtok: 0, output_per_mtok: 0}
