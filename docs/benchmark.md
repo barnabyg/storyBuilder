@@ -58,12 +58,19 @@ tighter estimate: at 20 samples, one invalid outline is 5 percentage points.
 
 ## How the per-run cap protects you
 
-Before every request, including repairs, the gateway reserves a worst-case
-estimate of its cost: input tokens from the prompt length and output tokens
-from the candidate's `max_tokens`. If the reservation would take the run past
+Before every request, including repairs, the gateway reserves an estimate of
+its cost: input tokens from the prompt length and output tokens from the
+candidate's `max_tokens`. If the reservation would take the run past
 `budget.per_run_usd` (or the day past `budget.per_day_usd`), the request is
-not made and the run stops with `aborted: budget`. So a run never spends more
-than its cap, even if every response needs every repair. Candidates take turns
+not made and the run stops with `aborted: budget`. Every request is checked,
+however many repairs the responses need.
+
+The estimate is conservative but not a guarantee. Output is bounded, because
+providers stop at `max_tokens`. Input is estimated at 3 characters per token,
+which is generous for English, but unusually token-dense text can exceed it.
+So the cap can be overshot by at most the underestimated input cost of the
+last request. That is small next to the cap when `max_tokens` is set; leave
+some headroom if the cap is a hard limit for you. Candidates take turns
 for each repetition, so a run cut short by its cap still has comparable
 samples for every candidate, and its report still shows the table for what
 was collected. Re-running after raising the cap reuses every cached response

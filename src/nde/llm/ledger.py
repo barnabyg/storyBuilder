@@ -6,8 +6,10 @@ per million tokens, because they vary by provider and change over time.
 Before every provider call the gateway reserves a conservative estimate of its
 cost against the per-run and per-day caps; if the reservation would exceed a
 cap the call is not made. After the call the reservation is settled at the
-actual cost. The per-day total is kept in SQLite so it persists across runs and
-is shared by concurrent runs. Days are UTC calendar days.
+actual cost. The output estimate is bounded by max_tokens, but the input
+estimate is a heuristic, so a call can cost slightly more than it reserved.
+The per-day total is kept in SQLite so it persists across runs and is shared
+by concurrent runs. Days are UTC calendar days.
 """
 
 import math

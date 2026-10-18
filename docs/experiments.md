@@ -234,7 +234,10 @@ check them against the provider's price list.
   run or the day over its cap, the call is not made. The run stops with
   `status: aborted`, `abort_reason: budget`, and still writes its manifest,
   outputs so far and report. `nde run` then exits 1. Set `max_tokens` on every
-  role to keep the estimate tight.
+  role: providers stop there, so it bounds the output cost. The input
+  estimate is generous for English but is not a hard bound, so a request can
+  cost slightly more than its reservation, and the cap can be overshot by that
+  difference on the last request. Leave some headroom under a hard limit.
 - The daily total lives in `.nde/ledger.sqlite` (gitignored; change it with
   `--ledger PATH` or `NDE_LEDGER`), so it persists across runs and is shared
   by concurrent runs. Reservations are atomic, so concurrent runs cannot
