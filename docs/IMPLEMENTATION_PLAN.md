@@ -155,6 +155,35 @@ Sizes: **S** is about 1–2 weeks part-time, **M** about 3–5 weeks, **L** abou
 
 **Fail action:** if no low-cost model reaches that validity, simplify the schema shape (flatter, smaller per-call sub-schemas) or add a single mid-tier model only for the `planner` role. Record the decision.
 
+**G0 result (18 October 2026): passed.** Run `20261018T213124Z-benchmark-g0-80c381` of
+`configs/benchmark-g0.yaml`: 20 `StoryOutline` samples per model (two briefs × 10),
+at most 2 repairs, reasoning or thinking disabled for both models.
+
+| Model | First-attempt validity | Validity after repair | Median / p95 latency | Cost per outline |
+| --- | --- | --- | --- | --- |
+| `gpt-6-luna` | 95% | **100%** | 16.2 s / 19.2 s | ≈ $0.0010 |
+| `deepseek-flash` | 100% | **100%** | 8.6 s / 10.3 s | ≈ $0.0026 at peak rates (about half off-peak) |
+
+**Decision:** `gpt-6-luna` is the `planner` model. `deepseek-flash` is the fallback. No
+schema simplification and no mid-tier model are needed.
+
+- Luna costs less per outline and supports JSON-schema response mode natively.
+  DeepSeek has no schema mode, so the schema rides in every prompt, nearly
+  doubling its input tokens. DeepSeek was twice as fast and valid on every
+  first attempt, so it stays benchmarked and ready.
+- The fallback is a config change: point the `planner` role at
+  `deepseek/deepseek-flash` with `thinking: {type: disabled}`, as in
+  `configs/benchmark-g0.yaml`. Use it if Luna becomes unavailable, its validity
+  drops, or its price rises. The gateway does not fail over automatically.
+- Family separation: with an OpenAI planner, the judge and critic roles must
+  come from another family, such as DeepSeek. If the planner falls back to
+  DeepSeek, the judge and critic assignments must change too.
+- Caveat: 20 samples per model. With no failures, the 95% lower confidence
+  bound on validity is about 86%, not 95%. Every run report shows per-model
+  validity; revisit this decision if it falls below the threshold in later
+  phases. Raising `repeat` to 30 per brief (60 samples) would make the pass
+  statistically confident for about $0.15 more.
+
 **Manual test:** `uv run nde run configs/smoke.yaml` produces a run directory and a cost report. Running it a second time reports zero new spend.
 
 ### Phase 1 — Benchmark and instrument validation (M) — proposal Stage 0
@@ -327,7 +356,7 @@ Proposal Stage 7 (novel length, graph diffusion, tooling for revision) is **out 
 
 | Gate | Phase | Question | Default pass (confirm in pre-registration) | If it fails |
 | --- | --- | --- | --- | --- |
-| G0 | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
+| G0 (passed, 18 Oct 2026) | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
 | G-instr | P1 | Does the instrument detect known damage? | Owner ≥9/10, judges ≥80% agreement | Longer stories or excerpts; adjust the judges' role |
 | G-schema | P2 | Is the schema expressive and practical? | Mutation catch ≥95%; correction under about 2 hours per story | Cut channels |
 | **G1** | P3 | **Do multi-channel plans help?** | C ≥21/30 against B | One diagnostic retry, then stop the diffusion track |
