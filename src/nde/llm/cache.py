@@ -23,9 +23,13 @@ type CacheMode = Literal["use", "bypass", "refresh"]
 DEFAULT_CACHE_PATH = Path(".nde") / "cache.sqlite"
 
 
-def cache_key(provider: str, template: str, version: int, request: ChatRequest) -> str:
+def cache_key(
+    provider: str, base_url: str, template: str, version: int, request: ChatRequest
+) -> str:
     material = {
         "provider": provider,
+        # The resolved endpoint: one provider name can point at different servers.
+        "base_url": base_url.rstrip("/"),
         "template": template,
         "template_version": version,
         "request": request.body(),

@@ -188,3 +188,25 @@ def test_cache_defaults_to_a_gitignored_path_in_the_working_directory(
     assert main(["run", str(config_path), "--runs-dir", str(tmp_path / "runs")]) == 0
 
     assert (tmp_path / ".nde" / "cache.sqlite").is_file()
+
+
+def test_pointing_a_provider_at_another_server_misses_the_cache(tmp_path: Path) -> None:
+    servers = [FakeOpenAI(), FakeOpenAI()]
+    gateways: list[Gateway] = []
+    try:
+        for server in servers:
+            server.start()
+            gateway = Gateway(
+                {"fake": ProviderConfig(base_url=server.base_url)},
+                environ={},
+                cache=ResponseCache(tmp_path / "cache.sqlite"),
+            )
+            gateways.append(gateway)
+            gateway.complete(BINDING, PROMPT, seed=1)
+
+        assert [server.call_count for server in servers] == [1, 1]
+    finally:
+        for gateway in gateways:
+            gateway.close()
+        for server in servers:
+            server.stop()

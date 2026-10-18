@@ -107,9 +107,7 @@ class Gateway:
     ) -> Completion | None:
         if self.cache is None or self.cache_mode != "use":
             return None
-        stored = self.cache.get(
-            cache_key(binding.provider, prompt.template, prompt.version, request)
-        )
+        stored = self.cache.get(self._cache_key(binding, prompt, request))
         if stored is None:
             return None
         self.cache_stats.hits += 1
@@ -132,11 +130,14 @@ class Gateway:
             if self.ledger is not None and reservation is not None:
                 self.ledger.settle(reservation, cost)
         if self.cache is not None and self.cache_mode != "bypass":
-            key = cache_key(binding.provider, prompt.template, prompt.version, request)
-            self.cache.put(key, request, result)
+            self.cache.put(self._cache_key(binding, prompt, request), request, result)
         return Completion(
             binding, prompt, seed, result, cached=False, cost_usd=cost, retries=retries
         )
+
+    def _cache_key(self, binding: ModelBinding, prompt: Prompt, request: ChatRequest) -> str:
+        base_url = self.providers[binding.provider].resolved_base_url(self.environ)
+        return cache_key(binding.provider, base_url, prompt.template, prompt.version, request)
 
     def _chat_with_retries(self, provider: str, request: ChatRequest) -> tuple[ChatResult, int]:
         """Call the provider, retrying retryable errors under its policy."""

@@ -184,8 +184,9 @@ times.
 
 ## Response cache
 
-Every call is cached by everything that can change its response: provider,
-model, parameters, prompt template version, rendered messages, seed and
+Every call is cached by everything that can change its response: provider and
+its resolved base URL, model, parameters, prompt template version, rendered
+messages, seed and
 response format. Running the same config again makes no network calls and
 reproduces `outputs.jsonl` byte for byte. The manifest records the cache mode
 and the hit and miss counts.
