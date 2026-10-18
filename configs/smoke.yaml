@@ -17,8 +17,11 @@ providers:
 roles:
   prose:
     provider: deepseek
-    model: deepseek-chat
+    model: deepseek-flash
+    # deepseek-flash thinks by default, and ignores temperature while it does;
+    # disable thinking for plain, comparable completions.
     params:
+      thinking: {type: disabled}
       temperature: 0.7
       max_tokens: 200
 
@@ -32,7 +35,9 @@ calls:
 # USD per million tokens, per provider/model. Prices change: check the
 # provider's current price list before relying on these numbers.
 prices:
-  deepseek/deepseek-chat: {input_per_mtok: 0.27, output_per_mtok: 1.10}
+  # DeepSeek pricing page, checked 2026-10-18: peak rates (off-peak is half),
+  # cache-miss input, so recorded costs and budget checks err on the high side.
+  deepseek/deepseek-flash: {input_per_mtok: 0.30, output_per_mtok: 1.20}
 
 budget:
   per_run_usd: 0.01

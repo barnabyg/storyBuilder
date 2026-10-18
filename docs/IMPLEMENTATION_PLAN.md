@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Primary goal | Research first: answer the gates in proposal §11 | Minimal UI. CLI plus generated HTML/Markdown reports. The one exception is a small local reader app for blind evaluation. No plan-editor UI until the core thesis passes. |
 | Stack | Python throughout | One schema language (Pydantic) from extraction through to diffusion training. No cross-language contract. |
-| LLMs | Mix of low-cost APIs (e.g. DeepSeek Flash, GPT-6 Luna), plus local models if they prove good enough | A provider-agnostic gateway behind an OpenAI-compatible interface, with model choice set per role in config. Structured-output reliability on cheap models becomes an early, measured risk. |
+| LLMs | Mix of low-cost APIs (e.g. DeepSeek Flash (`deepseek-flash`), GPT-6 Luna (`gpt-6-luna`)), plus local models if they prove good enough | A provider-agnostic gateway behind an OpenAI-compatible interface, with model choice set per role in config. Structured-output reliability on cheap models becomes an early, measured risk. |
 | Evaluators | The project owner is the only human evaluator for now | Owner reading time is the scarcest resource and drives the evaluation design (§4). Results describe one reader's judgement. Any external claim later needs a panel. |
 
 ### Working assumptions (change any of these if they are wrong)

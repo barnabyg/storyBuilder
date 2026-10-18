@@ -34,7 +34,7 @@ def smoke_env(fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch) -> FakeOpen
 def test_smoke_run_records_manifest_output_and_report(
     smoke_env: FakeOpenAI, tmp_path: Path
 ) -> None:
-    smoke_env.queue(completion("The lamp went out at midnight.", model="deepseek-chat"))
+    smoke_env.queue(completion("The lamp went out at midnight.", model="deepseek-flash"))
     runs = tmp_path / "runs"
 
     code = main(["run", str(SMOKE), "--runs-dir", str(runs)])
@@ -47,7 +47,7 @@ def test_smoke_run_records_manifest_output_and_report(
     assert re.fullmatch(r"[0-9a-f]{40}", str(manifest["git_sha"]))
     assert re.fullmatch(r"[0-9a-f]{64}", str(manifest["config_hash"]))
     assert manifest["models"] == [
-        {"role": "prose", "provider": "deepseek", "model": "deepseek-chat"}
+        {"role": "prose", "provider": "deepseek", "model": "deepseek-flash"}
     ]
     assert manifest["prompt_templates"] == [
         {"template": "smoke", "version": 1, "sha256": manifest["prompt_templates"][0]["sha256"]}
@@ -62,15 +62,16 @@ def test_smoke_run_records_manifest_output_and_report(
 
     report = (run_dir / "report.md").read_text(encoding="utf-8")
     assert "The lamp went out at midnight." in report
-    assert "deepseek-chat" in report
+    assert "deepseek-flash" in report
     assert "smoke@1" in report
 
     [request] = smoke_env.requests
     assert request.path == "/v1/chat/completions"
     assert request.headers["authorization"] == "Bearer test-key"
-    assert request.body["model"] == "deepseek-chat"
+    assert request.body["model"] == "deepseek-flash"
     assert request.body["seed"] == 20261018
     assert request.body["temperature"] == 0.7
+    assert request.body["thinking"] == {"type": "disabled"}
     assert request.body["messages"] == [
         {"role": "system", "content": "You are a concise fiction writer."},
         {

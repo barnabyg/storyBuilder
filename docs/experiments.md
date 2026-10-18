@@ -35,8 +35,9 @@ providers:                  # OpenAI-compatible endpoints
 roles:                      # annotator | planner | prose | critic | judge
   prose:
     provider: deepseek
-    model: deepseek-chat
-    params: {temperature: 0.7, max_tokens: 200}   # passed through to the API
+    model: deepseek-flash
+    params: {thinking: {type: disabled}, temperature: 0.7, max_tokens: 200}
+    # params pass straight through to the API, including provider-specific ones
 
 calls:
   - id: opening-line
@@ -143,7 +144,7 @@ providers:
 roles:
   planner:
     provider: deepseek
-    model: deepseek-chat
+    model: deepseek-flash
     json_schema: null         # optional per-model override of the provider's flag
 
 calls:
@@ -208,7 +209,7 @@ Every config carries a price table and, optionally, caps:
 
 ```yaml
 prices:                     # USD per million tokens, keyed by provider/model
-  deepseek/deepseek-chat: {input_per_mtok: 0.27, output_per_mtok: 1.10}
+  deepseek/deepseek-flash: {input_per_mtok: 0.30, output_per_mtok: 1.20}
   local/llama3.1:8b: {input_per_mtok: 0, output_per_mtok: 0}
 
 budget:
