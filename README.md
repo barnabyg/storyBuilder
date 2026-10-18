@@ -54,8 +54,13 @@ gates still run after a failure, so one run shows every problem. The command
 exits non-zero if any gate failed.
 
 Gate 4 has no separate analyser: ruff's bugbear and bandit rule sets cover
-static bug and security analysis for this codebase. Every suppression is an
-inline `# noqa: <rule>` with its justification beside it.
+static bug and security analysis for this codebase. Every inline suppression
+names what it suppresses (`# noqa: <rule>`, or `# pragma: allowlist secret` for
+a secret-scan false positive) and has its justification beside it.
+The only broader exceptions are the per-file ignores for `tests/**` in
+`pyproject.toml` (assert statements and literal expected values), justified
+there, and the `prompts/checksums.json` secret-scan exclusion, justified in
+`src/nde/verify/steps.py`. The code has no type-checker suppressions.
 
 CI (`.github/workflows/verify.yml`) runs the same command headless on every
 push and pull request.

@@ -17,7 +17,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
-from typing import Any, override
+from typing import Any, cast, override
 
 from nde.verify.runner import Gate, GateObserver, GateResult, RunReport
 
@@ -305,7 +305,8 @@ class Dashboard:
                     event: object = json.loads(self.rfile.read(length))
                     if not isinstance(event, dict):
                         raise ValueError("an event is a JSON object")
-                    dashboard.state.apply(event)  # pyright: ignore[reportUnknownArgumentType]
+                    # json.loads gives str keys; apply() validates the values.
+                    dashboard.state.apply(cast("dict[str, Any]", event))
                 except (ValueError, KeyError, TypeError) as error:
                     self._send(_HTTP_BAD_REQUEST, "text/plain", str(error).encode())
                     return
