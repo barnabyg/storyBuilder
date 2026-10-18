@@ -60,6 +60,11 @@ inline `# noqa: <rule>` with its justification beside it.
 CI (`.github/workflows/verify.yml`) runs the same command headless on every
 push and pull request.
 
+Run locally, `nde-verify` also serves a live dashboard on localhost and prints
+its address as `TEST_DASHBOARD_URL=...`. Turn it off with `--no-dashboard` or
+`NDE_DASHBOARD=0`; it never runs in CI. See
+[docs/verification.md](docs/verification.md).
+
 Line endings are fixed to LF by `.gitattributes`, overriding
 `core.autocrlf` on Windows checkouts.
 

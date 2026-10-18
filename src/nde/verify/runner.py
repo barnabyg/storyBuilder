@@ -9,9 +9,9 @@ import os
 import re
 import subprocess
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Literal, TextIO
+from typing import Literal, Protocol, TextIO
 
 GateStatus = Literal["passed", "failed", "warning"]
 
@@ -52,6 +52,8 @@ class GateResult:
 @dataclass
 class RunReport:
     results: list[GateResult] = field(default_factory=list[GateResult])
+    # Set when an observer raised; the run itself is unaffected.
+    observer_failure: BaseException | None = None
 
     @property
     def passed(self) -> bool:
@@ -62,17 +64,52 @@ def contains_warning(text: str) -> bool:
     return any(pattern.search(text) for pattern in _WARNING_PATTERNS)
 
 
-def _child_env() -> dict[str, str]:
+class GateObserver(Protocol):
+    """Watches a verification run, e.g. the live dashboard. It cannot affect the run."""
+
+    def run_started(self, gates: Sequence[Gate]) -> None: ...
+    def gate_started(self, gate: Gate) -> None: ...
+    def output(self, line: str) -> None: ...
+    def gate_finished(self, result: GateResult) -> None: ...
+    def run_finished(self, report: RunReport) -> None: ...
+
+
+class _SafeObserver:
+    """Forwards to an observer until it first raises, then ignores it.
+
+    Observer failures never reach the run: its output, gate order and result
+    stay exactly what they would be without an observer.
+    """
+
+    def __init__(self, observer: GateObserver | None) -> None:
+        self._observer = observer
+        self.failure: BaseException | None = None
+
+    def notify(self, method: str, *args: object) -> None:
+        if self._observer is None:
+            return
+        try:
+            getattr(self._observer, method)(*args)
+        except Exception as error:
+            self.failure = error
+            self._observer = None
+
+
+def _child_env(extra_env: Mapping[str, str]) -> dict[str, str]:
     env = dict(os.environ)
     # Child Python tools write UTF-8 regardless of the Windows console code page.
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    env.update(extra_env)
     return env
 
 
-def _run_command(command: Command, out: TextIO) -> tuple[int, str]:
+def _run_command(
+    command: Command, out: TextIO, observer: _SafeObserver, extra_env: Mapping[str, str]
+) -> tuple[int, str]:
     out.write(f"$ {command.display()}\n")
     out.flush()
+    observer.notify("output", f"$ {command.display()}")
     try:
         # S603: the commands come from the repository's own gate profile, not user input.
         process = subprocess.Popen(  # noqa: S603
@@ -82,11 +119,12 @@ def _run_command(command: Command, out: TextIO) -> tuple[int, str]:
             text=True,
             encoding="utf-8",
             errors="replace",
-            env=_child_env(),
+            env=_child_env(extra_env),
         )
     except OSError as error:
         message = f"could not start {command.args[0]}: {error}\n"
         out.write(message)
+        observer.notify("output", message.rstrip("\n"))
         return 127, message
 
     lines: list[str] = []
@@ -98,16 +136,24 @@ def _run_command(command: Command, out: TextIO) -> tuple[int, str]:
             lines.append(line)
             out.write(line)
             out.flush()
+            observer.notify("output", line.rstrip("\n"))
         exit_code = process.wait()
     return exit_code, "".join(lines)
 
 
-def run_gate(gate: Gate, out: TextIO) -> GateResult:
+def run_gate(
+    gate: Gate,
+    out: TextIO,
+    observer: _SafeObserver | None = None,
+    extra_env: Mapping[str, str] | None = None,
+) -> GateResult:
     started = time.monotonic()
     outputs: list[str] = []
     exit_code = 0
     for command in gate.commands:
-        exit_code, output = _run_command(command, out)
+        exit_code, output = _run_command(
+            command, out, observer or _SafeObserver(None), extra_env or {}
+        )
         outputs.append(output)
         if exit_code != 0:
             break
@@ -128,15 +174,28 @@ def run_gate(gate: Gate, out: TextIO) -> GateResult:
     )
 
 
-def run_gates(gates: Sequence[Gate], out: TextIO) -> RunReport:
+def run_gates(
+    gates: Sequence[Gate],
+    out: TextIO,
+    *,
+    observer: GateObserver | None = None,
+    extra_env: Mapping[str, str] | None = None,
+) -> RunReport:
+    """Run every gate in order. `extra_env` is added to each command's environment."""
+    safe = _SafeObserver(observer)
     report = RunReport()
+    safe.notify("run_started", gates)
     for index, gate in enumerate(gates, start=1):
         out.write(f"\n=== [{index}/{len(gates)}] {gate.name} ===\n")
         out.flush()
-        result = run_gate(gate, out)
+        safe.notify("gate_started", gate)
+        result = run_gate(gate, out, safe, extra_env)
         report.results.append(result)
         out.write(f"--- {gate.name}: {result.status} ({result.seconds:.1f}s)\n")
+        safe.notify("gate_finished", result)
     _write_summary(report, out)
+    safe.notify("run_finished", report)
+    report.observer_failure = safe.failure
     return report
 
 

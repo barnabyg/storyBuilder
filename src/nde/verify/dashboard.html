@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nde-verify</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+    --pass: #1f7a3a; --fail: #b3261e; --warn: #9a6700; --run: #1f5fa8; --pending: #9a9a93;
+    --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --panel: #1f1f1d; --text: #ecece6; --muted: #a3a39b; --line: #33332f;
+      --pass: #5cc77a; --fail: #f2766c; --warn: #e0b341; --run: #6fa8ec; --pending: #77776f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600;
+       text-transform: uppercase; letter-spacing: .04em; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+           padding: 14px 16px; min-width: 0; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 600;
+           font-size: 13px; color: #fff; background: var(--pending); }
+  .passed { background: var(--pass); } .failed { background: var(--fail); }
+  .warning { background: var(--warn); } .running { background: var(--run); }
+  .waiting, .pending { background: var(--pending); }
+  .meta { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  @media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  ol.gates { list-style: none; margin: 0; padding: 0; }
+  ol.gates li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0;
+                border-bottom: 1px solid var(--line); }
+  ol.gates li:last-child { border-bottom: 0; }
+  .bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden;
+         display: flex; margin: 8px 0; }
+  .bar span { display: block; height: 100%; }
+  .counts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-variant-numeric: tabular-nums; }
+  .mono { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+  pre { margin: 0; max-height: 420px; overflow: auto; font: 12.5px/1.4 var(--mono);
+        white-space: pre-wrap; overflow-wrap: anywhere; }
+  ul.failures { margin: 0; padding-left: 18px; }
+  .notice { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>nde-verify</h1>
+    <span id="status" class="badge waiting">waiting</span>
+    <span class="meta">elapsed <span id="elapsed">0.0</span> s</span>
+    <span class="meta" id="started"></span>
+    <span class="notice" id="notice"></span>
+  </header>
+  <div class="grid">
+    <section class="panel">
+      <h2>Gates</h2>
+      <ol class="gates" id="gates"></ol>
+    </section>
+    <section class="panel">
+      <h2>Tests</h2>
+      <div class="bar" id="bar"></div>
+      <div class="counts" id="counts">No test progress yet.</div>
+      <p class="mono" id="current"></p>
+      <h2>Failures</h2>
+      <ul class="failures" id="failures"><li class="notice">None so far.</li></ul>
+    </section>
+  </div>
+  <section class="panel">
+    <h2>Recent output</h2>
+    <pre id="output"></pre>
+  </section>
+</main>
+<script>
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  let lastVersion = -1;
+  let finished = false;
+
+  function el(tag, attrs, text) {
+    const node = document.createElement(tag);
+    Object.assign(node, attrs || {});
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function render(state) {
+    $("status").textContent = state.status;
+    $("status").className = "badge " + state.status;
+    $("elapsed").textContent = state.elapsed_s.toFixed(1);
+    $("started").textContent = state.started_at ? "started " + state.started_at : "";
+
+    const gates = $("gates");
+    gates.replaceChildren(...state.gates.map((gate) => {
+      const item = el("li");
+      item.append(el("span", {}, gate.name));
+      const right = el("span");
+      if (gate.seconds !== null) right.append(el("span", { className: "meta" }, gate.seconds.toFixed(1) + " s "));
+      right.append(el("span", { className: "badge " + gate.status }, gate.status));
+      item.append(right);
+      return item;
+    }));
+
+    const t = state.tests;
+    const total = t.collected || 0;
+    const bar = $("bar");
+    bar.replaceChildren();
+    if (total > 0) {
+      for (const [count, cls] of [[t.passed, "passed"], [t.failed, "failed"], [t.skipped, "pending"]]) {
+        bar.append(el("span", { className: cls, style: "width:" + (100 * count / total) + "%" }));
+      }
+      $("counts").textContent =
+        `${t.done} / ${total} done · ${t.passed} passed · ${t.failed} failed · ${t.skipped} skipped`;
+    }
+    $("current").textContent = t.current ? "running " + t.current : "";
+
+    const failures = [
+      ...state.failures.map((f) => `gate ${f.gate}: ${f.status}`),
+      ...t.failures.map((id) => `test ${id}`),
+    ];
+    $("failures").replaceChildren(...(failures.length
+      ? failures.map((text) => el("li", { className: "mono" }, text))
+      : [el("li", { className: "notice" }, "None so far.")]));
+
+    const output = $("output");
+    const atBottom = output.scrollTop + output.clientHeight >= output.scrollHeight - 4;
+    output.textContent = state.output.join("\n");
+    if (atBottom) output.scrollTop = output.scrollHeight;
+
+    finished = state.status === "passed" || state.status === "failed";
+  }
+
+  async function poll() {
+    try {
+      const response = await fetch("/api/state", { cache: "no-store" });
+      const state = await response.json();
+      if (state.version !== lastVersion) {
+        lastVersion = state.version;
+        render(state);
+      } else {
+        $("elapsed").textContent = state.elapsed_s.toFixed(1);
+      }
+      $("notice").textContent = "";
+    } catch (error) {
+      $("notice").textContent = finished
+        ? "Verification finished; the dashboard server has closed."
+        : "Waiting for the dashboard server…";
+      if (finished) return;
+    }
+    setTimeout(poll, 500);
+  }
+  poll();
+</script>
+</body>
+</html>

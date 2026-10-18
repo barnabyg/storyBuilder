@@ -44,7 +44,14 @@ def canonical_profile() -> list[Gate]:
                 ),
             ),
         ),
-        Gate("tests", (_python_module("pytest", "-p", "no:cacheprovider"),)),
+        Gate(
+            "tests",
+            (
+                _python_module(
+                    "pytest", "-p", "no:cacheprovider", "-p", "nde.verify.pytest_reporter"
+                ),
+            ),
+        ),
         Gate(
             "dependencies-and-secrets",
             (
