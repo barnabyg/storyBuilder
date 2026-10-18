@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from nde.llm.cache import CacheMode, CacheStats, ResponseCache, cache_key
 from nde.llm.client import ChatRequest, ChatResult, Message, OpenAICompatibleClient
 from nde.llm.config import ModelBinding, ProviderConfig
+from nde.llm.ledger import CostLedger, Pricing
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,8 @@ class Completion:
     seed: int
     result: ChatResult
     cached: bool
+    # New spend: zero for a cache hit.
+    cost_usd: float
 
     @property
     def text(self) -> str:
@@ -37,6 +40,8 @@ class Gateway:
     cache: ResponseCache | None = None
     cache_mode: CacheMode = "use"
     cache_stats: CacheStats = field(default_factory=CacheStats)
+    pricing: Pricing = field(default_factory=lambda: Pricing({}))
+    ledger: CostLedger | None = None
     _clients: dict[str, OpenAICompatibleClient] = field(
         default_factory=dict[str, OpenAICompatibleClient]
     )
@@ -47,6 +52,8 @@ class Gateway:
         self._clients.clear()
         if self.cache is not None:
             self.cache.close()
+        if self.ledger is not None:
+            self.ledger.close()
 
     def _client(self, provider: str) -> OpenAICompatibleClient:
         if provider not in self._clients:
@@ -69,9 +76,27 @@ class Gateway:
             stored = cache.get(key)
             if stored is not None:
                 self.cache_stats.hits += 1
-                return Completion(binding, prompt, seed, stored, cached=True)
+                return Completion(binding, prompt, seed, stored, cached=True, cost_usd=0.0)
         self.cache_stats.misses += 1
-        result = self._client(binding.provider).chat(request)
+        reservation = (
+            self.ledger.reserve(self.pricing.estimate(binding.label, request))
+            if self.ledger is not None
+            else None
+        )
+        cost = 0.0
+        try:
+            result = self._client(binding.provider).chat(request)
+            cost = self._token_cost(binding, result)
+        finally:
+            if self.ledger is not None and reservation is not None:
+                self.ledger.settle(reservation, cost)
         if cache is not None:
             cache.put(key, request, result)
-        return Completion(binding, prompt, seed, result, cached=False)
+        return Completion(binding, prompt, seed, result, cached=False, cost_usd=cost)
+
+    def _token_cost(self, binding: ModelBinding, result: ChatResult) -> float:
+        return self.pricing.cost(binding.label, result.input_tokens, result.output_tokens)
+
+    def token_cost(self, completion: "Completion") -> float:
+        """What a completion's tokens cost at list price, whether or not it was cached."""
+        return self._token_cost(completion.binding, completion.result)

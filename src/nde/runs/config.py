@@ -14,6 +14,7 @@ import yaml
 from pydantic import Field, ValidationError, model_validator
 
 from nde.llm.config import ModelBinding, ProviderConfig, Strict
+from nde.llm.ledger import DEFAULT_ASSUMED_OUTPUT_TOKENS, Price
 
 type RoleName = Literal["annotator", "planner", "prose", "critic", "judge"]
 
@@ -39,6 +40,16 @@ class CallSpec(Strict):
     repeat: int = Field(default=1, ge=1)
 
 
+class BudgetConfig(Strict):
+    per_run_usd: float | None = Field(default=None, ge=0)
+    per_day_usd: float | None = Field(default=None, ge=0)
+    # Unpriced models are rejected unless allowed; their calls then cost $0 and
+    # are invisible to the caps, and the run records a warning.
+    allow_unpriced_models: bool = False
+    # Output tokens assumed when estimating a call that sets no max_tokens.
+    assumed_output_tokens: int = Field(default=DEFAULT_ASSUMED_OUTPUT_TOKENS, ge=1)
+
+
 class ExperimentConfig(Strict):
     name: str
     seed: int
@@ -47,6 +58,9 @@ class ExperimentConfig(Strict):
     providers: dict[str, ProviderConfig]
     roles: dict[RoleName, ModelBinding]
     calls: list[CallSpec] = Field(min_length=1)
+    # USD per million tokens, keyed by "provider/model".
+    prices: dict[str, Price] = Field(default_factory=dict[str, Price])
+    budget: BudgetConfig = Field(default_factory=BudgetConfig)
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:
@@ -59,7 +73,24 @@ class ExperimentConfig(Strict):
         ids = [call.id for call in self.calls]
         if len(set(ids)) != len(ids):
             raise ValueError("call ids must be unique")
+        if not self.budget.allow_unpriced_models and self.unpriced_models():
+            raise ValueError("; ".join(self.unpriced_warnings()))
         return self
+
+    def used_bindings(self) -> list[ModelBinding]:
+        """Every model binding some call uses, once each, in call order."""
+        bindings = {self.roles[call.role].label: self.roles[call.role] for call in self.calls}
+        return list(bindings.values())
+
+    def unpriced_models(self) -> list[str]:
+        return [b.label for b in self.used_bindings() if b.label not in self.prices]
+
+    def unpriced_warnings(self) -> list[str]:
+        return [
+            f"model {label} has no price; add it to `prices` or set "
+            "budget.allow_unpriced_models (its calls then cost $0 and bypass the caps)"
+            for label in self.unpriced_models()
+        ]
 
 
 @dataclass(frozen=True)

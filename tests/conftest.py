@@ -42,6 +42,7 @@ def base_config(base_url: str) -> dict[str, Any]:
                 "variables": {"setting": "a quiet harbour"},
             }
         ],
+        "prices": {"fake/fake-model": {"input_per_mtok": 0.1, "output_per_mtok": 0.2}},
     }
 
 

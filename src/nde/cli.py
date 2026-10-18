@@ -9,6 +9,7 @@ from pathlib import Path
 from nde import __version__
 from nde.env import load_dotenv
 from nde.llm.cache import DEFAULT_CACHE_PATH
+from nde.llm.ledger import DEFAULT_LEDGER_PATH
 from nde.runs import prompts
 from nde.runs.config import ConfigError
 from nde.runs.records import read_manifest
@@ -36,6 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path(os.environ.get("NDE_CACHE", DEFAULT_CACHE_PATH)),
         help="response cache file (env NDE_CACHE, default .nde/cache.sqlite)",
+    )
+    run.add_argument(
+        "--ledger",
+        type=Path,
+        default=Path(os.environ.get("NDE_LEDGER", DEFAULT_LEDGER_PATH)),
+        help="cost ledger with the daily totals (env NDE_LEDGER, default .nde/ledger.sqlite)",
     )
     cache_mode = run.add_mutually_exclusive_group()
     cache_mode.add_argument(
@@ -70,6 +77,7 @@ def _run(args: argparse.Namespace) -> int:
         environ=dict(os.environ),
         cache_path=args.cache,
         cache_mode=args.cache_mode,
+        ledger_path=args.ledger,
     )
     try:
         run_dir = run_experiment(args.config, options)

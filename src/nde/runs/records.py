@@ -45,6 +45,19 @@ class CacheSummary(_Record):
     misses: int = 0
 
 
+class CostSummary(_Record):
+    input_tokens: int = 0
+    output_tokens: int = 0
+    # New spend in this run; cache hits cost nothing.
+    usd: float = 0.0
+    # What every call's tokens cost at list price, cached or not.
+    token_cost_usd: float = 0.0
+    per_run_cap_usd: float | None = None
+    per_day_cap_usd: float | None = None
+    # Spent today (UTC) across every run sharing the ledger, as of the end of this run.
+    day_spent_usd: float | None = None
+
+
 class Manifest(_Record):
     name: str
     status: RunStatus
@@ -56,8 +69,13 @@ class Manifest(_Record):
     models: list[ModelUse]
     prompt_templates: list[TemplateUse]
     cache: CacheSummary
+    cost: CostSummary
     started_at: str
     finished_at: str | None = None
+    # Why an aborted run stopped, e.g. "budget".
+    abort_reason: str | None = None
+    abort_message: str | None = None
+    warnings: list[str] = Field(default_factory=list[str])
     files: dict[str, str] = Field(
         default_factory=lambda: {"outputs": OUTPUTS, "calls": CALLS, "report": REPORT}
     )
@@ -87,6 +105,10 @@ class CallRecord(_Record):
     output_tokens: int
     latency_s: float
     cached: bool
+    # New spend: zero for a cache hit.
+    cost_usd: float
+    # What the call's tokens cost at list price, cached or not.
+    token_cost_usd: float
 
 
 def write_jsonl(path: Path, records: list[OutputRecord] | list[CallRecord]) -> None:

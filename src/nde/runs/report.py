@@ -3,7 +3,14 @@
 from pathlib import Path
 
 from nde.files import write_text_lf
-from nde.runs.records import REPORT, read_calls, read_manifest, read_outputs
+from nde.runs.records import (
+    REPORT,
+    CallRecord,
+    Manifest,
+    read_calls,
+    read_manifest,
+    read_outputs,
+)
 
 
 def render_report(run_dir: Path) -> str:
@@ -13,7 +20,7 @@ def render_report(run_dir: Path) -> str:
     lines = [
         f"# Run report: {manifest.name}",
         "",
-        f"- **Status:** {manifest.status}",
+        f"- **Status:** {_status(manifest)}",
         f"- **Started:** {manifest.started_at}",
         f"- **Finished:** {manifest.finished_at or '-'}",
         f"- **Git SHA:** `{manifest.git_sha}`{' (dirty)' if manifest.git_dirty else ''}",
@@ -47,21 +54,68 @@ def render_report(run_dir: Path) -> str:
             *_quote(output.text),
             "",
         ]
+    lines += _cost_section(manifest, calls)
     lines += [
         "## Calls",
         "",
-        "| Call | Model | Template | Seed | Cached | Input tokens | Output tokens | Latency (s) |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Call | Model | Template | Seed | Cached | Input tokens | Output tokens "
+        "| Cost | Latency (s) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         *(
             f"| {call.call} #{call.repetition + 1} | {call.response_model} "
             f"| {call.template}@{call.template_version} | {call.seed} "
             f"| {'yes' if call.cached else 'no'} "
-            f"| {call.input_tokens} | {call.output_tokens} | {call.latency_s:.2f} |"
+            f"| {call.input_tokens} | {call.output_tokens} | {_usd(call.cost_usd)} "
+            f"| {call.latency_s:.2f} |"
             for call in calls
         ),
         "",
     ]
     return "\n".join(lines)
+
+
+def _status(manifest: Manifest) -> str:
+    if manifest.abort_reason:
+        return f"{manifest.status}: {manifest.abort_reason} - {manifest.abort_message}"
+    return manifest.status
+
+
+def _usd(value: float | None) -> str:
+    return "-" if value is None else f"${value:.4f}"
+
+
+def _cost_section(manifest: Manifest, calls: list[CallRecord]) -> list[str]:
+    cost = manifest.cost
+    per_model: dict[str, list[CallRecord]] = {}
+    for call in calls:
+        per_model.setdefault(f"{call.provider}/{call.model}", []).append(call)
+    lines = [
+        "## Cost",
+        "",
+        f"- New spend this run: {_usd(cost.usd)}",
+        f"- Token cost at list price, including cache hits: {_usd(cost.token_cost_usd)}",
+        f"- Tokens: {cost.input_tokens} input, {cost.output_tokens} output",
+        f"- Per-run cap: {_usd(cost.per_run_cap_usd)}; per-day cap: {_usd(cost.per_day_cap_usd)}",
+        f"- Spent today (UTC, all runs): {_usd(cost.day_spent_usd)}",
+        "",
+    ]
+    if per_model:
+        lines += [
+            "| Model | Calls | Cache hits | Input tokens | Output tokens "
+            "| New spend | Token cost |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+            *(
+                f"| {label} | {len(items)} | {sum(c.cached for c in items)} "
+                f"| {sum(c.input_tokens for c in items)} | {sum(c.output_tokens for c in items)} "
+                f"| {_usd(sum(c.cost_usd for c in items))} "
+                f"| {_usd(sum(c.token_cost_usd for c in items))} |"
+                for label, items in per_model.items()
+            ),
+            "",
+        ]
+    if manifest.warnings:
+        lines += ["### Warnings", "", *(f"- {warning}" for warning in manifest.warnings), ""]
+    return lines
 
 
 def _quote(text: str) -> list[str]:

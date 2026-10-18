@@ -9,6 +9,7 @@ from pathlib import Path
 
 from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
 from nde.llm.gateway import Gateway, Prompt
+from nde.llm.ledger import DEFAULT_LEDGER_PATH, BudgetExceededError, CostLedger, Pricing
 from nde.runs.config import CallSpec, ConfigError, LoadedConfig, RoleName, load_config
 from nde.runs.prompts import PromptTemplate, load_template
 from nde.runs.records import (
@@ -16,6 +17,7 @@ from nde.runs.records import (
     OUTPUTS,
     CacheSummary,
     CallRecord,
+    CostSummary,
     Manifest,
     ModelUse,
     OutputRecord,
@@ -38,6 +40,7 @@ class RunOptions:
     environ: Mapping[str, str]
     cache_path: Path = DEFAULT_CACHE_PATH
     cache_mode: CacheMode = "use"
+    ledger_path: Path = DEFAULT_LEDGER_PATH
     clock: Clock = utc_now
 
 
@@ -121,6 +124,10 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
             mode=options.cache_mode,
             path=None if options.cache_mode == "bypass" else str(options.cache_path),
         ),
+        cost=CostSummary(
+            per_run_cap_usd=config.budget.per_run_usd, per_day_cap_usd=config.budget.per_day_usd
+        ),
+        warnings=config.unpriced_warnings(),
         started_at=started.isoformat(),
     )
 
@@ -160,8 +167,17 @@ def _run_call(
             output_tokens=result.output_tokens,
             latency_s=result.latency_s,
             cached=completion.cached,
+            cost_usd=completion.cost_usd,
+            token_cost_usd=gateway.token_cost(completion),
         )
     )
+
+
+def _summarise_costs(summary: CostSummary, calls: list[CallRecord]) -> None:
+    summary.input_tokens = sum(call.input_tokens for call in calls)
+    summary.output_tokens = sum(call.output_tokens for call in calls)
+    summary.usd = sum(call.cost_usd for call in calls)
+    summary.token_cost_usd = sum(call.token_cost_usd for call in calls)
 
 
 def execute(prepared: PreparedRun, options: RunOptions) -> Path:
@@ -177,14 +193,28 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
         environ=options.environ,
         cache=None if options.cache_mode == "bypass" else ResponseCache(options.cache_path),
         cache_mode=options.cache_mode,
+        pricing=Pricing(config.prices, config.budget.assumed_output_tokens),
+        ledger=CostLedger(
+            options.ledger_path,
+            per_run_usd=config.budget.per_run_usd,
+            per_day_usd=config.budget.per_day_usd,
+            clock=options.clock,
+        ),
     )
     try:
         for call in config.calls:
             for repetition in range(call.repeat):
                 _run_call(gateway, prepared, call, repetition, state)
         manifest.status = "succeeded"
+    except BudgetExceededError as error:
+        manifest.status = "aborted"
+        manifest.abort_reason = "budget"
+        manifest.abort_message = str(error)
     finally:
+        if gateway.ledger is not None:
+            manifest.cost.day_spent_usd = gateway.ledger.day_spent()
         gateway.close()
+        _summarise_costs(manifest.cost, state.calls)
         manifest.cache.hits = gateway.cache_stats.hits
         manifest.cache.misses = gateway.cache_stats.misses
         if manifest.status == "running":

@@ -28,3 +28,12 @@ calls:
     prompt: {template: smoke, version: 1}
     variables:
       setting: a lighthouse in a storm
+
+# USD per million tokens, per provider/model. Prices change: check the
+# provider's current price list before relying on these numbers.
+prices:
+  deepseek/deepseek-chat: {input_per_mtok: 0.27, output_per_mtok: 1.10}
+
+budget:
+  per_run_usd: 0.01
+  per_day_usd: 1.00
