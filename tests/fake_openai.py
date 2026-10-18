@@ -6,6 +6,7 @@ with a default completion. Every request body is recorded for assertions.
 
 import json
 import threading
+import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -21,6 +22,8 @@ class Reply:
     body: Json | str = field(default_factory=dict[str, Any])
     headers: tuple[tuple[str, str], ...] = ()
     drop_connection: bool = False
+    # Seconds to wait before answering, to provoke client timeouts.
+    delay_s: float = 0.0
 
 
 def completion(
@@ -128,6 +131,8 @@ class FakeOpenAI:
                     body=json.loads(raw) if raw else {},
                 )
                 reply = fake.next_reply(request)
+                if reply.delay_s:
+                    time.sleep(reply.delay_s)
                 if reply.drop_connection:
                     self.close_connection = True
                     self.connection.close()

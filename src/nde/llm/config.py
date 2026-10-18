@@ -9,6 +9,18 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+class RetryConfig(Strict):
+    """Retries for rate-limited and transient failures: exponential backoff, full jitter.
+
+    Retry n (from 0) waits a random time up to min(max_delay_s, base_delay_s * 2**n),
+    and never less than a rate limit's Retry-After (still capped at max_delay_s).
+    """
+
+    max_retries: int = Field(default=3, ge=0)
+    base_delay_s: float = Field(default=1.0, ge=0)
+    max_delay_s: float = Field(default=30.0, ge=0)
+
+
 class ProviderConfig(Strict):
     base_url: str
     # Environment variable that, when set, overrides base_url.
@@ -18,6 +30,7 @@ class ProviderConfig(Strict):
     timeout_s: float = Field(default=60.0, gt=0)
     # Whether the provider supports JSON-schema response mode (`response_format`).
     json_schema: bool = False
+    retry: RetryConfig = Field(default_factory=RetryConfig)
 
     def resolved_base_url(self, environ: Mapping[str, str]) -> str:
         if self.base_url_env and environ.get(self.base_url_env):

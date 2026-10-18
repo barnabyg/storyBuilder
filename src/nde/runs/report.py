@@ -62,14 +62,14 @@ def render_report(run_dir: Path) -> str:
         "## Calls",
         "",
         "| Call | Attempt | Model | Template | Seed | Cached | Input tokens | Output tokens "
-        "| Cost | Latency (s) |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Cost | Latency (s) | Retries |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         *(
             f"| {call.call} #{call.repetition + 1} | {call.attempt + 1} | {call.reported_model} "
             f"| {call.template}@{call.template_version} | {call.seed} "
             f"| {'yes' if call.cached else 'no'} "
             f"| {call.input_tokens} | {call.output_tokens} | {_usd(call.cost_usd)} "
-            f"| {call.latency_s:.2f} |"
+            f"| {call.latency_s:.2f} | {call.retries} |"
             for call in calls
         ),
         "",
@@ -80,6 +80,9 @@ def render_report(run_dir: Path) -> str:
 def _status(manifest: Manifest) -> str:
     if manifest.abort_reason:
         return f"{manifest.status}: {manifest.abort_reason} - {manifest.abort_message}"
+    if manifest.error:
+        where = f" (call `{manifest.error.call}`)" if manifest.error.call else ""
+        return f"{manifest.status}: {manifest.error.type}{where} - {manifest.error.message}"
     return manifest.status
 
 

@@ -71,6 +71,61 @@ uv run nde prompts lock
 `nde prompts lock` never re-records a changed version; it reports it and
 exits 2.
 
+## Provider failures and retries
+
+Each provider has a retry policy for rate limits and transient failures:
+
+```yaml
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    timeout_s: 60
+    retry:
+      max_retries: 3          # retries after the first attempt
+      base_delay_s: 1.0
+      max_delay_s: 30.0
+```
+
+Retry *n* (from 0) waits a random time up to
+`min(max_delay_s, base_delay_s * 2**n)` (exponential backoff with full
+jitter); a rate limit's `Retry-After` header sets a minimum wait, still capped
+at `max_delay_s`. Every provider failure is mapped to one of these types:
+
+| Type | Retried | Typical cause |
+| --- | --- | --- |
+| `rate_limited` | yes | HTTP 429 |
+| `transient` | yes | HTTP 408, 409 or 5xx; timeouts; dropped or refused connections; garbled replies |
+| `authentication` | no | HTTP 401 or 403 |
+| `invalid_request` | no | other HTTP 4xx, such as an unknown model or a bad parameter |
+| `content_refused` | no | a provider content filter (error code or `finish_reason`) |
+
+A call that still fails after its retries, or fails with a non-retryable
+error, stops the run. The run directory records `status: failed` with
+`error.type`, the message, the call that failed and the HTTP status. The
+outputs completed so far and the report are still written, and `nde run`
+exits 1 without a stack trace. `calls.jsonl` records how many retries each
+successful call needed.
+
+## Local models
+
+A local OpenAI-compatible server is just another provider.
+`configs/local-ollama.yaml` runs the smoke experiment against Ollama:
+
+```powershell
+ollama pull llama3.1:8b
+uv run nde run configs/local-ollama.yaml
+```
+
+The provider has no `api_key_env`, a long `timeout_s` for the first call
+(which loads the model), and a zero price. For llama.cpp, start
+`llama-server -m model.gguf --port 8080`, set
+`NDE_LOCAL_BASE_URL=http://localhost:8080/v1`, and set the role's model to the
+name the server reports at `/v1/models`.
+
+`uv run pytest -m live` includes a test that runs this config against a local
+server when one answers at the configured URL (using whichever model it has),
+and skips otherwise.
+
 ## Structured output
 
 A call can ask for a response that conforms to a Pydantic model:
@@ -192,7 +247,7 @@ Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
 | --- | --- |
 | `manifest.json` | git SHA (and whether the tree was dirty), config path and hash, seed, models per role, prompt template versions and checksums, timestamps and run status |
 | `outputs.jsonl` | one line per call: call ID, repetition, model, seed and the raw output text |
-| `calls.jsonl` | one line per call: the provider's reported model ID, template, tokens, cost, latency and whether it was a cache hit |
+| `calls.jsonl` | one line per provider call (including repair attempts): the reported model ID, template, tokens, cost, latency, retries and whether it was a cache hit |
 | `report.md` | generated from the files above |
 
 Regenerate a report with `uv run nde report <run dir>`.

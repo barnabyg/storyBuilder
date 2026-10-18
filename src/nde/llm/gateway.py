@@ -1,6 +1,9 @@
 """The gateway: every LLM call in the project goes through `Gateway`."""
 
-from collections.abc import Mapping
+import random
+import secrets
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -9,7 +12,8 @@ from pydantic import BaseModel, ValidationError
 from nde.llm import structured
 from nde.llm.cache import CacheMode, CacheStats, ResponseCache, cache_key
 from nde.llm.client import ChatRequest, ChatResult, Message, OpenAICompatibleClient
-from nde.llm.config import ModelBinding, ProviderConfig
+from nde.llm.config import ModelBinding, ProviderConfig, RetryConfig
+from nde.llm.errors import ProviderError, RateLimitedError
 from nde.llm.ledger import CostLedger, Pricing
 from nde.llm.structured import StructuredOutputError, StructuredResult
 
@@ -32,6 +36,8 @@ class Completion:
     cached: bool
     # New spend: zero for a cache hit.
     cost_usd: float
+    # Retries after rate-limited or transient failures before the call succeeded.
+    retries: int = 0
 
     @property
     def text(self) -> str:
@@ -49,6 +55,8 @@ class Gateway:
     ledger: CostLedger | None = None
     # Every completion this gateway has returned, in order, including repair attempts.
     history: list[Completion] = field(default_factory=list[Completion])
+    sleep: Callable[[float], None] = time.sleep
+    jitter: random.Random = field(default_factory=secrets.SystemRandom)
     _clients: dict[str, OpenAICompatibleClient] = field(
         default_factory=dict[str, OpenAICompatibleClient]
     )
@@ -118,7 +126,7 @@ class Gateway:
         )
         cost = 0.0
         try:
-            result = self._client(binding.provider).chat(request)
+            result, retries = self._chat_with_retries(binding.provider, request)
             cost = self._token_cost(binding, result)
         finally:
             if self.ledger is not None and reservation is not None:
@@ -126,7 +134,30 @@ class Gateway:
         if self.cache is not None and self.cache_mode != "bypass":
             key = cache_key(binding.provider, prompt.template, prompt.version, request)
             self.cache.put(key, request, result)
-        return Completion(binding, prompt, seed, result, cached=False, cost_usd=cost)
+        return Completion(
+            binding, prompt, seed, result, cached=False, cost_usd=cost, retries=retries
+        )
+
+    def _chat_with_retries(self, provider: str, request: ChatRequest) -> tuple[ChatResult, int]:
+        """Call the provider, retrying retryable errors under its policy."""
+        policy = self.providers[provider].retry
+        client = self._client(provider)
+        retry = 0
+        while True:
+            try:
+                return client.chat(request), retry
+            except ProviderError as error:
+                if not error.retryable or retry >= policy.max_retries:
+                    raise
+                self.sleep(self._backoff(policy, retry, error))
+            retry += 1
+
+    def _backoff(self, policy: RetryConfig, retry: int, error: ProviderError) -> float:
+        ceiling = min(policy.max_delay_s, policy.base_delay_s * 2**retry)
+        delay = self.jitter.uniform(0, ceiling)
+        if isinstance(error, RateLimitedError) and error.retry_after_s is not None:
+            delay = max(delay, min(error.retry_after_s, policy.max_delay_s))
+        return delay
 
     def _token_cost(self, binding: ModelBinding, result: ChatResult) -> float:
         return self.pricing.cost(binding.label, result.input_tokens, result.output_tokens)

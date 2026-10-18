@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
+from nde.llm.errors import ProviderError
 from nde.llm.gateway import Completion, Gateway, Prompt
 from nde.llm.ledger import DEFAULT_LEDGER_PATH, BudgetExceededError, CostLedger, Pricing
 from nde.llm.structured import StructuredOutputError
@@ -22,6 +23,7 @@ from nde.runs.records import (
     Manifest,
     ModelUse,
     OutputRecord,
+    RunError,
     StructuredMetrics,
     TemplateUse,
     write_jsonl,
@@ -58,6 +60,8 @@ class RunState:
     outputs: list[OutputRecord] = field(default_factory=list[OutputRecord])
     calls: list[CallRecord] = field(default_factory=list[CallRecord])
     structured: dict[str, StructuredMetrics] = field(default_factory=dict[str, StructuredMetrics])
+    # The call in progress, for failure records.
+    current_call: str | None = None
 
 
 def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
@@ -202,6 +206,7 @@ def _call_record(
         latency_s=result.latency_s,
         cached=completion.cached,
         cost_usd=completion.cost_usd,
+        retries=completion.retries,
         token_cost_usd=gateway.token_cost(completion),
     )
 
@@ -237,12 +242,22 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
     try:
         for call in config.calls:
             for repetition in range(call.repeat):
+                state.current_call = call.id
                 _run_call(gateway, prepared, call, repetition, state)
         manifest.status = "succeeded"
     except BudgetExceededError as error:
         manifest.status = "aborted"
         manifest.abort_reason = "budget"
         manifest.abort_message = str(error)
+    except ProviderError as error:
+        manifest.status = "failed"
+        manifest.error = RunError(
+            type=error.kind, message=str(error), call=state.current_call, status=error.status
+        )
+    except BaseException as error:
+        # A bug, or an interrupt: still leave a manifest and report behind, then re-raise.
+        manifest.error = RunError(type="internal", message=repr(error), call=state.current_call)
+        raise
     finally:
         if gateway.ledger is not None:
             manifest.cost.day_spent_usd = gateway.ledger.day_spent()

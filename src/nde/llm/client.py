@@ -3,10 +3,19 @@
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import httpx
 from pydantic import JsonValue
+
+from nde.llm.errors import (
+    AuthenticationError,
+    ContentRefusedError,
+    InvalidRequestError,
+    ProviderError,
+    RateLimitedError,
+    TransientError,
+)
 
 
 class Message(TypedDict):
@@ -45,16 +54,17 @@ class ChatResult:
     latency_s: float
 
 
-class ProviderResponseError(Exception):
-    """The provider answered, but not with a usable completion."""
-
-    def __init__(self, message: str, *, status: int | None = None, body: str = "") -> None:
-        super().__init__(message)
-        self.status = status
-        self.body = body
+# Error codes providers use for content-policy refusals.
+_CONTENT_REFUSAL_CODES = {"content_filter", "content_policy_violation"}
+_RETRYABLE_CLIENT_STATUSES = {408, 409}
+_TOO_MANY_REQUESTS = 429
+_FIRST_SERVER_ERROR = 500
+_AUTHENTICATION_STATUSES = {401, 403}
 
 
 class OpenAICompatibleClient:
+    """Makes one chat-completion request; every failure raises a common ProviderError."""
+
     def __init__(self, base_url: str, *, api_key: str | None, timeout_s: float) -> None:
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._http = httpx.Client(
@@ -66,15 +76,55 @@ class OpenAICompatibleClient:
 
     def chat(self, request: ChatRequest) -> ChatResult:
         started = time.monotonic()
-        response = self._http.post("chat/completions", json=request.body())
+        try:
+            response = self._http.post("chat/completions", json=request.body())
+        except httpx.TimeoutException as error:
+            raise TransientError(f"request timed out: {error!r}") from error
+        except (httpx.NetworkError, httpx.RemoteProtocolError) as error:
+            raise TransientError(f"connection failed: {error!r}") from error
+        except httpx.HTTPError as error:
+            raise InvalidRequestError(f"request could not be sent: {error!r}") from error
         latency = time.monotonic() - started
         if not response.is_success:
-            raise ProviderResponseError(
-                f"HTTP {response.status_code} from provider",
-                status=response.status_code,
-                body=response.text,
-            )
-        return _parse_completion(response, request.model, latency)
+            raise _status_error(response)
+        result = _parse_completion(response, request.model, latency)
+        if result.finish_reason == "content_filter":
+            raise ContentRefusedError("the provider's content filter stopped the response")
+        return result
+
+
+def _error_details(response: httpx.Response) -> tuple[str, str | None]:
+    try:
+        error: object = response.json().get("error")
+    except (ValueError, AttributeError):
+        error = None
+    if isinstance(error, dict):
+        details = cast("dict[str, Any]", error)
+        code = details.get("code")
+        return str(details.get("message") or response.text), str(code) if code else None
+    return response.text[:500], None
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    try:
+        return float(response.headers["Retry-After"])
+    except (KeyError, ValueError):
+        return None
+
+
+def _status_error(response: httpx.Response) -> ProviderError:
+    status = response.status_code
+    message, code = _error_details(response)
+    text = f"HTTP {status}: {message}"
+    if status == _TOO_MANY_REQUESTS:
+        return RateLimitedError(text, status=status, retry_after_s=_retry_after(response))
+    if status >= _FIRST_SERVER_ERROR or status in _RETRYABLE_CLIENT_STATUSES:
+        return TransientError(text, status=status)
+    if status in _AUTHENTICATION_STATUSES:
+        return AuthenticationError(text, status=status)
+    if code in _CONTENT_REFUSAL_CODES:
+        return ContentRefusedError(text, status=status)
+    return InvalidRequestError(text, status=status)
 
 
 def _parse_completion(response: httpx.Response, requested_model: str, latency: float) -> ChatResult:
@@ -92,8 +142,7 @@ def _parse_completion(response: httpx.Response, requested_model: str, latency: f
             latency_s=latency,
         )
     except (ValueError, KeyError, IndexError, TypeError, AttributeError) as error:
-        raise ProviderResponseError(
-            f"malformed completion from provider: {error!r}",
-            status=response.status_code,
-            body=response.text,
+        # A garbled 200 is a provider glitch, so it is retried like other transient failures.
+        raise TransientError(
+            f"malformed completion from provider: {error!r}", status=response.status_code
         ) from error

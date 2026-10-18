@@ -82,6 +82,17 @@ class StructuredMetrics(_Record):
         self.repair_rate = self.repaired_calls / self.calls
 
 
+class RunError(_Record):
+    """Why a run failed: a common provider error type (see nde.llm.errors) or "internal"."""
+
+    type: str
+    message: str
+    # The call that was running when the run failed.
+    call: str | None = None
+    # The provider's HTTP status, when it answered.
+    status: int | None = None
+
+
 class Manifest(_Record):
     name: str
     status: RunStatus
@@ -99,6 +110,8 @@ class Manifest(_Record):
     # Why an aborted run stopped, e.g. "budget".
     abort_reason: str | None = None
     abort_message: str | None = None
+    # Set when status is "failed".
+    error: RunError | None = None
     warnings: list[str] = Field(default_factory=list[str])
     # Per "provider/model": validity of structured (response-model) calls.
     structured: dict[str, StructuredMetrics] = Field(default_factory=dict[str, StructuredMetrics])
@@ -138,6 +151,8 @@ class CallRecord(_Record):
     output_tokens: int
     latency_s: float
     cached: bool
+    # Retries after rate-limited or transient failures before this call succeeded.
+    retries: int = 0
     # New spend: zero for a cache hit.
     cost_usd: float
     # What the call's tokens cost at list price, cached or not.
