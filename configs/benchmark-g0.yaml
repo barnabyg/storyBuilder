@@ -35,9 +35,12 @@ benchmark:
   role: planner
   threshold: 0.95             # validity after repair needed to pass G0
   candidates:
+    # deepseek-flash (DeepSeek-V4.1-Flash) thinks by default and then ignores
+    # temperature; thinking is disabled to match gpt-6-luna's
+    # reasoning_effort "none".
     - provider: deepseek
-      model: deepseek-chat
-      params: {temperature: 0.7, max_tokens: 3000}
+      model: deepseek-flash
+      params: {thinking: {type: disabled}, temperature: 0.7, max_tokens: 3000}
     # gpt-6-luna is a reasoning model. In Chat Completions it takes
     # max_completion_tokens instead of max_tokens, and accepts a non-default
     # temperature only with reasoning_effort "none", which also matches the
@@ -75,7 +78,9 @@ structured:
 
 # USD per million tokens, per provider/model. CHECK BEFORE RUNNING.
 prices:
-  deepseek/deepseek-chat: {input_per_mtok: 0.27, output_per_mtok: 1.10}
+  # DeepSeek pricing page, checked 2026-10-18: peak rates (off-peak is half),
+  # cache-miss input, so recorded costs and budget checks err on the high side.
+  deepseek/deepseek-flash: {input_per_mtok: 0.30, output_per_mtok: 1.20}
   # OpenAI model page, checked 2026-10-18 (prompts above 272K tokens cost more).
   openai/gpt-6-luna: {input_per_mtok: 0.10, output_per_mtok: 0.50}
   # local/llama3.1:8b: {input_per_mtok: 0, output_per_mtok: 0}
