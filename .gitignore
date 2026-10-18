@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments (uv)
+.venv/
+
+# Tool caches
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secrets and local config (API keys live here, never in git)
+.env
+.env.*
+!.env.example
+
+# Corpus and datasets: only the manifest is committed (see docs/IMPLEMENTATION_PLAN.md)
+data/*
+!data/manifest.*
+!data/README.md
+
+# Local LLM response cache, experiment outputs and model checkpoints
+*.sqlite
+*.sqlite3
+*.db
+*.ckpt
+*.safetensors
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
