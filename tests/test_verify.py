@@ -1,8 +1,11 @@
 import io
 import sys
+import zipfile
+from pathlib import Path
 
 from nde.verify.gates import GATE_ORDER, canonical_profile
 from nde.verify.runner import Command, Gate, run_gates
+from nde.verify.steps import missing_from_wheel
 
 
 def _python(code: str) -> Command:
@@ -104,3 +107,16 @@ def test_a_missing_executable_fails_the_gate_instead_of_crashing() -> None:
     )
 
     assert report.results[0].status == "failed"
+
+
+def test_build_check_reports_source_modules_missing_from_the_wheel(tmp_path: Path) -> None:
+    package = tmp_path / "src" / "pkg"
+    (package / "sub").mkdir(parents=True)
+    for name in ("__init__.py", "a.py", "sub/__init__.py", "sub/b.py"):
+        (package / name).write_text("", encoding="utf-8")
+    wheel = tmp_path / "pkg-0.1-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        for name in ("pkg/__init__.py", "pkg/a.py", "pkg-0.1.dist-info/METADATA"):
+            archive.writestr(name, "")
+
+    assert missing_from_wheel(wheel, package) == ["pkg/sub/__init__.py", "pkg/sub/b.py"]

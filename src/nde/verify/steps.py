@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import zipfile
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -107,10 +108,25 @@ def secrets() -> int:
     return 0
 
 
+def missing_from_wheel(wheel: Path, package_dir: Path) -> list[str]:
+    """Source modules under `package_dir` that the wheel does not contain."""
+    root = package_dir.parent
+    expected = {path.relative_to(root).as_posix() for path in package_dir.rglob("*.py")}
+    with zipfile.ZipFile(wheel) as archive:
+        return sorted(expected - set(archive.namelist()))
+
+
 def build() -> int:
-    """Build the sdist and wheel into a temporary directory."""
+    """Build the sdist and wheel, then check the wheel ships every source module."""
     with tempfile.TemporaryDirectory() as tmp:
-        return _run([_uv(), "build", "--out-dir", tmp, "--quiet"])
+        code = _run([_uv(), "build", "--out-dir", tmp, "--quiet"])
+        if code != 0:
+            return code
+        [wheel] = Path(tmp).glob("*.whl")
+        missing = missing_from_wheel(wheel, Path("src") / "nde")
+        for name in missing:
+            print(f"missing from wheel: {name}")
+        return 1 if missing else 0
 
 
 _STEPS = {"audit": audit, "secrets": secrets, "build": build}
