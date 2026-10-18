@@ -26,6 +26,9 @@ packages = ["src/nde"]
 # Only the dev group is installed by `uv sync`. Optional ML dependencies are
 # installed explicitly with `uv sync --group ml`.
 default-groups = ["dev"]
+# uv runs gates 6 and 7 (lock check, export, build); pin it like the other tools.
+# Keep in step with the version in .github/workflows/verify.yml.
+required-version = "==0.8.14"
 
 [dependency-groups]
 dev = [

@@ -6,7 +6,8 @@ Research tooling for structured story planning. See
 
 ## Setup
 
-Install [uv](https://docs.astral.sh/uv/) 0.8 or later, then:
+Install [uv](https://docs.astral.sh/uv/) 0.8.14 (pinned by `required-version` in
+`pyproject.toml`), then:
 
 ```powershell
 uv sync
