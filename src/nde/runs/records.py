@@ -38,6 +38,13 @@ class TemplateUse(_Record):
     sha256: str
 
 
+class CacheSummary(_Record):
+    mode: str
+    path: str | None
+    hits: int = 0
+    misses: int = 0
+
+
 class Manifest(_Record):
     name: str
     status: RunStatus
@@ -48,6 +55,7 @@ class Manifest(_Record):
     seed: int
     models: list[ModelUse]
     prompt_templates: list[TemplateUse]
+    cache: CacheSummary
     started_at: str
     finished_at: str | None = None
     files: dict[str, str] = Field(
@@ -78,6 +86,7 @@ class CallRecord(_Record):
     input_tokens: int
     output_tokens: int
     latency_s: float
+    cached: bool
 
 
 def write_jsonl(path: Path, records: list[OutputRecord] | list[CallRecord]) -> None:

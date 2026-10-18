@@ -71,6 +71,25 @@ uv run nde prompts lock
 `nde prompts lock` never re-records a changed version; it reports it and
 exits 2.
 
+## Response cache
+
+Every call is cached by everything that can change its response: provider,
+model, parameters, prompt template version, rendered messages, seed and
+response format. Running the same config again makes no network calls and
+reproduces `outputs.jsonl` byte for byte. The manifest records the cache mode
+and the hit and miss counts.
+
+| Option | Effect |
+| --- | --- |
+| *(default)* | read and write the cache |
+| `--no-cache` | neither read nor write the cache |
+| `--refresh-cache` | call the provider for every request and replace the stored responses |
+| `--cache PATH` | cache file; default `.nde/cache.sqlite` (gitignored), or `NDE_CACHE` |
+
+The cache is a SQLite database in write-ahead-log mode, so concurrent runs can
+share one file safely. Because repetition *i* of a call uses seed + *i*, each
+repetition is cached separately.
+
 ## Run directories
 
 Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
@@ -79,7 +98,7 @@ Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
 | --- | --- |
 | `manifest.json` | git SHA (and whether the tree was dirty), config path and hash, seed, models per role, prompt template versions and checksums, timestamps and run status |
 | `outputs.jsonl` | one line per call: call ID, repetition, model, seed and the raw output text |
-| `calls.jsonl` | one line per call: the provider's reported model ID, template, tokens and latency |
+| `calls.jsonl` | one line per call: the provider's reported model ID, template, tokens, latency and whether it was a cache hit |
 | `report.md` | generated from the files above |
 
 Regenerate a report with `uv run nde report <run dir>`.

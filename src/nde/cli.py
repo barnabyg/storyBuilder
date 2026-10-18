@@ -8,6 +8,7 @@ from pathlib import Path
 
 from nde import __version__
 from nde.env import load_dotenv
+from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.runs import prompts
 from nde.runs.config import ConfigError
 from nde.runs.records import read_manifest
@@ -30,6 +31,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--runs-dir", type=Path, default=Path("runs"), help="where run directories go (./runs)"
     )
 
+    run.add_argument(
+        "--cache",
+        type=Path,
+        default=Path(os.environ.get("NDE_CACHE", DEFAULT_CACHE_PATH)),
+        help="response cache file (env NDE_CACHE, default .nde/cache.sqlite)",
+    )
+    cache_mode = run.add_mutually_exclusive_group()
+    cache_mode.add_argument(
+        "--no-cache",
+        dest="cache_mode",
+        action="store_const",
+        const="bypass",
+        default="use",
+        help="neither read nor write the response cache",
+    )
+    cache_mode.add_argument(
+        "--refresh-cache",
+        dest="cache_mode",
+        action="store_const",
+        const="refresh",
+        help="call the provider for every request and replace the stored responses",
+    )
+
     report = commands.add_parser("report", help="regenerate a run directory's report")
     report.add_argument("run_dir", type=Path)
 
@@ -41,8 +65,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _run(args: argparse.Namespace) -> int:
-    load_dotenv(Path(".env"))
-    options = RunOptions(runs_dir=args.runs_dir, environ=dict(os.environ))
+    options = RunOptions(
+        runs_dir=args.runs_dir,
+        environ=dict(os.environ),
+        cache_path=args.cache,
+        cache_mode=args.cache_mode,
+    )
     try:
         run_dir = run_experiment(args.config, options)
     except ConfigError as error:
@@ -68,6 +96,8 @@ def _prompts_lock(args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    # Before parsing, so `.env` can also supply option defaults such as NDE_CACHE.
+    load_dotenv(Path(".env"))
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "run":

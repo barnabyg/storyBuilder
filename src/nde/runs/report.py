@@ -19,6 +19,8 @@ def render_report(run_dir: Path) -> str:
         f"- **Git SHA:** `{manifest.git_sha}`{' (dirty)' if manifest.git_dirty else ''}",
         f"- **Config:** `{manifest.config_path}` (hash `{manifest.config_hash[:12]}`)",
         f"- **Seed:** {manifest.seed}",
+        f"- **Cache:** {manifest.cache.mode}, {manifest.cache.hits} hits, "
+        f"{manifest.cache.misses} misses",
         "",
         "## Models",
         "",
@@ -48,11 +50,12 @@ def render_report(run_dir: Path) -> str:
     lines += [
         "## Calls",
         "",
-        "| Call | Model | Template | Seed | Input tokens | Output tokens | Latency (s) |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Call | Model | Template | Seed | Cached | Input tokens | Output tokens | Latency (s) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
         *(
             f"| {call.call} #{call.repetition + 1} | {call.response_model} "
             f"| {call.template}@{call.template_version} | {call.seed} "
+            f"| {'yes' if call.cached else 'no'} "
             f"| {call.input_tokens} | {call.output_tokens} | {call.latency_s:.2f} |"
             for call in calls
         ),

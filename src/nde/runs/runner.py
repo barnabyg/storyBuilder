@@ -7,12 +7,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
 from nde.llm.gateway import Gateway, Prompt
 from nde.runs.config import CallSpec, ConfigError, LoadedConfig, RoleName, load_config
 from nde.runs.prompts import PromptTemplate, load_template
 from nde.runs.records import (
     CALLS,
     OUTPUTS,
+    CacheSummary,
     CallRecord,
     Manifest,
     ModelUse,
@@ -34,6 +36,8 @@ def utc_now() -> datetime:
 class RunOptions:
     runs_dir: Path
     environ: Mapping[str, str]
+    cache_path: Path = DEFAULT_CACHE_PATH
+    cache_mode: CacheMode = "use"
     clock: Clock = utc_now
 
 
@@ -91,7 +95,7 @@ def _new_run_dir(runs_dir: Path, name: str, started: datetime) -> Path:
     return run_dir
 
 
-def _manifest(prepared: PreparedRun, started: datetime) -> Manifest:
+def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> Manifest:
     loaded = prepared.loaded
     config = loaded.config
     roles: list[RoleName] = list(dict.fromkeys(call.role for call in config.calls))
@@ -113,6 +117,10 @@ def _manifest(prepared: PreparedRun, started: datetime) -> Manifest:
             TemplateUse(template=template.name, version=template.version, sha256=template.sha256)
             for template in prepared.templates.values()
         ],
+        cache=CacheSummary(
+            mode=options.cache_mode,
+            path=None if options.cache_mode == "bypass" else str(options.cache_path),
+        ),
         started_at=started.isoformat(),
     )
 
@@ -151,6 +159,7 @@ def _run_call(
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             latency_s=result.latency_s,
+            cached=completion.cached,
         )
     )
 
@@ -160,10 +169,15 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
     config = prepared.loaded.config
     started = options.clock()
     run_dir = _new_run_dir(options.runs_dir, config.name, started)
-    manifest = _manifest(prepared, started)
+    manifest = _manifest(prepared, options, started)
     write_manifest(run_dir, manifest)
     state = RunState()
-    gateway = Gateway(config.providers, environ=options.environ)
+    gateway = Gateway(
+        config.providers,
+        environ=options.environ,
+        cache=None if options.cache_mode == "bypass" else ResponseCache(options.cache_path),
+        cache_mode=options.cache_mode,
+    )
     try:
         for call in config.calls:
             for repetition in range(call.repeat):
@@ -171,6 +185,8 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
         manifest.status = "succeeded"
     finally:
         gateway.close()
+        manifest.cache.hits = gateway.cache_stats.hits
+        manifest.cache.misses = gateway.cache_stats.misses
         if manifest.status == "running":
             manifest.status = "failed"
         manifest.finished_at = options.clock().isoformat()
