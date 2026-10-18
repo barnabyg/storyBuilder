@@ -38,9 +38,13 @@ benchmark:
     - provider: deepseek
       model: deepseek-chat
       params: {temperature: 0.7, max_tokens: 3000}
+    # gpt-6-luna is a reasoning model. In Chat Completions it takes
+    # max_completion_tokens instead of max_tokens, and accepts a non-default
+    # temperature only with reasoning_effort "none", which also matches the
+    # non-reasoning DeepSeek candidate.
     - provider: openai
-      model: gpt-6.1-luna
-      params: {temperature: 0.7, max_tokens: 3000}
+      model: gpt-6-luna
+      params: {reasoning_effort: none, temperature: 0.7, max_completion_tokens: 3000}
     # - provider: local
     #   model: llama3.1:8b
     #   params: {temperature: 0.7, max_tokens: 3000}
@@ -72,8 +76,8 @@ structured:
 # USD per million tokens, per provider/model. CHECK BEFORE RUNNING.
 prices:
   deepseek/deepseek-chat: {input_per_mtok: 0.27, output_per_mtok: 1.10}
-  # Placeholder: replace with the provider's published price.
-  openai/gpt-6.1-luna: {input_per_mtok: 0.50, output_per_mtok: 2.00}
+  # OpenAI model page, checked 2026-10-18 (prompts above 272K tokens cost more).
+  openai/gpt-6-luna: {input_per_mtok: 0.10, output_per_mtok: 0.50}
   # local/llama3.1:8b: {input_per_mtok: 0, output_per_mtok: 0}
 
 budget:

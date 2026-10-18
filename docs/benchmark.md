@@ -35,7 +35,8 @@ reports the same table; the **Cost** section shows what the run actually spent.
 
 1. Check each candidate's model ID and each price in
    `configs/benchmark-g0.yaml` against the provider's current lists. The
-   OpenAI price is a placeholder.
+   `gpt-6-luna` ID and price were checked against OpenAI's model page on
+   18 October 2026.
 2. Put the API keys in `.env` (see `.env.example`): `DEEPSEEK_API_KEY`,
    `OPENAI_API_KEY`.
 3. Set `budget.per_run_usd` to what you are willing to spend.
@@ -60,7 +61,7 @@ tighter estimate: at 20 samples, one invalid outline is 5 percentage points.
 
 Before every request, including repairs, the gateway reserves an estimate of
 its cost: input tokens from the prompt length and output tokens from the
-candidate's `max_tokens`. If the reservation would take the run past
+candidate's `max_tokens` (or `max_completion_tokens`). If the reservation would take the run past
 `budget.per_run_usd` (or the day past `budget.per_day_usd`), the request is
 not made and the run stops with `aborted: budget`. Every request is checked,
 however many repairs the responses need.
@@ -76,7 +77,9 @@ samples for every candidate, and its report still shows the table for what
 was collected. Re-running after raising the cap reuses every cached response
 and only pays for the rest.
 
-Set `max_tokens` on every candidate: without it the estimate assumes
+Set `max_tokens` on every candidate, or `max_completion_tokens` for OpenAI
+reasoning models such as `gpt-6-luna`, which reject `max_tokens` in Chat
+Completions. Without either, the estimate assumes
 `budget.assumed_output_tokens` (1,024 by default).
 
 ## Adding a candidate model
