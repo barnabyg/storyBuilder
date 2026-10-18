@@ -82,6 +82,32 @@ class StructuredMetrics(_Record):
         self.repair_rate = self.repaired_calls / self.calls
 
 
+class BenchmarkRow(_Record):
+    """One candidate model's G0 benchmark results."""
+
+    model: str
+    # Logical calls: a call and its repair attempts count once.
+    calls: int
+    first_attempt_validity: float
+    validity_after_repair: float
+    repair_rate: float
+    # Per logical call, all attempts included; None when the model made no calls.
+    latency_median_s: float | None
+    latency_p95_s: float | None
+    # At list price, cache hits included, so a cached re-run reports the same numbers.
+    cost_per_1k_output_usd: float | None
+    token_cost_usd: float
+    # Actually spent in this run.
+    new_spend_usd: float
+    meets_threshold: bool
+
+
+class BenchmarkSummary(_Record):
+    role: str
+    threshold: float
+    rows: list[BenchmarkRow]
+
+
 class RunError(_Record):
     """Why a run failed: a common provider error type (see nde.llm.errors) or "internal"."""
 
@@ -115,6 +141,8 @@ class Manifest(_Record):
     warnings: list[str] = Field(default_factory=list[str])
     # Per "provider/model": validity of structured (response-model) calls.
     structured: dict[str, StructuredMetrics] = Field(default_factory=dict[str, StructuredMetrics])
+    # Set for benchmark configs: the per-candidate comparison for gate G0.
+    benchmark: BenchmarkSummary | None = None
     files: dict[str, str] = Field(
         default_factory=lambda: {"outputs": OUTPUTS, "calls": CALLS, "report": REPORT}
     )

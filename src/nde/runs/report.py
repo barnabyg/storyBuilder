@@ -56,6 +56,7 @@ def render_report(run_dir: Path) -> str:
             *_output_body(output),
             "",
         ]
+    lines += _benchmark_section(manifest)
     lines += _structured_section(manifest)
     lines += _cost_section(manifest, calls)
     lines += [
@@ -161,6 +162,37 @@ def _structured_section(manifest: Manifest) -> list[str]:
             f"| {_percent(m.validity_after_repair)} | {_percent(m.repair_rate)} "
             f"| {m.failed_calls} |"
             for label, m in manifest.structured.items()
+        ),
+        "",
+    ]
+
+
+def _seconds(value: float | None) -> str:
+    return "-" if value is None else f"{value:.2f}"
+
+
+def _benchmark_section(manifest: Manifest) -> list[str]:
+    benchmark = manifest.benchmark
+    if benchmark is None:
+        return []
+    return [
+        "## Benchmark (gate G0)",
+        "",
+        f"Candidates for the `{benchmark.role}` role; threshold: "
+        f"{benchmark.threshold:.0%} validity after repair. Latency is per call, repairs "
+        "included. Costs are at list price, cache hits included.",
+        "",
+        "| Model | Calls | First-attempt validity | Validity after repair | Repair rate "
+        "| Latency median (s) | Latency p95 (s) | Cost per 1k output tokens | Total cost "
+        "| Meets G0 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        *(
+            f"| {row.model} | {row.calls} | {_percent(row.first_attempt_validity)} "
+            f"| {_percent(row.validity_after_repair)} | {_percent(row.repair_rate)} "
+            f"| {_seconds(row.latency_median_s)} | {_seconds(row.latency_p95_s)} "
+            f"| {_usd(row.cost_per_1k_output_usd)} | {_usd(row.token_cost_usd)} "
+            f"| {'yes' if row.meets_threshold else 'no'} |"
+            for row in benchmark.rows
         ),
         "",
     ]

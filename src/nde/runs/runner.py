@@ -8,15 +8,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
+from nde.llm.config import ModelBinding
 from nde.llm.errors import ProviderError
 from nde.llm.gateway import Completion, Gateway, Prompt
 from nde.llm.ledger import DEFAULT_LEDGER_PATH, BudgetExceededError, CostLedger, Pricing
 from nde.llm.structured import StructuredOutputError
-from nde.runs.config import CallSpec, ConfigError, LoadedConfig, RoleName, load_config
+from nde.runs.benchmark import benchmark_rows
+from nde.runs.config import CallSpec, ConfigError, LoadedConfig, load_config
 from nde.runs.prompts import PromptTemplate, load_template
 from nde.runs.records import (
     CALLS,
     OUTPUTS,
+    BenchmarkSummary,
     CacheSummary,
     CallRecord,
     CostSummary,
@@ -74,7 +77,7 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
         if ref.label not in templates:
             templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
         templates[ref.label].render(call.variables)
-    for provider_name in sorted({config.roles[call.role].provider for call in config.calls}):
+    for provider_name in sorted({binding.provider for binding in config.used_bindings()}):
         provider = config.providers[provider_name]
         if provider.api_key_env and not environ.get(provider.api_key_env):
             raise ConfigError(
@@ -109,7 +112,6 @@ def _new_run_dir(runs_dir: Path, name: str, started: datetime) -> Path:
 def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> Manifest:
     loaded = prepared.loaded
     config = loaded.config
-    roles: list[RoleName] = list(dict.fromkeys(call.role for call in config.calls))
     return Manifest(
         name=config.name,
         status="running",
@@ -119,10 +121,8 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
         config_hash=loaded.hash,
         seed=config.seed,
         models=[
-            ModelUse(
-                role=role, provider=config.roles[role].provider, model=config.roles[role].model
-            )
-            for role in roles
+            ModelUse(role=role, provider=binding.provider, model=binding.model)
+            for role, binding in config.role_bindings()
         ],
         prompt_templates=[
             TemplateUse(template=template.name, version=template.version, sha256=template.sha256)
@@ -140,11 +140,15 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
     )
 
 
-def _run_call(
-    gateway: Gateway, prepared: PreparedRun, call: CallSpec, repetition: int, state: RunState
+def _run_call(  # noqa: PLR0913, PLR0917 - one call's full context
+    gateway: Gateway,
+    prepared: PreparedRun,
+    call: CallSpec,
+    binding: ModelBinding,
+    repetition: int,
+    state: RunState,
 ) -> None:
     config = prepared.loaded.config
-    binding = config.roles[call.role]
     template = prepared.templates[call.prompt.label]
     prompt = Prompt(template.name, template.version, template.render(call.variables))
     seed = config.seed + repetition
@@ -242,8 +246,10 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
     try:
         for call in config.calls:
             for repetition in range(call.repeat):
-                state.current_call = call.id
-                _run_call(gateway, prepared, call, repetition, state)
+                # Benchmark candidates take turns, so a budget stop leaves comparable samples.
+                for binding in config.bindings_for(call):
+                    state.current_call = call.id
+                    _run_call(gateway, prepared, call, binding, repetition, state)
         manifest.status = "succeeded"
     except BudgetExceededError as error:
         manifest.status = "aborted"
@@ -264,6 +270,17 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
         gateway.close()
         _summarise_costs(manifest.cost, state.calls)
         manifest.structured = state.structured
+        if config.benchmark is not None:
+            manifest.benchmark = BenchmarkSummary(
+                role=config.benchmark.role,
+                threshold=config.benchmark.threshold,
+                rows=benchmark_rows(
+                    state.calls,
+                    state.structured,
+                    threshold=config.benchmark.threshold,
+                    models=[candidate.label for candidate in config.benchmark.candidates],
+                ),
+            )
         manifest.cache.hits = gateway.cache_stats.hits
         manifest.cache.misses = gateway.cache_stats.misses
         if manifest.status == "running":

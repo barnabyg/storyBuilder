@@ -51,6 +51,10 @@ models. Unknown roles, missing models, unknown providers, missing template
 versions or variables, and unset API-key variables are all rejected before
 any call.
 
+A config may also have a `benchmark` section that runs one role's calls once
+per candidate model and compares them; the role then needs no entry under
+`roles`. See [benchmark.md](benchmark.md).
+
 ## Prompt templates
 
 Templates live at `prompts/<name>/v<version>.yaml`:

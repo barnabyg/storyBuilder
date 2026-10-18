@@ -67,26 +67,48 @@ class BudgetConfig(Strict):
     assumed_output_tokens: int = Field(default=DEFAULT_ASSUMED_OUTPUT_TOKENS, ge=1)
 
 
+class BenchmarkConfig(Strict):
+    """Run the calls of one role once per candidate model and compare them (gate G0)."""
+
+    role: RoleName
+    candidates: list[ModelBinding] = Field(min_length=1)
+    # Validity after repair a model must reach to pass gate G0.
+    threshold: float = Field(default=0.95, gt=0, le=1)
+
+    @model_validator(mode="after")
+    def _candidates_are_distinct(self) -> Self:
+        labels = [candidate.label for candidate in self.candidates]
+        if len(set(labels)) != len(labels):
+            raise ValueError("benchmark candidates must be distinct provider/model pairs")
+        return self
+
+
 class ExperimentConfig(Strict):
     name: str
     seed: int
     # Directory of prompt templates, relative to the config file.
     prompts_dir: str = "../prompts"
     providers: dict[str, ProviderConfig]
-    roles: dict[RoleName, ModelBinding]
+    roles: dict[RoleName, ModelBinding] = Field(default_factory=dict[RoleName, ModelBinding])
     calls: list[CallSpec] = Field(min_length=1)
     # USD per million tokens, keyed by "provider/model".
     prices: dict[str, Price] = Field(default_factory=dict[str, Price])
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     structured: StructuredConfig = Field(default_factory=StructuredConfig)
+    benchmark: BenchmarkConfig | None = None
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:
-        for role, binding in self.roles.items():
+        bindings = [(f"role {role!r}", binding) for role, binding in self.roles.items()]
+        if self.benchmark is not None:
+            bindings += [("benchmark candidate", c) for c in self.benchmark.candidates]
+            if all(call.role != self.benchmark.role for call in self.calls):
+                raise ValueError(f"no call uses the benchmark role {self.benchmark.role!r}")
+        for owner, binding in bindings:
             if binding.provider not in self.providers:
-                raise ValueError(f"role {role!r} uses unknown provider {binding.provider!r}")
+                raise ValueError(f"{owner} uses unknown provider {binding.provider!r}")
         for call in self.calls:
-            if call.role not in self.roles:
+            if not self.bindings_for(call):
                 raise ValueError(f"call {call.id!r} uses role {call.role!r}, which has no model")
         ids = [call.id for call in self.calls]
         if len(set(ids)) != len(ids):
@@ -95,10 +117,22 @@ class ExperimentConfig(Strict):
             raise ValueError("; ".join(self.unpriced_warnings()))
         return self
 
+    def bindings_for(self, call: CallSpec) -> list[ModelBinding]:
+        """The models a call runs on: every candidate for the benchmark role, else its role's."""
+        if self.benchmark is not None and call.role == self.benchmark.role:
+            return list(self.benchmark.candidates)
+        return [self.roles[call.role]] if call.role in self.roles else []
+
+    def role_bindings(self) -> list[tuple[RoleName, ModelBinding]]:
+        """Every (role, model) some call uses, once per model, in call order."""
+        seen: dict[str, tuple[RoleName, ModelBinding]] = {}
+        for call in self.calls:
+            for binding in self.bindings_for(call):
+                seen.setdefault(binding.label, (call.role, binding))
+        return list(seen.values())
+
     def used_bindings(self) -> list[ModelBinding]:
-        """Every model binding some call uses, once each, in call order."""
-        bindings = {self.roles[call.role].label: self.roles[call.role] for call in self.calls}
-        return list(bindings.values())
+        return [binding for _, binding in self.role_bindings()]
 
     def unpriced_models(self) -> list[str]:
         return [b.label for b in self.used_bindings() if b.label not in self.prices]

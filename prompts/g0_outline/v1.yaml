@@ -1,0 +1,14 @@
+system: >-
+  You are a story planner. You answer with a single JSON object and no other
+  text.
+user: >-
+  Plan a short story (about 2,000 words) from this brief: $brief
+
+
+  Give a title and a one-sentence logline; two to six characters (ids c1, c2,
+  ...) each with a role, a want and optionally a flaw; one to five locations
+  (ids l1, l2, ...); and five to eight scenes in story order (ids s1, s2, ...).
+  Each scene names its location, its point-of-view character, the characters
+  present (including the point-of-view character), one to four beats, a
+  tension from 1 to 5, and any earlier scenes whose setups it pays off. Every
+  id you reference must be defined.

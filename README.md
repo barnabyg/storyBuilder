@@ -29,6 +29,7 @@ uv run nde run configs/smoke.yaml
 
 See [docs/experiments.md](docs/experiments.md) for configs, prompt templates and
 run directories.
+The G0 model benchmark is described in [docs/benchmark.md](docs/benchmark.md).
 
 ## Verification
 
