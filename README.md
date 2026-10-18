@@ -20,6 +20,16 @@ with `uv sync --group ml` when a phase needs them.
 uv run nde --version
 ```
 
+## Running experiments
+
+```powershell
+Copy-Item .env.example .env   # then add your API key
+uv run nde run configs/smoke.yaml
+```
+
+See [docs/experiments.md](docs/experiments.md) for configs, prompt templates and
+run directories.
+
 ## Verification
 
 One canonical, non-mutating command runs every gate in order:

@@ -13,7 +13,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 # Files excluded from the secret scan, each with its justification.
-_SECRET_SCAN_EXCLUDES: dict[str, str] = {}
+_SECRET_SCAN_EXCLUDES: dict[str, str] = {
+    # SHA-256 checksums of prompt templates: high-entropy hex by design, and
+    # JSON has no comments to carry an inline allowlist pragma.
+    "prompts/checksums.json": "prompt template checksums",
+}
 
 
 def _uv() -> str:
