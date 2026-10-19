@@ -27,9 +27,9 @@ from nde.runs.records import (
 )
 from nde.runs.state import RunState
 from nde.schema.brief import SPLITS, Brief
-from nde.stories import PIPELINES
 from nde.stories.length import Draft, attempt_seed, choose, measure
 from nde.stories.pipeline import Pipeline, StepFailedError, StoryContext
+from nde.stories.registry import PIPELINES
 
 # The normalised story, which blind batches and judges see, and the model's raw text.
 STORY_FILE = "story.md"

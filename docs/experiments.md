@@ -145,9 +145,54 @@ it is in range.
 | Pipeline | Condition | Steps |
 | --- | --- | --- |
 | `baseline_a` | Baseline A | one call on `prose` with `story_a@1`: brief to complete story |
+| `baseline_b` | Baseline B | a beat outline on `planner` (`beat_outline@1`, structured, with repair), then one call per scene on `prose` through the shared prose contract |
 
 Parameters: `baseline_a` takes `prompt` (default `{template: story_a,
-version: 1}`).
+version: 1}`); `baseline_b` takes `outline_prompt` (default
+`{template: beat_outline, version: 1}`).
+
+`configs/stories-ab.yaml` runs A and B on the same two dev briefs in one run.
+
+### Baseline B
+
+The `planner` role turns the brief into a `BeatOutline`
+(`src/nde/plan/beats.py`): a title and, in story order, between the brief's
+`min_scenes` and `max_scenes` scenes, each with a one-sentence summary and one
+to six beats. It is validated structured output with bounded repair, so
+per-model validity appears in the report's **Structured output** table as for
+any structured call. The outline is kept as `outline.json` beside the story.
+An outline still invalid after its repairs fails that story only.
+
+The outline's seed is the story's seed, so another condition that asks for the
+same outline (B-scrambled) gets it from the cache. Length control regenerates
+B's prose, never its outline: each attempt's scenes are kept as
+`attempts/<k>/scene-NN.md`.
+
+### The shared prose contract
+
+Every structured condition writes its prose through
+`nde.prose.scenes.write_scenes(ctx, scenes, seed=...)`, with the scene-prose
+template `scene_prose@1` (`SCENE_PROSE`) on the `prose` role (`PROSE_ROLE`).
+These are the **shared prose contract**: B, B-scrambled and the later
+conditions C, D and E must reuse them unchanged, so that conditions differ
+only in their plans (a leakage control in §4 of the plan). A new template
+version is a change to every condition at once.
+
+A condition supplies a list of `SceneSpec`s: a summary, beats and optional
+free-text `notes` for whatever else its planner wants realised. Each scene is
+written in order from:
+
+- the brief;
+- the whole plan, as the numbered list of scene summaries;
+- the current scene's beats and notes, with a word target of the brief's
+  `target_words` divided by the number of scenes;
+- a compact summary of the story so far: the planned summaries of the scenes
+  already written and the last paragraph of the previous scene.
+
+Each scene is a step named `scene-01`, `scene-02`, ... in `calls.jsonl`. The
+scenes are joined with blank lines, and normalisation makes them one
+continuous story. A different planner feeds the same prose steps simply by
+passing its own scene list; the tests drive them with a hand-written one.
 
 ### What a story run records
 

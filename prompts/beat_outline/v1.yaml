@@ -1,0 +1,15 @@
+system: >-
+  You are a story planner. You answer with a single JSON object and no other
+  text.
+user: >-
+  Plan a short story of about $target_words words from this brief, as a beat
+  outline.
+
+
+  $brief
+
+
+  Give the story a title and $min_scenes to $max_scenes scenes in story order.
+  For each scene, give a one-sentence summary and two to five beats: the
+  concrete events of the scene, in order. Together the scenes must form a
+  complete arc, with setups that pay off, that meets the ending constraint.
