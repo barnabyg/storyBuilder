@@ -13,7 +13,9 @@ see the normalised form. The rules are deterministic:
 4. Markdown and HTML markup is reduced to its text: emphasis, inline code,
    links, block quotes, list bullets and tags.
 5. A model preamble ("Here is your story:") and a leading title line are
-   removed, as are sign-offs at the end ("The End", "I hope you enjoyed...").
+   removed, as are sign-offs at the end ("The End", "I hope you enjoyed the
+   story"): a closing line that starts like one but is not about the story or
+   the request, or is dialogue, is part of the story and stays.
 6. Every remaining non-empty line is a paragraph, with runs of whitespace
    collapsed; paragraphs are separated by one blank line.
 
@@ -56,12 +58,32 @@ _CHATTER = re.compile(
     re.IGNORECASE,
 )
 _CHATTER_TOPIC = re.compile(r"\b(story|brief|words|request)\b", re.IGNORECASE)
-_SIGN_OFF = re.compile(
-    r"^((the )?end|fin|finis)[.!]?$"
-    r"|^(i hope|hope you|let me know|feel free|would you like|if you'?d like|i can |"
-    r"note:|author'?s note)",
+_END_MARK = re.compile(r"^((the )?end|fin|finis)[.!]?$", re.IGNORECASE)
+_NOTE = re.compile(r"^(note:|author'?s note)", re.IGNORECASE)
+# A closing paragraph that starts like a model talking to the user is a sign-off only
+# if it also talks about the story or the request, and is not dialogue: "I can still
+# hear the gulls, she thought." is a story's last line.
+_SIGN_OFF_START = re.compile(
+    r"^(i hope|hope you|let me know|feel free|would you like|if you'?d like|i can )",
     re.IGNORECASE,
 )
+_SIGN_OFF_TOPIC = re.compile(
+    r"\b(story|stories|scene|works|enjoy\w*|changes?|revis\w*|adjust\w*|edit\w*|"
+    r"versions?|expand\w*|shorten\w*|longer|shorter|tone|feedback|request|help)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_sign_off(paragraph: str) -> bool:
+    if _END_MARK.match(paragraph) or _NOTE.match(paragraph):
+        return True
+    return (
+        bool(_SIGN_OFF_START.match(paragraph))
+        and '"' not in paragraph
+        and bool(_SIGN_OFF_TOPIC.search(paragraph))
+    )
+
+
 _MAX_TITLE_WORDS = 12
 # A first line ending in one of these is prose, not a title (0x2014 is an em dash).
 _TERMINAL = (*".!?'\":;,)-", chr(0x2014))
@@ -112,7 +134,7 @@ def normalise(text: str) -> str:
         paragraphs.pop(0)
     if len(paragraphs) > 1 and _is_title(paragraphs[0]):
         paragraphs.pop(0)
-    while paragraphs and _SIGN_OFF.match(paragraphs[-1]):
+    while paragraphs and _is_sign_off(paragraphs[-1]):
         paragraphs.pop()
     return "\n\n".join(paragraphs) + "\n" if paragraphs else ""
 

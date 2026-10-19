@@ -90,3 +90,34 @@ def test_normalisation_is_idempotent(text: str) -> None:
 def test_words_are_counted_on_whitespace() -> None:
     assert word_count(MARKDOWN_EXPECTED) == 26
     assert word_count("") == 0
+
+
+@pytest.mark.parametrize(
+    "ending",
+    [
+        "I can still hear the gulls, she thought.",
+        "I hope you will forgive me, she wrote, and sealed the letter.",
+        '"Let me know when you are home," he said.',
+        "Feel free, the sign said, but nobody was.",
+    ],
+)
+def test_a_story_ending_that_only_starts_like_a_sign_off_is_kept(ending: str) -> None:
+    text = f"She walked to the shore.\n\n{ending}"
+
+    assert normalise(text) == f"She walked to the shore.\n\n{ending}\n"
+
+
+@pytest.mark.parametrize(
+    "sign_off",
+    [
+        "I hope this works for you!",
+        "I hope you enjoyed the story.",
+        "Let me know if you would like any changes.",
+        "Feel free to ask for a revision.",
+        "Would you like me to expand any scene?",
+        "I can adjust the tone or length if needed.",
+        "If you'd like, I can write a longer version.",
+    ],
+)
+def test_model_sign_offs_are_removed(sign_off: str) -> None:
+    assert normalise(f"She walked to the shore.\n\n{sign_off}") == "She walked to the shore.\n"

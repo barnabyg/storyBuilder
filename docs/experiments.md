@@ -108,7 +108,11 @@ so neither format nor length can reveal which condition wrote a story.
 - Markdown and HTML markup (emphasis, inline code, links, block quotes, list
   bullets, tags) is reduced to its text.
 - A model preamble ("Here is your story:"), a leading title line and
-  sign-offs ("The End", "I hope you enjoyed...") are removed.
+  sign-offs ("The End", "I hope you enjoyed the story") are removed. A closing
+  line that only starts like a sign-off but is not about the story or the
+  request, or is dialogue ("I can still hear the gulls, she thought."), stays.
+- Scene-by-scene conditions normalise each scene before joining them, so
+  chatter around a scene never lands mid-story.
 - Every remaining line is a paragraph, with whitespace collapsed; paragraphs
   are separated by one blank line.
 
