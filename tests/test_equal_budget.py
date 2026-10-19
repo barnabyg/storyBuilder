@@ -184,3 +184,16 @@ def test_equal_budget_must_name_two_conditions_of_the_run(
     assert code == 2
     assert message in capsys.readouterr().err
     assert budget_llm.call_count == 0
+
+
+def test_a_pass_that_lands_just_above_the_other_budget_but_within_tolerance_is_matched(
+    budget_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    # B costs 15 + 5 * 722 = 3625; one revision takes A to 4020, 10.9% above B but
+    # within 10% of the larger budget, so the brief is matched with no overshoot.
+    budget_llm.default = lambda body: _reply(body, scene_tokens=712)
+
+    run_dir = run(tmp_path, _config(budget_llm.base_url))
+
+    match = manifest(run_dir)["stories"]["equal_budget"]["matches"][0]
+    assert (match["passes"], match["matched"], match["reason"]) == (1, True, None)

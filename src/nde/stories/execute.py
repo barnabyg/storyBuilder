@@ -336,13 +336,14 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
         while match.passes < spec.max_revision_passes:
             revise_story(run, cheaper, spec.revision_prompt)
             match.passes += 1
-            if cheaper.tokens > dearer.tokens * (1 + spec.tolerance):
+            if within(cheaper.tokens, dearer.tokens, spec.tolerance):
+                break
+            if cheaper.tokens > dearer.tokens:
+                # Out of tolerance on the other side: another pass only widens the gap.
                 match.reason = (
                     f"overshot after {_passes(match.passes)}: {match.revised} costs "
                     f"{cheaper.tokens} tokens against {dearer.tokens}"
                 )
-                break
-            if within(cheaper.tokens, dearer.tokens, spec.tolerance):
                 break
     match.after = {name: jobs[name].tokens for name in spec.conditions}
     match.matched = not failed and within(cheaper.tokens, dearer.tokens, spec.tolerance)
