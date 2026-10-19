@@ -161,6 +161,21 @@ story config (the committed ones do). A panel with fewer than two families, a
 judge without a family, a judge in a generator's family, or a batch whose
 generators have no recorded family is a config error, raised before any call.
 
+**Relaxing the rules.** Both rules are the plan's defaults. A judge config can
+relax them, but only explicitly:
+
+```yaml
+judges:
+  min_families: 1                 # default 2
+  allow_generator_families: true  # default false
+```
+
+A judge that shares a generator's family is then allowed, but not hidden.
+The run manifest and run report carry a "family separation waived" warning,
+each of its verdicts records `shares_generator_family: true`, and the batch
+report flags it under **LLM judges**: its verdicts may favour stories from its
+own family.
+
 ### What judges do
 
 Judges see only the batch's normalised story text, exactly as the reader

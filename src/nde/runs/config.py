@@ -175,17 +175,25 @@ class JudgesConfig(Strict):
     rubric_prompt: PromptRef = Field(
         default_factory=lambda: PromptRef(template="judge_rubric", version=1)
     )
+    # The plan's family rules (§3.1, §4): at least two judge families, none shared
+    # with the models that generated the batch. A config may relax them only
+    # explicitly; run manifests, judge verdicts and batch reports then say so.
+    min_families: int = Field(default=2, ge=1)
+    allow_generator_families: bool = False
 
     @model_validator(mode="after")
-    def _panel_spans_two_families(self) -> Self:
+    def _panel_spans_enough_families(self) -> Self:
         labels = [judge.label for judge in self.panel]
         if len(set(labels)) != len(labels):
             raise ValueError("judges must be distinct provider/model pairs")
         for judge in self.panel:
             if judge.family is None:
                 raise ValueError(f"judge {judge.label} has no family; set `family` on it")
-        if len({judge.family for judge in self.panel}) < 2:  # noqa: PLR2004 - the plan's rule
-            raise ValueError("the judge panel needs at least two model families")
+        if len({judge.family for judge in self.panel}) < self.min_families:
+            raise ValueError(
+                f"the judge panel needs at least {self.min_families} model families "
+                "(judges.min_families)"
+            )
         return self
 
 

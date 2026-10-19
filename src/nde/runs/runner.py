@@ -161,6 +161,7 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
             ],
         )
         manifest.files["judgements"] = JUDGEMENTS
+        manifest.warnings += judges.waivers
     return manifest
 
 
