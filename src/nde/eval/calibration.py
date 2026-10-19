@@ -103,6 +103,9 @@ def build_calibration_batch(batches_dir: Path, spec: CalibrationSpec) -> Path:
     if batch.exists():
         raise BatchError(f"batch {spec.name!r} already exists at {batch}")
     sources, rubric = spec.sources, spec.rubric
+    names = [source.condition for source in sources]
+    if len(set(names)) != len(names):
+        raise BatchError("calibration sources need distinct condition names")
     if any(source.condition == HUMAN for source in sources):
         raise BatchError(f"{HUMAN!r} is reserved for the human-written stories")
     seed = secrets.randbits(32) if spec.seed is None else spec.seed
