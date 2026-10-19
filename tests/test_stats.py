@@ -1,6 +1,6 @@
 import pytest
 
-from nde.eval.stats import binomial_two_sided
+from nde.eval.stats import binomial_two_sided, bootstrap_mean_ci
 
 
 @pytest.mark.parametrize(
@@ -33,3 +33,27 @@ def test_the_binomial_test_rejects_impossible_counts() -> None:
         binomial_two_sided(11, 10)
     with pytest.raises(ValueError, match="trials"):
         binomial_two_sided(0, 0)
+
+
+def test_a_bootstrap_interval_of_a_constant_is_that_constant() -> None:
+    assert bootstrap_mean_ci([3, 3, 3, 3], seed=1) == (3.0, 3.0)
+
+
+def test_a_bootstrap_interval_of_two_values_spans_both() -> None:
+    # Resampled means of [0, 1] are 0, 0.5 or 1 with probability 1/4, 1/2, 1/4,
+    # so the 2.5th and 97.5th percentiles are 0 and 1.
+    assert bootstrap_mean_ci([0, 1], seed=7, resamples=4000) == (0.0, 1.0)
+
+
+def test_a_bootstrap_interval_is_reproducible_with_a_fixed_seed_and_contains_the_mean() -> None:
+    values = [1, 2, 3, 4, 5] * 4
+
+    low, high = bootstrap_mean_ci(values, seed=42)
+
+    assert bootstrap_mean_ci(values, seed=42) == (low, high)
+    assert 2.0 < low < 3.0 < high < 4.0
+
+
+def test_a_bootstrap_interval_needs_values() -> None:
+    with pytest.raises(ValueError, match="at least one value"):
+        bootstrap_mean_ci([], seed=0)

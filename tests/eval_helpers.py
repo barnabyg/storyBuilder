@@ -1,5 +1,6 @@
 """Helpers for evaluation tests: story runs to batch, and a reader client."""
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -7,8 +8,19 @@ from fastapi.testclient import TestClient
 
 from nde.cli import main
 from nde.eval.reader import create_app
+from tests.conftest import REPO
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
 from tests.stories import run, story_config, story_text
+
+RUBRIC_DIR = REPO / "benchmark" / "rubric"
+DIMENSIONS = [
+    "engagement",
+    "coherence",
+    "emotional_impact",
+    "character_believability",
+    "pacing",
+    "originality",
+]
 
 # Distinctive names, so a leak of the key into the reader is easy to spot.
 INTACT = {"name": "intact", "pipeline": "baseline_a"}
@@ -50,6 +62,8 @@ def build_batch(tmp_path: Path, runs: tuple[Path, Path], name: str = "demo", *ex
             "control",
             "--batches-dir",
             str(batches),
+            "--rubric-dir",
+            str(RUBRIC_DIR),
             *extra,
         ]
     )
@@ -59,3 +73,32 @@ def build_batch(tmp_path: Path, runs: tuple[Path, Path], name: str = "demo", *ex
 
 def reader(batch_dir: Path) -> TestClient:
     return TestClient(create_app(batch_dir), base_url="http://127.0.0.1")
+
+
+type Form = dict[str, str | list[str]]
+
+
+@dataclass(frozen=True)
+class Marks:
+    """The reader's marks for one story: one score for every dimension, and tags."""
+
+    score: int = 3
+    tags: list[str] = field(default_factory=list[str])
+    free_tags: str = ""
+
+
+def complete_form(
+    preferred: str = "A",
+    strength: int = 2,
+    guess: str = "intact",
+    a: Marks | None = None,
+    b: Marks | None = None,
+) -> Form:
+    """A complete judgement: preference, strength, guess, every score, and tags."""
+    form: Form = {"preferred": preferred, "strength": str(strength), "guess": guess}
+    for side, marks in (("a", a or Marks()), ("b", b or Marks())):
+        for dimension in DIMENSIONS:
+            form[f"score-{side}-{dimension}"] = str(marks.score)
+        form[f"tags-{side}"] = marks.tags
+        form[f"free-tags-{side}"] = marks.free_tags
+    return form

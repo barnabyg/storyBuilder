@@ -1,11 +1,20 @@
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
+from httpx2 import Response
 
 from nde.cli import main
-from tests.eval_helpers import BRIEFS, build_batch, reader, two_runs
+from tests.eval_helpers import (
+    BRIEFS,
+    RUBRIC_DIR,
+    build_batch,
+    complete_form,
+    reader,
+    two_runs,
+)
 from tests.fake_openai import FakeOpenAI
 
 
@@ -28,7 +37,7 @@ def _key(batch: Path) -> dict[str, Any]:
 def _judge_all(batch: Path, preferred: str = "A") -> None:
     client = reader(batch)
     for number in range(1, len(_view(batch)["pairs"]) + 1):
-        response = client.post(f"/pairs/{number}", data={"preferred": preferred, "strength": "2"})
+        response = client.post(f"/pairs/{number}", data=complete_form(preferred))
         assert response.status_code in {200, 303}
 
 
@@ -82,6 +91,8 @@ def test_a_batch_name_cannot_be_reused(
             "control",
             "--batches-dir",
             str(tmp_path / "batches"),
+            "--rubric-dir",
+            str(RUBRIC_DIR),
         ]
     )
 
@@ -107,6 +118,8 @@ def test_a_condition_missing_from_a_run_is_rejected(
             "control",
             "--batches-dir",
             str(tmp_path / "batches"),
+            "--rubric-dir",
+            str(RUBRIC_DIR),
         ]
     )
 
@@ -134,18 +147,34 @@ def test_no_page_or_api_response_reveals_the_key(runs: tuple[Path, Path], tmp_pa
         responses.append(client.get(f"/pairs/{number}"))
         responses.append(client.get(f"/api/pairs/{number}"))
         responses.append(
-            client.post(
-                f"/pairs/{number}", data={"preferred": "B", "strength": "3"}, follow_redirects=True
-            )
+            client.post(f"/pairs/{number}", data=complete_form("B", 3), follow_redirects=True)
         )
     responses.append(client.post("/close", follow_redirects=True))
     responses += [client.get("/sealed/key.json"), client.get("/key.json")]
 
+    guesses: set[str] = set()
     for response in responses:
-        body = response.text.lower()
+        body = _without_guess_options(response, guesses).lower()
         for word in forbidden:
             assert word.lower() not in body, f"{response.request.url} leaks {word!r}"
     assert responses[-1].status_code == 404
+    # The guess offers both condition names, always in the same order, on every page.
+    assert guesses == {"control | intact"}
+
+
+_GUESS = re.compile(r'<fieldset class="guess">(.*?)</fieldset>', re.DOTALL)
+
+
+def _without_guess_options(response: Response, seen: set[str]) -> str:
+    """The response without the condition guess, which names both conditions by design."""
+    if response.headers.get("content-type", "").startswith("application/json"):
+        data: dict[str, Any] = response.json()
+        if data.get("judgement"):
+            data["judgement"]["guess"] = None
+        return json.dumps(data)
+    for options in _GUESS.findall(response.text):
+        seen.add(" | ".join(re.findall(r'value="([^"]+)"', options)))
+    return _GUESS.sub("", response.text)
 
 
 def test_a_pair_page_shows_both_stories_and_the_choice_form(
@@ -167,12 +196,13 @@ def test_judgements_are_saved_at_once_and_survive_a_restart(
     runs: tuple[Path, Path], tmp_path: Path
 ) -> None:
     batch = build_batch(tmp_path, runs)
-    reader(batch).post("/pairs/1", data={"preferred": "B", "strength": "3"})
+    reader(batch).post("/pairs/1", data=complete_form("B", 3))
 
     restarted = reader(batch)
 
     assert restarted.get("/api/progress").json() == {"pairs": 4, "judged": 1, "closed": False}
-    assert restarted.get("/api/pairs/1").json()["judgement"] == {"preferred": "B", "strength": 3}
+    judgement = restarted.get("/api/pairs/1").json()["judgement"]
+    assert (judgement["preferred"], judgement["strength"]) == ("B", 3)
     # The reader resumes at the first unjudged pair.
     resumed = restarted.get("/", follow_redirects=False)
     assert resumed.headers["location"] == "/pairs/2"
@@ -196,7 +226,7 @@ def test_the_batch_closes_only_when_every_pair_is_judged(
 ) -> None:
     batch = build_batch(tmp_path, runs)
     client = reader(batch)
-    client.post("/pairs/1", data={"preferred": "A", "strength": "1"})
+    client.post("/pairs/1", data=complete_form("A", 1))
 
     assert client.post("/close").status_code == 409
     _judge_all(batch)
@@ -209,7 +239,7 @@ def test_a_closed_batch_rejects_new_judgements(runs: tuple[Path, Path], tmp_path
     _judge_all(batch)
     reader(batch).post("/close")
 
-    response = reader(batch).post("/pairs/1", data={"preferred": "B", "strength": "1"})
+    response = reader(batch).post("/pairs/1", data=complete_form("B", 1))
 
     assert response.status_code == 409
     assert reader(batch).get("/api/pairs/1").json()["judgement"]["preferred"] == "A"
@@ -234,7 +264,7 @@ def test_the_report_reveals_the_key_with_win_counts_and_a_binomial_p_value(
     # Prefer the intact story in every pair.
     for number, pair in enumerate(_key(batch)["pairs"], start=1):
         side = "A" if pair["a"]["condition"] == "intact" else "B"
-        client.post(f"/pairs/{number}", data={"preferred": side, "strength": "2"})
+        client.post(f"/pairs/{number}", data=complete_form(side))
     client.post("/close")
     capsys.readouterr()
 

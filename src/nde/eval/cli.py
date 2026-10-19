@@ -3,11 +3,14 @@
 import argparse
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from nde.eval import batch as batches
 from nde.eval import report
+from nde.eval.leakage import generating_code_warning
 from nde.eval.reader import DEFAULT_PORT, HOST
+from nde.eval.rubric import DEFAULT_RUBRIC_DIR, RubricError, load_rubric
 
 EXIT_OK = 0
 EXIT_USAGE = 2
@@ -38,6 +41,10 @@ def configure(evaluation: argparse.ArgumentParser) -> None:
         help="a run directory and one of its conditions; give exactly two",
     )
     build.add_argument("--seed", type=int, help="shuffle seed (default: random, kept sealed)")
+    build.add_argument(
+        "--rubric-dir", type=Path, default=DEFAULT_RUBRIC_DIR, help="(./benchmark/rubric)"
+    )
+    build.add_argument("--rubric-version", type=int, default=1, help="rubric version (1)")
     _batches_dir_option(build)
 
     serve = sub.add_parser("serve", help="open the blind reader on localhost")
@@ -56,7 +63,10 @@ def _build(args: argparse.Namespace) -> int:
         print("nde eval batch: give --from exactly twice", file=sys.stderr)
         return EXIT_USAGE
     first, second = (batches.Source(Path(run), condition) for run, condition in sources)
-    path = batches.build_batch(args.batches_dir, args.name, first, second, seed=args.seed)
+    rubric = load_rubric(args.rubric_dir, args.rubric_version)
+    path = batches.build_batch(
+        args.batches_dir, args.name, (first, second), rubric=rubric, seed=args.seed
+    )
     pairs = len(batches.read_view(path).pairs)
     print(f"built batch {args.name!r}: {pairs} pairs in {path}")
     print(f"read it with: uv run nde eval serve --batch {args.name}")
@@ -70,6 +80,10 @@ def _serve(args: argparse.Namespace) -> int:
     from nde.eval.reader import create_app  # noqa: PLC0415
 
     path = batches.batch_dir(args.batches_dir, args.batch)
+    warning = generating_code_warning(Path.cwd(), datetime.now(UTC))
+    if warning is not None:
+        batches.record_warning(path, warning)
+        print(f"WARNING: {warning}; the batch report will record this", file=sys.stderr)
     print(f"blind reader for {args.batch!r}: http://{HOST}:{args.port}/  (Ctrl+C to stop)")
     uvicorn.run(create_app(path), host=HOST, port=args.port, log_level="warning")
     return EXIT_OK
@@ -85,6 +99,6 @@ def run(args: argparse.Namespace) -> int:
     handlers = {"batch": _build, "serve": _serve, "report": _report}
     try:
         return handlers[args.eval_command](args)
-    except batches.BatchError as error:
+    except (batches.BatchError, RubricError) as error:
         print(f"nde eval {args.eval_command}: {error}", file=sys.stderr)
         return EXIT_USAGE
