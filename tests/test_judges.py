@@ -5,6 +5,8 @@ from typing import Any
 import pytest
 
 from nde.cli import main
+from nde.eval.judge_report import PairLabels, judges_section
+from nde.eval.judges import JudgeRecord
 from tests.conftest import base_config, write_config
 from tests.eval_helpers import Marks, build_batch, complete_form, reader, seeded_story, two_runs
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
@@ -232,8 +234,24 @@ def test_the_report_gives_each_family_wins_agreement_kappa_and_consistency(
     assert "## LLM judges" in report
     assert "Judges never pass a gate" in report
     # family-one always prefers story 1, so it flips with the order: never consistent.
-    assert "| family-one | fake/biased-judge | 4 | 0 | 0 | 4 | 0% | 0.00 | 0% |" in report
+    assert "| family-one | fake/biased-judge | 4 | 0 | 0 | 4 | 0 | 0% | 0.00 | 0% |" in report
     # family-two always prefers intact: it agrees with the owner in 3 of 4 pairs. The owner
     # rates [i, i, i, c] and the judge [i, i, i, i]: observed 0.75, chance 0.75, kappa 0.
-    assert "| family-two | fake/fair-judge | 4 | 4 | 0 | 0 | 75% | 0.00 | 100% |" in report
+    assert "| family-two | fake/fair-judge | 4 | 4 | 0 | 0 | 0 | 75% | 0.00 | 100% |" in report
     assert "### Judge rubric scores" in report
+
+
+def test_a_missing_verdict_is_incomplete_not_position_inconsistent() -> None:
+    pairs = [PairLabels(a="intact", b="control", owner="intact") for _ in range(2)]
+    records = [
+        JudgeRecord(judge="f/j", family="f", mode="pairwise", pair=1, order="AB", preferred="A"),
+        JudgeRecord(judge="f/j", family="f", mode="pairwise", pair=1, order="BA", preferred="A"),
+        JudgeRecord(judge="f/j", family="f", mode="pairwise", pair=2, order="AB", preferred="A"),
+        JudgeRecord(judge="f/j", family="f", mode="pairwise", pair=2, order="BA", error="bad"),
+    ]
+
+    lines = judges_section(records, pairs, ["intact", "control"], None)
+
+    # One consistent pair; pair 2 is incomplete, so 0 inconsistent and 100% consistency.
+    assert "| f | f/j | 2 | 1 | 0 | 0 | 1 | 50% |" in "\n".join(lines)
+    assert "| 100% |" in "\n".join(lines)

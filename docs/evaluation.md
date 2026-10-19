@@ -189,9 +189,16 @@ one row per judge (so per family on a typical panel):
 | --- | --- |
 | Wins per condition | position-consistent verdicts only |
 | Position-inconsistent | pairs whose two orders disagreed; reported, not averaged away |
-| Agreement with owner | share of pairs where the judge's consistent verdict matched the owner's preference; inconsistent pairs count as disagreement |
-| Cohen's kappa | agreement beyond chance between the owner's preferred condition and the judge's verdict ("inconsistent" is its own category); `n/a` when undefined |
+| Incomplete | pairs missing a valid verdict in one or both orders |
+| Agreement with owner | share of pairs where the judge's consistent verdict matched the owner's preference; inconsistent and incomplete pairs count as disagreement |
+| Cohen's kappa | agreement beyond chance between the owner's preferred condition and the judge's verdict ("inconsistent" and "incomplete" are categories of their own); `n/a` when undefined |
 | Position consistency | consistent pairs as a share of the pairs judged in both orders |
+
+**Reading kappa on a one-sided batch.** Kappa corrects agreement for chance,
+and chance agreement is high when one side wins almost every pair. In the
+instrument check, if you prefer intact B in 10 of 10 pairs, kappa is `n/a`
+for a judge that does the same, and 0 or below for a judge with even one
+inconsistent pair. In that case read agreement, the gate's metric, not kappa.
 
 A **Judge rubric scores** table gives each judge's mean score per dimension
 and condition. If a judge is run again, its latest verdicts count.

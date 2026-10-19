@@ -6,6 +6,8 @@ Per judge (one per family on a typical panel):
   orders preferred the same story).
 - **Position-inconsistent** pairs: the two orders disagreed. They are reported,
   not averaged away, and count as disagreement with the owner.
+- **Incomplete** pairs: a verdict is missing or invalid in one or both orders.
+  They also count as disagreement, and are left out of position consistency.
 - **Agreement with the owner**: the share of pairs where the judge's
   consistent verdict matches the owner's preference.
 - **Cohen's kappa** between the owner's preferred condition and the judge's
@@ -17,11 +19,13 @@ Per judge (one per family on a typical panel):
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from nde.eval.judges import JudgeRecord
+from nde.eval.judges import ORDERS, JudgeRecord
 from nde.eval.rubric import Rubric
 from nde.eval.stats import cohens_kappa
 
 INCONSISTENT = "inconsistent"
+# A pair missing a valid verdict in one or both orders (an invalid or absent response).
+INCOMPLETE = "incomplete"
 
 
 @dataclass(frozen=True)
@@ -66,14 +70,16 @@ def _pairwise_row(judge: _Judge, pairs: Sequence[PairLabels], names: Sequence[st
     both_orders = consistent = 0
     for number, labels in enumerate(pairs, start=1):
         orders = verdicts.get(number, {})
-        if len(orders) == 2:  # noqa: PLR2004 - both orders
-            both_orders += 1
-        if len(orders) == 2 and orders["AB"] == orders["BA"]:  # noqa: PLR2004 - both orders
-            consistent += 1
-            verdict = labels.condition(orders["AB"])
-            wins[verdict] += 1
+        if len(orders) < len(ORDERS):
+            verdict = INCOMPLETE
         else:
-            verdict = INCONSISTENT
+            both_orders += 1
+            if orders["AB"] == orders["BA"]:
+                consistent += 1
+                verdict = labels.condition(orders["AB"])
+                wins[verdict] += 1
+            else:
+                verdict = INCONSISTENT
         judged.append(verdict)
         owner.append(labels.owner)
     agreed = sum(a == b for a, b in zip(judged, owner, strict=True))
@@ -81,7 +87,8 @@ def _pairwise_row(judge: _Judge, pairs: Sequence[PairLabels], names: Sequence[st
     win_cells = " | ".join(str(wins[name]) for name in names)
     return (
         f"| {judge.family} | {judge.label} | {len(pairs)} | {win_cells} "
-        f"| {len(pairs) - consistent} | {_percent(agreed, len(pairs))} "
+        f"| {both_orders - consistent} | {len(pairs) - both_orders} "
+        f"| {_percent(agreed, len(pairs))} "
         f"| {'n/a' if kappa is None else f'{kappa:.2f}'} | {_percent(consistent, both_orders)} |"
     )
 
@@ -128,8 +135,9 @@ def judges_section(
         "verdicts in this closed batch; position-inconsistent pairs count as disagreement.",
         "",
         f"| Family | Judge | Pairs | {' | '.join(f'{n} wins' for n in names)} "
-        "| Position-inconsistent | Agreement with owner | Cohen's kappa | Position consistency |",
-        f"| --- | --- | --- |{' --- |' * len(names)} --- | --- | --- | --- |",
+        "| Position-inconsistent | Incomplete | Agreement with owner | Cohen's kappa "
+        "| Position consistency |",
+        f"| --- | --- | --- |{' --- |' * len(names)} --- | --- | --- | --- | --- |",
         *(_pairwise_row(judge, pairs, names) for judge in judges),
         "",
     ]
