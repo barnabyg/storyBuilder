@@ -226,3 +226,10 @@ def test_drafts_from_a_run_without_brief_drafts_are_refused(
     assert main(["briefs", "drafts", str(run_dir), "--out", str(tmp_path / "drafts")]) == 1
 
     assert "no brief drafts" in capsys.readouterr().err
+
+
+def test_the_committed_frozen_fixture_split_passes_the_check() -> None:
+    # The manual test edits this fixture to see the check fail (docs/briefs.md).
+    assert (
+        main(["briefs", "check", "--dir", str(REPO / "tests" / "fixtures" / "frozen-split")]) == 0
+    )

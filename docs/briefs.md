@@ -61,7 +61,16 @@ uv run nde briefs freeze test
 Freezing records the SHA-256 of every brief in the split in
 `benchmark/frozen.json`, the same way `prompts/checksums.json` records prompt
 templates. After that, editing, adding or removing a brief in that split fails
-the check, naming the brief. A frozen split cannot be refrozen over changes:
+the check, naming the brief. To see this, change one character in the frozen
+fixture split and check it:
+
+```powershell
+uv run nde briefs check --dir tests/fixtures/frozen-split
+```
+
+It fails with `test/brief-91 changed after the test split was frozen`; restore
+the file with `git checkout tests/fixtures/frozen-split`. A frozen split cannot
+be refrozen over changes:
 restore the briefs instead. Runs record the split's checksum in their
 manifest, so a gate result names exactly the briefs it used.
 

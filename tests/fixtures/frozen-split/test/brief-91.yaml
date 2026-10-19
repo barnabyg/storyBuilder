@@ -1,0 +1,17 @@
+id: brief-91
+split: test
+genre: literary fiction
+premise: >-
+  On the night her late husband's fishing boat is finally sold, a lighthouse
+  keeper on a decommissioned station learns that the buyer plans to run it
+  aground for the insurance.
+protagonist:
+  name: Ada Venn
+  description: a widowed former keeper in her sixties who still climbs the tower every night
+central_conflict: >-
+  Ada must choose between exposing the buyer, a neighbour whose family is
+  drowning in debt, and letting the last thing her husband built be destroyed.
+themes: [grief, loyalty, letting go]
+ending_constraint:
+  kind: bittersweet
+  detail: The boat is lost, but Ada keeps her neighbour's trust and her own self-respect.
