@@ -1,59 +1,52 @@
-# Gate G-instr, LLM judge panel over the p1-instrument batch (docs/evaluation.md).
+# Gate G-instr, LLM judge over the p1-instrument batch (docs/evaluation.md).
 #
 #   uv run nde run configs/p1-judges.yaml
 #
-# OWNER: choose the panel (see #22). The batch's stories come from the openai
-# (planner) and deepseek (prose) families, so judges must come from two other
-# families. The proposal below uses Anthropic and Mistral through their
-# OpenAI-compatible chat-completions endpoints. Replace either judge freely:
-# set `family` on every judge.
+# The owner's choice (19 October 2026): one judge, OpenAI gpt-6.1-sol at medium
+# reasoning effort. Only OpenAI and DeepSeek APIs are available, and the batch's
+# stories come from both families (planner gpt-6-luna, prose deepseek-flash), so
+# the plan's family rules are waived explicitly below. Every report on the batch
+# flags that this judge shares the planner's family (self-preference is not
+# controlled).
 #
-# Needs ANTHROPIC_API_KEY and MISTRAL_API_KEY in the environment or in `.env`.
-# CHECK BEFORE RUNNING: both model IDs, both base URLs and both prices against
-# the providers' current documentation.
+# Needs OPENAI_API_KEY in the environment or in `.env`.
+# CHECK BEFORE RUNNING: the model ID and price against OpenAI's current lists.
 name: p1-judges
 seed: 2320
 prompts_dir: ../prompts
 
 providers:
-  anthropic:
-    base_url: https://api.anthropic.com/v1
-    base_url_env: NDE_ANTHROPIC_BASE_URL
-    api_key_env: ANTHROPIC_API_KEY  # pragma: allowlist secret - a variable name, not a key
-    json_schema: false          # the schema goes in the prompt
-    timeout_s: 180
-  mistral:
-    base_url: https://api.mistral.ai/v1
-    base_url_env: NDE_MISTRAL_BASE_URL
-    api_key_env: MISTRAL_API_KEY  # pragma: allowlist secret - a variable name, not a key
-    json_schema: false
-    timeout_s: 180
+  openai:
+    base_url: https://api.openai.com/v1
+    base_url_env: NDE_OPENAI_BASE_URL
+    api_key_env: OPENAI_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: true           # response_format: json_schema
+    timeout_s: 300
 
 judges:
   batch: p1-instrument
   batches_dir: ../batches
   modes: [pairwise, rubric]
+  min_families: 1                 # waived: a one-judge panel
+  allow_generator_families: true  # waived: shares the planner's family (openai)
   panel:
-    - provider: anthropic
-      model: claude-haiku-5-5
-      family: anthropic
-      params: {max_tokens: 2000}
-    - provider: mistral
-      model: mistral-small-latest
-      family: mistral
-      params: {temperature: 0.2, max_tokens: 2000}
+    - provider: openai
+      model: gpt-6.1-sol
+      family: openai
+      # A reasoning model: Chat Completions takes max_completion_tokens, which
+      # also bounds the reasoning tokens and so each call's cost reservation.
+      params: {reasoning_effort: medium, max_completion_tokens: 8000}
 
 structured:
   max_repairs: 2
 
 prices:
-  # Anthropic's model list (Claude API skill, cached 2026-10-06): prompts up to 100K tokens.
-  anthropic/claude-haiku-5-5: {input_per_mtok: 0.10, output_per_mtok: 0.50}
-  # Third-party price listing for Mistral Small 4 (2026-09); NOT checked against
-  # Mistral's own price list.
-  mistral/mistral-small-latest: {input_per_mtok: 0.15, output_per_mtok: 0.60}
+  # Secondary listings citing OpenAI's price page (checked 2026-10-19): $2 input,
+  # $10 output per million tokens; reasoning tokens bill as output.
+  openai/gpt-6.1-sol: {input_per_mtok: 2.00, output_per_mtok: 10.00}
 
 budget:
-  # 10 pairs x 2 judges x 4 calls of two stories (~6K tokens) or one (~3K).
-  per_run_usd: 1.00
-  per_day_usd: 5.00
+  # 10 pairs x (2 orders + 2 stories) = 40 calls. Each reserves at most about
+  # $0.09 (8,000 output tokens plus the stories); actual spend is likely $1-2.
+  per_run_usd: 5.00
+  per_day_usd: 10.00
