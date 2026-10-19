@@ -65,7 +65,7 @@ def test_an_out_of_range_story_is_regenerated_on_a_new_seed(
     calls = jsonl(run_dir / "calls.jsonl")
     assert [c["story_attempt"] for c in calls] == [0, 1]
     report = (run_dir / "report.md").read_text(encoding="utf-8")
-    assert "| brief-01 | A | 1 | 2000 | 2000 | 2 | yes | ok | 2 |" in report
+    assert "| brief-01 | A | 1 | 2000 | 2000 | 2 | yes | 0 | ok | 2 |" in report
 
 
 def test_a_story_still_out_of_range_after_the_bound_is_kept_and_flagged(

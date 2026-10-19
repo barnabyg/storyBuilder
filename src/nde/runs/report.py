@@ -253,11 +253,12 @@ def _stories_section(
         "Token cost is at list price, cache hits included; new spend is what this run paid.",
         "",
         f"Words are counted on the normalised story; the length tolerance is "
-        f"{_tolerance(summary.length_tolerance)}, with at most {summary.max_attempts} attempts.",
+        f"{_tolerance(summary.length_tolerance)}, with at most {summary.max_attempts} attempts. "
+        "Attempts are those of the story's final generation: its last revision pass, if any.",
         "",
-        "| Brief | Condition | Rep | Words | Target | Attempts | In range | Status | Calls "
-        "| Input tokens | Output tokens | Token cost | New spend | Files |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Brief | Condition | Rep | Words | Target | Attempts | In range | Revisions | Status "
+        "| Calls | Input tokens | Output tokens | Token cost | New spend | Files |",
+        "|" + " --- |" * 15,
     ]
     for story in stories:
         # Attempt folders hold every generation; link only the story and its plan files.
@@ -267,8 +268,8 @@ def _stories_section(
         story_calls = per_story.get((story.condition, story.brief, story.repetition), [])
         lines.append(
             f"| {story.brief} | {story.condition} | {story.repetition + 1} | {story.words} "
-            f"| {story.target_words} | {len(story.attempts)} "
-            f"| {'yes' if story.in_range else 'no'} | {story.status} "
+            f"| {story.target_words} | {len(story.final_attempts)} "
+            f"| {'yes' if story.in_range else 'no'} | {story.revision_passes} | {story.status} "
             f"| {_usage(story_calls)} | {links} |"
         )
     lines += [
@@ -297,7 +298,7 @@ def _stories_section(
             "",
             *(
                 f"- {s.condition}/{s.brief} #{s.repetition + 1}: {s.words} words after "
-                f"{len(s.attempts)} attempts (target {s.target_words} "
+                f"{len(s.final_attempts)} attempts (target {s.target_words} "
                 f"{_tolerance(summary.length_tolerance)})"
                 for s in out_of_range
             ),

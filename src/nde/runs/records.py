@@ -314,6 +314,12 @@ class StoryRecord(_Record):
     budget: Budget = Field(default_factory=Budget)
     revision_passes: int = 0
     revisions: list[RevisionRecord] = Field(default_factory=list[RevisionRecord])
+
+    @property
+    def final_attempts(self) -> list[LengthAttempt]:
+        """The length-control attempts of the text the story now holds."""
+        return self.revisions[-1].attempts if self.revisions else self.attempts
+
     # Why the story could not be produced, when status is "failed".
     error: str | None = None
     # The story's files (the story and every intermediate output), relative to `path`.

@@ -197,3 +197,31 @@ def test_a_pass_that_lands_just_above_the_other_budget_but_within_tolerance_is_m
 
     match = manifest(run_dir)["stories"]["equal_budget"]["matches"][0]
     assert (match["passes"], match["matched"], match["reason"]) == (1, True, None)
+
+
+def test_the_report_shows_revision_passes_and_the_final_generations_attempts(
+    budget_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    replies = iter(
+        [
+            completion(story_text(1500), completion_tokens=1000),
+            completion(story_text(1600), completion_tokens=1000),
+            completion(story_text(2050), completion_tokens=1000),
+        ]
+    )
+
+    def revision_replies(body: Json) -> Reply:
+        if "Revise" in last_user_message(body):
+            return next(replies)
+        return _reply(body)
+
+    budget_llm.default = revision_replies
+    config = _config(budget_llm.base_url)
+    config["stories"]["briefs"] = {"ids": ["brief-01"]}
+
+    run_dir = run(tmp_path, config)
+
+    report = (run_dir / "report.md").read_text(encoding="utf-8")
+    # A: 2,050 words after the revision's third attempt, one revision pass.
+    assert "| brief-01 | A | 1 | 2050 | 2000 | 3 | yes | 1 | ok |" in report
+    assert "| brief-01 | B | 1 | 2000 | 2000 | 1 | yes | 0 | ok |" in report
