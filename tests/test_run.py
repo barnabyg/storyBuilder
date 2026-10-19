@@ -185,4 +185,4 @@ def test_committed_configs_are_valid(config: Path) -> None:
 
     prepared = prepare(config, keys)
 
-    assert prepared.loaded.config.calls
+    assert prepared.loaded.config.calls or prepared.stories

@@ -3,7 +3,10 @@
 - `manifest.json`: what ran, from what, and how it ended (`Manifest`).
 - `outputs.jsonl`: one `OutputRecord` per call. Deterministic: re-running a run
   from cache produces a byte-identical file.
-- `calls.jsonl`: one `CallRecord` per call, with timings and usage.
+- `calls.jsonl`: one `CallRecord` per provider call, with timings and usage.
+- `stories.jsonl` and `stories/`: for story runs, one `StoryRecord` per story,
+  and each story's files under `stories/<condition>/<brief>/r<repetition>/`.
+  Deterministic, like `outputs.jsonl`.
 - `report.md`: generated from the three files above, never edited by hand.
 """
 
@@ -18,6 +21,8 @@ MANIFEST = "manifest.json"
 OUTPUTS = "outputs.jsonl"
 CALLS = "calls.jsonl"
 REPORT = "report.md"
+STORIES = "stories.jsonl"
+STORY_DIR = "stories"
 
 type RunStatus = Literal["running", "succeeded", "failed", "aborted"]
 
@@ -108,6 +113,25 @@ class BenchmarkSummary(_Record):
     rows: list[BenchmarkRow]
 
 
+class ConditionUse(_Record):
+    name: str
+    pipeline: str
+    params: dict[str, JsonValue]
+
+
+class StoriesSummary(_Record):
+    """What a story run generated from."""
+
+    briefs_dir: str
+    brief_ids: list[str]
+    # Checksum of each frozen split the briefs come from (see nde.briefs).
+    split_checksums: dict[str, str]
+    conditions: list[ConditionUse]
+    repeat: int
+    stories: int = 0
+    failed: int = 0
+
+
 class RunError(_Record):
     """Why a run failed: a common provider error type (see nde.llm.errors) or "internal"."""
 
@@ -143,6 +167,8 @@ class Manifest(_Record):
     structured: dict[str, StructuredMetrics] = Field(default_factory=dict[str, StructuredMetrics])
     # Set for benchmark configs: the per-candidate comparison for gate G0.
     benchmark: BenchmarkSummary | None = None
+    # Set for story runs.
+    stories: StoriesSummary | None = None
     files: dict[str, str] = Field(
         default_factory=lambda: {"outputs": OUTPUTS, "calls": CALLS, "report": REPORT}
     )
@@ -166,6 +192,10 @@ class OutputRecord(_Record):
 class CallRecord(_Record):
     call: str
     repetition: int
+    # For story runs: the brief, condition and pipeline step the call served.
+    brief: str | None = None
+    condition: str | None = None
+    step: str | None = None
     # 0 for the first request; 1, 2, ... for structured-output repair requests.
     attempt: int = 0
     provider: str
@@ -187,7 +217,30 @@ class CallRecord(_Record):
     token_cost_usd: float
 
 
-def write_jsonl(path: Path, records: list[OutputRecord] | list[CallRecord]) -> None:
+type StoryStatus = Literal["ok", "failed"]
+
+
+class StoryRecord(_Record):
+    """One generated story. Deterministic: no timings or spend, so re-runs match byte for byte."""
+
+    brief: str
+    condition: str
+    pipeline: str
+    repetition: int
+    seed: int
+    status: StoryStatus
+    # Folder of the story's files, relative to the run directory.
+    path: str
+    words: int = 0
+    # Why the story could not be produced, when status is "failed".
+    error: str | None = None
+    # The story's files (the story and every intermediate output), relative to `path`.
+    files: list[str] = Field(default_factory=list[str])
+
+
+def write_jsonl(
+    path: Path, records: list[OutputRecord] | list[CallRecord] | list[StoryRecord]
+) -> None:
     write_text_lf(path, "".join(record.model_dump_json() + "\n" for record in records))
 
 
@@ -197,6 +250,10 @@ def read_outputs(run_dir: Path) -> list[OutputRecord]:
 
 def read_calls(run_dir: Path) -> list[CallRecord]:
     return [CallRecord.model_validate_json(line) for line in _lines(run_dir / CALLS)]
+
+
+def read_stories(run_dir: Path) -> list[StoryRecord]:
+    return [StoryRecord.model_validate_json(line) for line in _lines(run_dir / STORIES)]
 
 
 def read_manifest(run_dir: Path) -> Manifest:

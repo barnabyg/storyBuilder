@@ -56,6 +56,87 @@ A config may also have a `benchmark` section that runs one role's calls once
 per candidate model and compares them; the role then needs no entry under
 `roles`. See [benchmark.md](benchmark.md).
 
+## Story-generation runs
+
+A config with a `stories` section generates **stories**: one per brief, per
+**condition**, per repetition. A condition names a registered generation
+**pipeline** and its parameters. `configs/stories-a.yaml` runs Baseline A on
+two dev briefs:
+
+```yaml
+roles:
+  prose: {provider: deepseek, model: deepseek-flash, params: {max_tokens: 5000}}
+
+stories:
+  briefs_dir: ../benchmark          # relative to the config file (default ../benchmark)
+  briefs: {ids: [brief-01, brief-02]}   # or {split: dev}, or a split and ids in it
+  repeat: 1                         # stories per brief and condition
+  conditions:
+    - name: A                       # a label for reports and blind batches
+      pipeline: baseline_a          # registered in nde.stories.PIPELINES
+      params: {}                    # validated by the pipeline; optional
+```
+
+`calls` and `stories` can appear in the same config; the calls run first. A
+config needs at least one of them.
+
+Before any call, `nde run` rejects unknown briefs, unknown pipelines, invalid
+condition parameters, missing or changed prompt templates, a role a pipeline
+uses that has no model, and unpriced models (see [briefs.md](briefs.md) for
+the briefs themselves).
+
+Stories are written brief by brief: for each brief and repetition, every
+condition in turn, so a budget stop leaves comparable stories. Repetition *i*
+uses seed + *i* for every condition.
+
+### Pipelines
+
+| Pipeline | Condition | Steps |
+| --- | --- | --- |
+| `baseline_a` | Baseline A | one call on `prose` with `story_a@1`: brief to complete story |
+
+Parameters: `baseline_a` takes `prompt` (default `{template: story_a,
+version: 1}`).
+
+### What a story run records
+
+| File | Contents |
+| --- | --- |
+| `stories/<condition>/<brief>/r<n>/story.md` | the story; intermediate outputs (such as an outline) sit beside it |
+| `stories.jsonl` | one line per story: brief, condition, pipeline, repetition, seed, status, word count and its files |
+| `calls.jsonl` | as for every run; each line also names the `brief`, `condition` and pipeline `step` it served |
+| `manifest.json` | the `stories` section: brief IDs, the checksum of each frozen split they come from, conditions and repetitions |
+
+The report's **Stories** section lists every story with its word count,
+calls, tokens and cost, and a **Per condition** table gives the totals and the
+cost per story. A re-run reads every response from the cache and reproduces
+`stories/` and `stories.jsonl` byte for byte.
+
+A step whose structured output is still invalid after its repairs fails that
+story, not the run: the story is recorded with `status: failed` and the error,
+and the run goes on. A budget stop aborts the run and a provider error fails
+it, as for any call; both still leave the manifest, the stories so far and the
+report.
+
+### Registering a pipeline
+
+A pipeline is a subclass of `nde.stories.pipeline.Pipeline` with:
+
+- `roles`: the roles it calls, checked against the config's `roles`;
+- `templates()`: every prompt template it uses and the variables it fills in,
+  so templates are loaded and checked before any call;
+- `plan(ctx)`: calls that are never regenerated, such as an outline (return
+  `None` if there are none);
+- `write(ctx, plan, seed=...)`: the prose calls; returns the raw story text.
+
+Every call goes through the `StoryContext`: `ctx.complete(step, seed=...)` and
+`ctx.structured(step, Model, seed=...)` take a `Step` (its name in
+`calls.jsonl`, role, template and variables), and `ctx.keep(name, text)` keeps
+an intermediate output as a file beside the story. A pipeline's parameters are
+a Pydantic model it validates in a `from_params` class method. Register the
+class in `PIPELINES` in `src/nde/stories/__init__.py`. Baseline A
+(`src/nde/stories/baseline_a.py`) is the smallest example.
+
 ## Prompt templates
 
 Templates live at `prompts/<name>/v<version>.yaml`:
@@ -257,6 +338,7 @@ Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
 | `manifest.json` | git SHA (and whether the tree was dirty), config path and hash, seed, models per role, prompt template versions and checksums, timestamps and run status |
 | `outputs.jsonl` | one line per call: call ID, repetition, model, seed and the raw output text |
 | `calls.jsonl` | one line per provider call (including repair attempts): the reported model ID, template, tokens, cost, latency, retries and whether it was a cache hit |
+| `stories.jsonl`, `stories/` | story runs only; see [Story-generation runs](#story-generation-runs) |
 | `report.md` | generated from the files above |
 
 Regenerate a report with `uv run nde report <run dir>`.
