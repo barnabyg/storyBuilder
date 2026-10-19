@@ -310,7 +310,8 @@ uv run nde prompts lock
 ```
 
 `nde prompts lock` never re-records a changed version; it reports it and
-exits 2.
+exits 2. `uv run nde prompts lock --check` reports unrecorded and changed
+versions without writing anything, and exits 2 if there are any.
 
 ## Provider failures and retries
 

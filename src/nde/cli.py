@@ -25,6 +25,12 @@ EXIT_RUN_FAILED = 1
 EXIT_USAGE = 2
 
 
+def _check_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--check", action="store_true", help="report unrecorded or changed versions; write nothing"
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
@@ -72,6 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
     prompt_commands = prompt.add_subparsers(dest="prompts_command", required=True)
     lock = prompt_commands.add_parser("lock", help="record checksums of new template versions")
     lock.add_argument("--dir", type=Path, default=Path("prompts"), help="templates (./prompts)")
+    _check_option(lock)
 
     eval_cli.configure(
         commands.add_parser("eval", help="blind evaluation: batches, reader, reports")
@@ -101,9 +108,7 @@ def build_parser() -> argparse.ArgumentParser:
     rubric_lock.add_argument(
         "--dir", type=Path, default=rubric.DEFAULT_RUBRIC_DIR, help="(./benchmark/rubric)"
     )
-    rubric_lock.add_argument(
-        "--check", action="store_true", help="report unrecorded or changed versions; write nothing"
-    )
+    _check_option(rubric_lock)
 
     brief = commands.add_parser("briefs", help="check, freeze and draft benchmark briefs")
     brief_commands = brief.add_subparsers(dest="briefs_command", required=True)
@@ -148,13 +153,30 @@ def _report(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _prompts_lock(args: argparse.Namespace) -> int:
-    added, changed = prompts.lock(args.dir)
-    for label in added:
-        print(f"recorded {label}")
+type Versions = Callable[[Path], tuple[list[str], list[str]]]
+
+
+def _lock(args: argparse.Namespace, command: str, check: Versions, lock: Versions) -> int:
+    """`nde <command> lock`: record new versions, or with --check only report them.
+
+    Exits 2 if a released version changed, or, with --check, if one is unrecorded.
+    """
+    if args.check:
+        unrecorded, changed = check(args.dir)
+        for label in unrecorded:
+            print(f"UNRECORDED {label}: run `nde {command} lock`", file=sys.stderr)
+    else:
+        added, changed = lock(args.dir)
+        unrecorded = []
+        for label in added:
+            print(f"recorded {label}")
     for label in changed:
         print(f"CHANGED {label}: restore its text or save it as a new version", file=sys.stderr)
-    return EXIT_USAGE if changed else EXIT_OK
+    return EXIT_USAGE if changed or unrecorded else EXIT_OK
+
+
+def _prompts_lock(args: argparse.Namespace) -> int:
+    return _lock(args, "prompts", prompts.check, prompts.lock)
 
 
 def _calibration(args: argparse.Namespace) -> int:
@@ -173,18 +195,7 @@ def _calibration(args: argparse.Namespace) -> int:
 
 
 def _rubric_lock(args: argparse.Namespace) -> int:
-    if args.check:
-        unrecorded, changed = rubric.check(args.dir)
-        for label in unrecorded:
-            print(f"UNRECORDED {label}: run `nde rubric lock`", file=sys.stderr)
-    else:
-        added, changed = rubric.lock(args.dir)
-        unrecorded = []
-        for label in added:
-            print(f"recorded {label}")
-    for label in changed:
-        print(f"CHANGED {label}: restore its text or save it as a new version", file=sys.stderr)
-    return EXIT_USAGE if changed or unrecorded else EXIT_OK
+    return _lock(args, "rubric", rubric.check, rubric.lock)
 
 
 def _briefs(args: argparse.Namespace) -> int:

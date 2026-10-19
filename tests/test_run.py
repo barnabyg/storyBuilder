@@ -193,3 +193,18 @@ def test_committed_configs_are_valid(config: Path) -> None:
     prepared = prepare(config, keys)
 
     assert prepared.loaded.config.calls or prepared.stories
+
+
+def test_prompts_lock_check_reports_without_writing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    prompts_dir = tmp_path / "prompts"
+    (prompts_dir / "smoke").mkdir(parents=True)
+    (prompts_dir / "smoke" / "v1.yaml").write_text("user: Hello $setting.\n", encoding="utf-8")
+
+    assert main(["prompts", "lock", "--dir", str(prompts_dir), "--check"]) == 2
+
+    assert "UNRECORDED smoke@1: run `nde prompts lock`" in capsys.readouterr().err
+    assert not (prompts_dir / "checksums.json").exists()
+    assert main(["prompts", "lock", "--dir", str(prompts_dir)]) == 0
+    assert main(["prompts", "lock", "--dir", str(prompts_dir), "--check"]) == 0
