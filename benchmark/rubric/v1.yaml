@@ -1,0 +1,173 @@
+# Rubric v1: the dimensions and failure tags that the blind reader and the LLM
+# judges score stories against (docs/rubric.md). Released text is fixed by
+# benchmark/rubric/checksums.json: to change any wording, save it as v2.yaml
+# and run `uv run nde rubric lock`.
+version: 1
+
+# Every dimension is scored on this scale. The anchors describe the low end,
+# the middle and the high end; the points between them are interpolated.
+scale: {min: 1, max: 5}
+
+dimensions:
+  - id: engagement
+    name: Engagement
+    definition: >-
+      How strongly the story makes the reader want to keep reading: open
+      questions, stakes and momentum, judged from the reader's own experience.
+    anchors:
+      low: >-
+        Reading it is a chore. Nothing is at stake, or the stakes are stated
+        rather than felt, and there is no reason to wonder what happens next.
+      middle: >-
+        Readable and occasionally gripping, with real questions raised, but
+        with stretches where attention drifts.
+      high: >-
+        Hard to put down. The story keeps raising questions the reader cares
+        about and answers them at the right moments.
+
+  - id: coherence
+    name: Coherence
+    definition: >-
+      Whether events follow from each other and the story holds together:
+      causes come before effects, and setups and payoffs, facts and the
+      timeline stay consistent.
+    anchors:
+      low: >-
+        Events happen without causes, contradict each other, or arrive in an
+        order that makes no sense. The reader cannot reconstruct what happened
+        or why.
+      middle: >-
+        The main line holds together, but some events are weakly motivated,
+        or there are minor contradictions or setups that never pay off.
+      high: >-
+        Every major event follows from what came before, setups pay off, and
+        nothing contradicts anything else.
+
+  - id: emotional_impact
+    name: Emotional impact
+    definition: >-
+      How much the story makes the reader feel, and whether the feeling is
+      earned by what happens rather than asserted by the narration.
+    anchors:
+      low: >-
+        The reader feels nothing, or the story tells the reader what to feel
+        ("it was heartbreaking") without giving a reason to feel it.
+      middle: >-
+        Some moments land, but others are stated rather than dramatised, or the
+        feeling fades before the end.
+      high: >-
+        The story produces a strong, specific feeling that comes out of its
+        events and characters and lasts beyond the last line.
+
+  - id: character_believability
+    name: Character believability
+    definition: >-
+      Whether the characters act, speak and change like particular people
+      with understandable reasons, rather than serving the plot.
+    anchors:
+      low: >-
+        Characters are mouthpieces or types. They do what the plot needs,
+        change without cause and speak in interchangeable voices.
+      middle: >-
+        The protagonist is mostly convincing, but some choices or changes are
+        unmotivated and secondary characters are thin.
+      high: >-
+        Every important character has recognisable wants and limits, acts from
+        them and changes only under pressure the story has shown.
+
+  - id: pacing
+    name: Pacing
+    definition: >-
+      Whether time and attention are spent where they matter: scenes have the
+      length their weight deserves, and the story neither rushes its turns nor
+      lingers on what does not matter.
+    anchors:
+      low: >-
+        Badly proportioned. Key turns are summarised in a sentence while minor
+        material runs long, or the ending is crammed into the last paragraph.
+      middle: >-
+        Generally well proportioned, with one or two scenes that drag or a turn
+        that is rushed.
+      high: >-
+        Every scene earns its length, the story accelerates and slows when it
+        should, and the ending has room to land.
+
+  - id: originality
+    name: Originality
+    definition: >-
+      How fresh the story is in situation, detail, structure and language,
+      compared with the obvious way to write this brief.
+    anchors:
+      low: >-
+        The most predictable version of the brief, built from stock situations,
+        stock images and familiar phrasing.
+      middle: >-
+        A familiar shape with some specific, surprising details, choices or
+        lines.
+      high: >-
+        Takes the brief somewhere unexpected but right. Details, structure and
+        language feel particular to this story.
+
+failure_tags:
+  - id: unearned-change
+    name: Unearned change
+    definition: >-
+      A character changes their mind, feelings or nature without events in the
+      story that cause it.
+    example: >-
+      A father who has refused to forgive his son for the whole story embraces
+      him in the final scene after one line of dialogue.
+
+  - id: dropped-thread
+    name: Dropped thread
+    definition: >-
+      Something set up as important (an object, a question, a promise, a
+      character) is never resolved or mentioned again.
+    example: >-
+      The protagonist pockets a mysterious key in the first scene; the key
+      never appears again.
+
+  - id: continuity-error
+    name: Continuity error
+    definition: >-
+      A fact contradicts an earlier fact: names, places, times, who knows what,
+      or what has already happened.
+    example: >-
+      A character who left the house in scene 2 answers the door in scene 3
+      with no return shown.
+
+  - id: melodrama
+    name: Melodrama
+    definition: >-
+      Emotion is pitched far above what the events justify, or is signalled
+      through overwrought language instead of action.
+    example: >-
+      A missed train is described as shattering the narrator's world, with
+      tears and screaming, in a story about a minor inconvenience.
+
+  - id: generic
+    name: Generic
+    definition: >-
+      The story could be any story: stock characters, settings, images or
+      phrasing that carry no particular detail.
+    example: >-
+      A grizzled detective in a rain-slicked city who "had seen it all" and
+      solves the case with a sudden hunch.
+
+  - id: rushed-ending
+    name: Rushed ending
+    definition: >-
+      The resolution is summarised or arrives too quickly for the story's
+      build-up, often in the final paragraph.
+    example: >-
+      After four scenes of rising conflict, the last paragraph reports that
+      "in the end, everything worked out" without showing how.
+
+  - id: repetition
+    name: Repetition
+    definition: >-
+      The same beat, image, phrase or emotional note recurs without
+      development, so later scenes restate earlier ones.
+    example: >-
+      Three consecutive scenes each end with the protagonist staring out of a
+      window, feeling uncertain about the future.

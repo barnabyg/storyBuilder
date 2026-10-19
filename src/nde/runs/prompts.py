@@ -7,7 +7,6 @@ Loading a template whose text no longer matches its checksum fails: changing a
 template's text requires a new version. `nde prompts lock` records new versions.
 """
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,11 +15,12 @@ from string import Template
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from nde.files import checksum_lf, write_text_lf
+from nde import versioned
+from nde.files import checksum_lf
 from nde.llm.client import Message
 from nde.runs.config import ConfigError
 
-CHECKSUMS = "checksums.json"
+CHECKSUMS = versioned.CHECKSUMS
 
 
 class _TemplateFile(BaseModel):
@@ -60,14 +60,6 @@ def template_path(prompts_dir: Path, name: str, version: int) -> Path:
     return prompts_dir / name / f"v{version}.yaml"
 
 
-def read_checksums(prompts_dir: Path) -> dict[str, str]:
-    path = prompts_dir / CHECKSUMS
-    if not path.is_file():
-        return {}
-    data: dict[str, str] = json.loads(path.read_text(encoding="utf-8"))
-    return data
-
-
 def load_template(prompts_dir: Path, name: str, version: int) -> PromptTemplate:
     label = f"{name}@{version}"
     path = template_path(prompts_dir, name, version)
@@ -75,13 +67,12 @@ def load_template(prompts_dir: Path, name: str, version: int) -> PromptTemplate:
         data = path.read_bytes()
     except OSError as error:
         raise ConfigError(f"prompt template {label} not found at {path}") from error
-    digest = checksum_lf(data)
-    recorded = read_checksums(prompts_dir).get(label)
-    if recorded is None:
+    released = versioned.status(prompts_dir, label, data)
+    if released == "unregistered":
         raise ConfigError(
             f"prompt template {label} is not registered; run `nde prompts lock` to record it"
         )
-    if recorded != digest:
+    if released == "changed":
         raise ConfigError(
             f"prompt template {label} changed after release; save the new text as a new version"
         )
@@ -89,38 +80,14 @@ def load_template(prompts_dir: Path, name: str, version: int) -> PromptTemplate:
         parsed = _TemplateFile.model_validate(yaml.safe_load(data))
     except (yaml.YAMLError, ValidationError) as error:
         raise ConfigError(f"prompt template {label} is malformed: {error}") from error
-    return PromptTemplate(name, version, parsed.system, parsed.user, digest)
-
-
-def _versions(prompts_dir: Path) -> dict[str, str]:
-    found: dict[str, str] = {}
-    for path in sorted(prompts_dir.glob("*/v*.yaml")):
-        version = path.stem.removeprefix("v")
-        if version.isdigit():
-            found[f"{path.parent.name}@{int(version)}"] = checksum_lf(path.read_bytes())
-    return found
+    return PromptTemplate(name, version, parsed.system, parsed.user, checksum_lf(data))
 
 
 def check(prompts_dir: Path) -> tuple[list[str], list[str]]:
     """Return (unregistered labels, changed labels) without writing anything."""
-    checksums = read_checksums(prompts_dir)
-    found = _versions(prompts_dir)
-    unregistered = [label for label in found if label not in checksums]
-    changed = [label for label, digest in found.items() if checksums.get(label, digest) != digest]
-    return unregistered, changed
+    return versioned.check(prompts_dir)
 
 
 def lock(prompts_dir: Path) -> tuple[list[str], list[str]]:
-    """Record checksums for new template versions.
-
-    Returns (added labels, changed labels). A changed version is never
-    re-recorded: restore its text, or save the new text as a new version.
-    """
-    added, changed = check(prompts_dir)
-    if added:
-        found = _versions(prompts_dir)
-        checksums = read_checksums(prompts_dir) | {label: found[label] for label in added}
-        write_text_lf(
-            prompts_dir / CHECKSUMS, json.dumps(dict(sorted(checksums.items())), indent=2) + "\n"
-        )
-    return added, changed
+    """Record checksums for new template versions; see `nde.versioned.lock`."""
+    return versioned.lock(prompts_dir)

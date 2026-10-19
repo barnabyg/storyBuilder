@@ -32,7 +32,7 @@ See [docs/experiments.md](docs/experiments.md) for configs, prompt templates and
 run directories.
 The G0 model benchmark is described in [docs/benchmark.md](docs/benchmark.md).
 Benchmark briefs (format, drafting, freezing) are described in
-[docs/briefs.md](docs/briefs.md).
+[docs/briefs.md](docs/briefs.md), and the rubric in [docs/rubric.md](docs/rubric.md).
 
 ## Verification
 
@@ -63,7 +63,7 @@ a secret-scan false positive) and has its justification beside it.
 The only broader exceptions are the per-file ignores for `tests/**` in
 `pyproject.toml` (assert statements and literal expected values), justified
 there, and the secret-scan exclusions for checksum files (`prompts/checksums.json`,
-`benchmark/frozen.json`), justified in `src/nde/verify/steps.py`. The code has no type-checker suppressions.
+`benchmark/frozen.json`, `benchmark/rubric/checksums.json`), justified in `src/nde/verify/steps.py`. The code has no type-checker suppressions.
 
 CI (`.github/workflows/verify.yml`) runs the same command headless on every
 push and pull request.
