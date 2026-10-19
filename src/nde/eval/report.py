@@ -2,7 +2,8 @@
 
 Every batch reports win counts with an exact binomial test. Batches scored with
 a rubric add rubric means per condition with bootstrap confidence intervals,
-failure-tag counts and the accuracy of the reader's condition guesses.
+failure-tag counts and the accuracy of the reader's condition guesses. Batches
+with judge-panel runs add the judges' results against the owner's verdicts.
 """
 
 from collections import Counter
@@ -20,6 +21,8 @@ from nde.eval.batch import (
     read_view,
     read_warnings,
 )
+from nde.eval.judge_report import PairLabels, judges_section
+from nde.eval.judges import read_records
 from nde.eval.rubric import Rubric
 from nde.eval.stats import binomial_two_sided, bootstrap_mean_ci
 from nde.files import write_text_lf
@@ -205,6 +208,11 @@ def render_report(batch: Path) -> str:
         lines += _tags_section(revealed, rubric)
     if any(judgement.guess is not None for judgement in revealed.judgements.values()):
         lines += _guess_section(revealed)
+    pairs = [
+        PairLabels(a=a, b=b, owner=a if judgement.preferred == "A" else b)
+        for _, judgement, a, b in revealed.numbered()
+    ]
+    lines += judges_section(read_records(batch), pairs, revealed.names, rubric)
     lines += _pairs_section(revealed)
     return "\n".join(lines)
 

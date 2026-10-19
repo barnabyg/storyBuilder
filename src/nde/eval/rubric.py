@@ -88,6 +88,22 @@ class Rubric(_Strict):
     def tag_ids(self) -> list[str]:
         return [tag.id for tag in self.failure_tags]
 
+    def describe(self) -> str:
+        """The rubric as plain text, for judge prompts."""
+        scale = self.scale
+        lines = [f"Score each dimension from {scale.min} to {scale.max}.", ""]
+        for dimension in self.dimensions:
+            anchors = dimension.anchors
+            lines += [
+                f"{dimension.id} ({dimension.name}): {dimension.definition}",
+                f"  {scale.min}: {anchors.low}",
+                f"  middle: {anchors.middle}",
+                f"  {scale.max}: {anchors.high}",
+            ]
+        lines += ["", "Failure tags (list every one that applies):"]
+        lines += [f"- {tag.id}: {tag.definition}" for tag in self.failure_tags]
+        return "\n".join(lines)
+
 
 def rubric_path(directory: Path, version: int) -> Path:
     return directory / f"v{version}.yaml"

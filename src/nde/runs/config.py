@@ -158,6 +158,37 @@ class StoriesConfig(Strict):
         return self
 
 
+type JudgeMode = Literal["pairwise", "rubric"]
+
+
+class JudgesConfig(Strict):
+    """An LLM judge panel for a blind batch: the `judge` role, one model per panel member."""
+
+    batch: str
+    # Where batches live, relative to the config file.
+    batches_dir: str = "../batches"
+    panel: list[ModelBinding] = Field(min_length=1)
+    modes: list[JudgeMode] = Field(default_factory=lambda: ["pairwise", "rubric"], min_length=1)
+    pairwise_prompt: PromptRef = Field(
+        default_factory=lambda: PromptRef(template="judge_pairwise", version=1)
+    )
+    rubric_prompt: PromptRef = Field(
+        default_factory=lambda: PromptRef(template="judge_rubric", version=1)
+    )
+
+    @model_validator(mode="after")
+    def _panel_spans_two_families(self) -> Self:
+        labels = [judge.label for judge in self.panel]
+        if len(set(labels)) != len(labels):
+            raise ValueError("judges must be distinct provider/model pairs")
+        for judge in self.panel:
+            if judge.family is None:
+                raise ValueError(f"judge {judge.label} has no family; set `family` on it")
+        if len({judge.family for judge in self.panel}) < 2:  # noqa: PLR2004 - the plan's rule
+            raise ValueError("the judge panel needs at least two model families")
+        return self
+
+
 class ExperimentConfig(Strict):
     name: str
     seed: int
@@ -172,12 +203,15 @@ class ExperimentConfig(Strict):
     structured: StructuredConfig = Field(default_factory=StructuredConfig)
     benchmark: BenchmarkConfig | None = None
     stories: StoriesConfig | None = None
+    judges: JudgesConfig | None = None
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:
-        if not self.calls and self.stories is None:
-            raise ValueError("a config needs `calls`, `stories`, or both")
+        if not self.calls and self.stories is None and self.judges is None:
+            raise ValueError("a config needs `calls`, `stories` or `judges`")
         bindings = [(f"role {role!r}", binding) for role, binding in self.roles.items()]
+        if self.judges is not None:
+            bindings += [("judge", judge) for judge in self.judges.panel]
         if self.benchmark is not None:
             bindings += [("benchmark candidate", c) for c in self.benchmark.candidates]
             if all(call.role != self.benchmark.role for call in self.calls):
@@ -210,6 +244,9 @@ class ExperimentConfig(Strict):
         for role in extra:
             if role in self.roles:
                 seen.setdefault(self.roles[role].label, (role, self.roles[role]))
+        if self.judges is not None:
+            for judge in self.judges.panel:
+                seen.setdefault(judge.label, ("judge", judge))
         return list(seen.values())
 
     def used_bindings(self, extra: Sequence[RoleName] = ()) -> list[ModelBinding]:
@@ -238,6 +275,11 @@ class LoadedConfig:
     @property
     def prompts_dir(self) -> Path:
         return (self.directory / self.config.prompts_dir).resolve()
+
+    @property
+    def batches_dir(self) -> Path | None:
+        judges = self.config.judges
+        return None if judges is None else (self.directory / judges.batches_dir).resolve()
 
     @property
     def briefs_dir(self) -> Path | None:

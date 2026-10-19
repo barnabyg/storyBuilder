@@ -1,5 +1,7 @@
 """Helpers for evaluation tests: story runs to batch, and a reader client."""
 
+import json
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -29,8 +31,11 @@ BRIEFS = ["brief-01", "brief-02", "brief-03", "brief-04"]
 
 
 def seeded_story(body: Json) -> Reply:
-    """A 2,000-word story whose words name the request's seed."""
-    return completion(story_text(2000, marker=f"w{body['seed']}"), completion_tokens=2000)
+    """A 2,000-word story whose words name the request's seed, opening with a word unique to
+    its prompt, so stories for different briefs differ."""
+    opening = f"p{zlib.crc32(json.dumps(body['messages']).encode('utf-8'))}"
+    text = story_text(2000, marker=f"w{body['seed']}")
+    return completion(opening + text[text.index(" ") :], completion_tokens=2000)
 
 
 def two_runs(fake: FakeOpenAI, tmp_path: Path) -> tuple[Path, Path]:
@@ -41,6 +46,7 @@ def two_runs(fake: FakeOpenAI, tmp_path: Path) -> tuple[Path, Path]:
         config = story_config(fake.base_url, [condition], briefs={"ids": BRIEFS})
         config["seed"] = seed
         config["roles"]["prose"]["model"] = "secret-model-id"
+        config["roles"]["prose"]["family"] = "generator-family"
         config["prices"]["fake/secret-model-id"] = {"input_per_mtok": 0, "output_per_mtok": 0}
         configs.append(config)
     return run(tmp_path, configs[0]), run(tmp_path, configs[1])

@@ -47,7 +47,7 @@ def test_smoke_run_records_manifest_output_and_report(
     assert re.fullmatch(r"[0-9a-f]{40}", str(manifest["git_sha"]))
     assert re.fullmatch(r"[0-9a-f]{64}", str(manifest["config_hash"]))
     assert manifest["models"] == [
-        {"role": "prose", "provider": "deepseek", "model": "deepseek-flash"}
+        {"role": "prose", "provider": "deepseek", "model": "deepseek-flash", "family": None}
     ]
     assert manifest["prompt_templates"] == [
         {"template": "smoke", "version": 1, "sha256": manifest["prompt_templates"][0]["sha256"]}

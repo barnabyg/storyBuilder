@@ -18,6 +18,7 @@ roles:
   prose:
     provider: deepseek
     model: deepseek-flash
+    family: deepseek          # recorded per model, for the judges' family rule
     # About 2,000 words is roughly 2,700 tokens; leave headroom for longer drafts.
     params: {thinking: {type: disabled}, temperature: 0.8, max_tokens: 5000}
 

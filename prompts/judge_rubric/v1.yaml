@@ -1,0 +1,15 @@
+system: >-
+  You are an experienced fiction editor scoring short stories against a
+  rubric. You answer with a single JSON object and no other text.
+user: |-
+  Score this short story against the rubric below.
+
+  $rubric
+
+  Story:
+
+  $story
+
+  Give each dimension an integer score from $scale_min to $scale_max, using
+  the dimension's id as the key, and list in failure_tags the id of every
+  failure tag that applies (an empty list if none does).

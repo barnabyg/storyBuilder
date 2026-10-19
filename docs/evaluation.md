@@ -121,3 +121,77 @@ sections.
 
 The statistics live in `src/nde/eval/stats.py` and are tested against exactly
 computed values.
+
+## LLM judge panel
+
+LLM judges judge the same blind batch the owner reads. They are for
+screening and diagnosis, and every batch report checks them against the
+owner's verdicts. **Judges never pass a gate.** See P1.7 and §4 of the plan.
+
+### Configuring the panel
+
+A judge run is an ordinary experiment config with a `judges` section, run
+with `nde run`, so it is cached, cost-capped and reproducible like any run:
+
+```yaml
+providers: { ... }          # the judges' OpenAI-compatible endpoints
+
+judges:
+  batch: p1-instrument      # the batch to judge
+  batches_dir: ../batches   # relative to the config file
+  modes: [pairwise, rubric] # the default: both
+  panel:                    # the judge role: one model per panel member
+    - {provider: anthropic, model: some-model, family: anthropic, params: {max_tokens: 400}}
+    - {provider: mistral, model: other-model, family: mistral, params: {max_tokens: 400}}
+  # pairwise_prompt: {template: judge_pairwise, version: 1}   (the defaults)
+  # rubric_prompt: {template: judge_rubric, version: 1}
+
+prices: { ... }             # every judge model needs a price
+```
+
+The panel needs **at least two model families**. Each model's `family` is
+recorded explicitly, not inferred from its provider (one provider can serve
+several families).
+
+**Family separation.** A judge must not share a family with the `planner` or
+`prose` models that generated the batch's stories, to reduce self-preference
+bias. Batches record their generating models, with families, from the source
+runs' manifests, so set `family` on the `planner` and `prose` roles of every
+story config (the committed ones do). A panel with fewer than two families, a
+judge without a family, a judge in a generator's family, or a batch whose
+generators have no recorded family is a config error, raised before any call.
+
+### What judges do
+
+Judges see only the batch's normalised story text, exactly as the reader
+does: no brief, no condition, no run.
+
+- **Pairwise mode** (`judge_pairwise@1`): for every pair, each judge gives a
+  forced-choice preference with strength (1 to 3) twice, once with the
+  stories in their shown order (`AB`) and once swapped (`BA`), to cancel
+  position bias. A pair whose two orders disagree is **position-inconsistent**.
+- **Rubric mode** (`judge_rubric@1`): each judge scores every story on every
+  rubric dimension and assigns failure tags from the taxonomy, as structured
+  output validated against the batch's rubric.
+
+Judges can run before the owner has closed the batch. Their verdicts are
+recorded by pair number and shown position, never by condition, in the run
+directory (`judgements.jsonl`) and in the batch (`judges/<run>.jsonl`). The
+reader never reads them. A verdict still invalid after its repairs is recorded
+with its error and counted in the run report's structured-output validity.
+
+### Reading the metrics
+
+Once the batch is closed, `nde eval report` adds an **LLM judges** table,
+one row per judge (so per family on a typical panel):
+
+| Column | Meaning |
+| --- | --- |
+| Wins per condition | position-consistent verdicts only |
+| Position-inconsistent | pairs whose two orders disagreed; reported, not averaged away |
+| Agreement with owner | share of pairs where the judge's consistent verdict matched the owner's preference; inconsistent pairs count as disagreement |
+| Cohen's kappa | agreement beyond chance between the owner's preferred condition and the judge's verdict ("inconsistent" is its own category); `n/a` when undefined |
+| Position consistency | consistent pairs as a share of the pairs judged in both orders |
+
+A **Judge rubric scores** table gives each judge's mean score per dimension
+and condition. If a judge is run again, its latest verdicts count.

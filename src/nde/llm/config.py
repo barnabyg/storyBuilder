@@ -44,6 +44,9 @@ class ModelBinding(Strict):
     params: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
     # Overrides the provider's json_schema capability for this model.
     json_schema: bool | None = None
+    # The model family (e.g. "openai", "deepseek"), recorded per model rather than inferred
+    # from the provider, for the rule that judges come from other families than generators.
+    family: str | None = Field(default=None, min_length=1)
 
     @property
     def label(self) -> str:

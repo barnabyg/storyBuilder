@@ -32,7 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from nde.eval.rubric import Rubric
 from nde.files import write_text_lf
-from nde.runs.records import read_stories
+from nde.runs.records import read_manifest, read_stories
 
 DEFAULT_BATCHES_DIR = Path("batches")
 VIEW = "view.json"
@@ -92,6 +92,19 @@ class SealedPair(_Record):
     b: StorySource
 
 
+class GeneratorUse(_Record):
+    """A model that generated the batch's stories, from its runs' manifests."""
+
+    role: str
+    provider: str
+    model: str
+    family: str | None
+
+    @property
+    def label(self) -> str:
+        return f"{self.provider}/{self.model}"
+
+
 class Key(_Record):
     """The sealed key: where every shown story came from."""
 
@@ -100,6 +113,8 @@ class Key(_Record):
     sources: list[StorySource]
     pairs: list[SealedPair]
     rubric_version: int | None = None
+    # The planner and prose models of the source runs, for the judges' family rule.
+    generators: list[GeneratorUse] = Field(default_factory=list[GeneratorUse])
 
 
 class StoryScores(_Record):
@@ -156,6 +171,21 @@ def _stories_by_pair(source: Source) -> dict[tuple[str, int], str]:
     return stories
 
 
+GENERATING_ROLES = ("planner", "prose")
+
+
+def _generators(sources: Sequence[Source]) -> list[GeneratorUse]:
+    found: dict[str, GeneratorUse] = {}
+    for source in sources:
+        for use in read_manifest(source.run_dir).models:
+            if use.role in GENERATING_ROLES:
+                generator = GeneratorUse(
+                    role=use.role, provider=use.provider, model=use.model, family=use.family
+                )
+                found.setdefault(generator.label, generator)
+    return list(found.values())
+
+
 def _text(source: StorySource) -> str:
     return (Path(source.run) / source.story).read_text(encoding="utf-8")
 
@@ -207,6 +237,7 @@ def build_batch(
         sources=origins,
         pairs=sealed,
         rubric_version=None if rubric is None else rubric.version,
+        generators=_generators(sources),
     )
     (batch_dir / SEALED).mkdir(parents=True)
     write_text_lf(batch_dir / VIEW, view.model_dump_json(indent=2) + "\n")
@@ -340,6 +371,12 @@ def read_closed(batch: Path) -> Closed | None:
     if not is_closed(batch):
         return None
     return Closed.model_validate_json((batch / CLOSED).read_text(encoding="utf-8"))
+
+
+def read_generators(batch: Path) -> list[GeneratorUse]:
+    """The models that generated the batch. Reveals no pairing, so it is readable while open."""
+    key = Key.model_validate_json((batch / SEALED / KEY).read_text(encoding="utf-8"))
+    return key.generators
 
 
 def read_key(batch: Path) -> Key:

@@ -1,0 +1,19 @@
+system: >-
+  You are an experienced fiction editor judging short stories. You answer with
+  a single JSON object and no other text.
+user: |-
+  Two short stories were written from the same brief. Read both and decide
+  which is the better story overall, as a reader would judge it: engagement,
+  coherence, emotional impact, character believability, pacing and
+  originality. The order they are given in means nothing.
+
+  Story 1:
+
+  $story_1
+
+  Story 2:
+
+  $story_2
+
+  Say which story is better (preferred: 1 or 2), by how much (strength: 1 for
+  slightly, 2 for clearly, 3 for much better), and give a one-sentence reason.

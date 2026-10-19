@@ -32,10 +32,12 @@ roles:
   planner:
     provider: openai
     model: gpt-6-luna
+    family: openai
     params: {reasoning_effort: none, temperature: 0.7, max_completion_tokens: 3000}
   prose:
     provider: deepseek
     model: deepseek-flash
+    family: deepseek          # recorded per model, for the judges' family rule
     # A whole story (A) is about 2,700 tokens; a scene (B) far less.
     params: {thinking: {type: disabled}, temperature: 0.8, max_tokens: 5000}
 

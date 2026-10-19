@@ -53,3 +53,22 @@ def bootstrap_mean_ci(
     low = means[math.floor(tail * resamples)]
     high = means[math.ceil((1 - tail) * resamples) - 1]
     return float(low), float(high)
+
+
+def cohens_kappa(first: Sequence[str], second: Sequence[str]) -> float | None:
+    """Cohen's kappa between two raters' categorical ratings of the same items.
+
+    None when it is undefined: both raters always give one and the same category,
+    so chance agreement is already perfect.
+    """
+    if len(first) != len(second):
+        raise ValueError("both raters must rate the same number of items")
+    if not first:
+        raise ValueError("kappa needs at least one rated item")
+    n = len(first)
+    observed = sum(a == b for a, b in zip(first, second, strict=True)) / n
+    categories = set(first) | set(second)
+    chance = sum((first.count(c) / n) * (second.count(c) / n) for c in categories)
+    if chance == 1:
+        return None
+    return (observed - chance) / (1 - chance)

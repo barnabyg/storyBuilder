@@ -35,6 +35,7 @@ class ModelUse(_Record):
     role: str
     provider: str
     model: str
+    family: str | None = None
 
 
 class TemplateUse(_Record):
@@ -160,6 +161,18 @@ class StoriesSummary(_Record):
     equal_budget: EqualBudgetSummary | None = None
 
 
+class JudgesSummary(_Record):
+    """What a judge-panel run judged."""
+
+    batch: str
+    batch_dir: str
+    modes: list[str]
+    panel: list[ModelUse]
+    records: int = 0
+    # Verdicts still invalid after their repairs.
+    errors: int = 0
+
+
 class RunError(_Record):
     """Why a run failed: a common provider error type (see nde.llm.errors) or "internal"."""
 
@@ -197,6 +210,8 @@ class Manifest(_Record):
     benchmark: BenchmarkSummary | None = None
     # Set for story runs.
     stories: StoriesSummary | None = None
+    # Set for judge-panel runs.
+    judges: JudgesSummary | None = None
     files: dict[str, str] = Field(
         default_factory=lambda: {"outputs": OUTPUTS, "calls": CALLS, "report": REPORT}
     )

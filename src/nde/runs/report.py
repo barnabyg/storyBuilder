@@ -35,9 +35,12 @@ def render_report(run_dir: Path) -> str:
         "",
         "## Models",
         "",
-        "| Role | Provider | Model |",
-        "| --- | --- | --- |",
-        *(f"| {use.role} | {use.provider} | {use.model} |" for use in manifest.models),
+        "| Role | Provider | Model | Family |",
+        "| --- | --- | --- | --- |",
+        *(
+            f"| {use.role} | {use.provider} | {use.model} | {use.family or '-'} |"
+            for use in manifest.models
+        ),
         "",
         "## Prompt templates",
         "",
