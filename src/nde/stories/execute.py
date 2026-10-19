@@ -166,7 +166,7 @@ def prepare_stories(
         checksum = split_checksum(briefs_dir, split)
         if checksum is not None and any(brief.split == split for brief in briefs):
             checksums[split] = checksum
-    prepared = PreparedStories(
+    return PreparedStories(
         briefs_dir,
         briefs,
         conditions,
@@ -175,10 +175,6 @@ def prepare_stories(
         stories.equal_budget,
         checksums,
     )
-    config = loaded.config
-    if not config.budget.allow_unpriced_models and config.unpriced_models(prepared.roles):
-        raise ConfigError("; ".join(config.unpriced_warnings(prepared.roles)))
-    return prepared
 
 
 @dataclass(frozen=True)

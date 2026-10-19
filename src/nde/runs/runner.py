@@ -76,12 +76,10 @@ class RunOptions:
 class PreparedRun:
     loaded: LoadedConfig
     templates: dict[str, PromptTemplate]
+    # Every (role, model) the run uses: calls, story pipelines and judges.
+    bindings: list[tuple[RoleName, ModelBinding]]
     stories: PreparedStories | None = None
     judges: PreparedJudges | None = None
-
-    @property
-    def story_roles(self) -> list[RoleName]:
-        return [] if self.stories is None else self.stories.roles
 
 
 def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
@@ -92,10 +90,11 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
     for call in config.calls:
         require_template(templates, loaded.prompts_dir, call.prompt, call.variables)
     stories = prepare_stories(loaded, templates)
-    story_roles = [] if stories is None else stories.roles
-    for provider_name in sorted(
-        {binding.provider for binding in config.used_bindings(story_roles)}
-    ):
+    bindings = config.role_bindings([] if stories is None else stories.roles)
+    unpriced = config.unpriced_warnings(binding for _, binding in bindings)
+    if unpriced and not config.budget.allow_unpriced_models:
+        raise ConfigError("; ".join(unpriced))
+    for provider_name in sorted({binding.provider for _, binding in bindings}):
         provider = config.providers[provider_name]
         if provider.api_key_env and not environ.get(provider.api_key_env):
             raise ConfigError(
@@ -103,7 +102,9 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
                 f"{provider.api_key_env}; set it or add it to .env (see .env.example)"
             )
     judges = prepare_judges(loaded, templates)
-    return PreparedRun(loaded=loaded, templates=templates, stories=stories, judges=judges)
+    return PreparedRun(
+        loaded=loaded, templates=templates, bindings=bindings, stories=stories, judges=judges
+    )
 
 
 def _new_run_dir(runs_dir: Path, name: str, started: datetime) -> Path:
@@ -128,7 +129,7 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
             ModelUse(
                 role=role, provider=binding.provider, model=binding.model, family=binding.family
             )
-            for role, binding in config.role_bindings(prepared.story_roles)
+            for role, binding in prepared.bindings
         ],
         prompt_templates=[
             TemplateUse(template=template.name, version=template.version, sha256=template.sha256)
@@ -141,7 +142,7 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
         cost=CostSummary(
             per_run_cap_usd=config.budget.per_run_usd, per_day_cap_usd=config.budget.per_day_usd
         ),
-        warnings=config.unpriced_warnings(prepared.story_roles),
+        warnings=config.unpriced_warnings(binding for _, binding in prepared.bindings),
         started_at=started.isoformat(),
         stories=None if prepared.stories is None else prepared.stories.summary(),
     )

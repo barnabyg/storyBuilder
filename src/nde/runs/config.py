@@ -6,7 +6,7 @@ including its prompt templates and API-key variables, before any network call.
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Self
@@ -225,8 +225,9 @@ class ExperimentConfig(Strict):
         ids = [call.id for call in self.calls]
         if len(set(ids)) != len(ids):
             raise ValueError("call ids must be unique")
-        if not self.budget.allow_unpriced_models and self.unpriced_models():
-            raise ValueError("; ".join(self.unpriced_warnings()))
+        unpriced = self.unpriced_warnings(binding for _, binding in self.role_bindings())
+        if unpriced and not self.budget.allow_unpriced_models:
+            raise ValueError("; ".join(unpriced))
         return self
 
     def bindings_for(self, call: CallSpec) -> list[ModelBinding]:
@@ -236,7 +237,11 @@ class ExperimentConfig(Strict):
         return [self.roles[call.role]] if call.role in self.roles else []
 
     def role_bindings(self, extra: Sequence[RoleName] = ()) -> list[tuple[RoleName, ModelBinding]]:
-        """Every (role, model) some call uses, then the `extra` roles' models, once per model."""
+        """Every (role, model) the config uses, once per model, in a stable order.
+
+        The models of calls, then of the `extra` roles (those a story run's
+        pipelines use, which only preparing the config can tell), then the judges.
+        """
         seen: dict[str, tuple[RoleName, ModelBinding]] = {}
         for call in self.calls:
             for binding in self.bindings_for(call):
@@ -249,17 +254,13 @@ class ExperimentConfig(Strict):
                 seen.setdefault(judge.label, ("judge", judge))
         return list(seen.values())
 
-    def used_bindings(self, extra: Sequence[RoleName] = ()) -> list[ModelBinding]:
-        return [binding for _, binding in self.role_bindings(extra)]
-
-    def unpriced_models(self, extra: Sequence[RoleName] = ()) -> list[str]:
-        return [b.label for b in self.used_bindings(extra) if b.label not in self.prices]
-
-    def unpriced_warnings(self, extra: Sequence[RoleName] = ()) -> list[str]:
+    def unpriced_warnings(self, bindings: Iterable[ModelBinding]) -> list[str]:
+        """A warning for each of `bindings` that has no price."""
         return [
-            f"model {label} has no price; add it to `prices` or set "
+            f"model {binding.label} has no price; add it to `prices` or set "
             "budget.allow_unpriced_models (its calls then cost $0 and bypass the caps)"
-            for label in self.unpriced_models(extra)
+            for binding in bindings
+            if binding.label not in self.prices
         ]
 
 
