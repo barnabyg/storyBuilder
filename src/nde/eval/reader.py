@@ -24,6 +24,7 @@ from nde.eval.batch import (
     InvalidJudgementError,
     Judgement,
     StoryScores,
+    View,
     close_batch,
     is_closed,
     judged,
@@ -76,21 +77,33 @@ def _story(heading: str, text: str) -> str:
     return f"<article><h2>{escape(heading)}</h2>{paragraphs}</article>"
 
 
-def _radio(name: str, value: str, label: str, *, checked: bool) -> str:
+def _radio(name: str, value: str, label: str, *, checked: bool, required: bool = True) -> str:
     return (
-        f'<label><input type="radio" name="{name}" value="{escape(value)}" required'
-        f"{' checked' if checked else ''}> {escape(label)}</label> "
+        f'<label><input type="radio" name="{name}" value="{escape(value)}"'
+        f"{' required' if required else ''}{' checked' if checked else ''}> "
+        f"{escape(label)}</label> "
     )
 
 
-def _scoring(rubric: Rubric, prefix: str, heading: str, scores: StoryScores | None) -> str:
+def _scoring(
+    rubric: Rubric,
+    prefix: str,
+    heading: str,
+    scores: StoryScores | None,
+    *,
+    required: bool = True,
+) -> str:
     """Rubric scores, failure tags and free-text tags for one story."""
     parts = [f"<div><h3>{escape(heading)}</h3>"]
     for dimension in rubric.dimensions:
         chosen = scores.scores.get(dimension.id) if scores else None
         radios = "".join(
             _radio(
-                f"score-{prefix}-{dimension.id}", str(value), str(value), checked=chosen == value
+                f"score-{prefix}-{dimension.id}",
+                str(value),
+                str(value),
+                checked=chosen == value,
+                required=required,
             )
             for value in range(rubric.scale.min, rubric.scale.max + 1)
         )
@@ -118,9 +131,8 @@ def _scoring(rubric: Rubric, prefix: str, heading: str, scores: StoryScores | No
     return "".join(parts)
 
 
-def _pair_form(
-    number: int, rubric: Rubric | None, guesses: list[str], current: Judgement | None
-) -> str:
+def _pair_form(number: int, view: View, current: Judgement | None) -> str:
+    rubric, required = view.rubric, not view.optional_scores
     preferred = "".join(
         _radio(
             "preferred",
@@ -145,12 +157,25 @@ def _pair_form(
         f"<fieldset><legend>By how much?</legend>{strength}</fieldset>",
     ]
     if rubric is not None:
-        story_a = _scoring(rubric, "a", "Story A", current.a if current else None)
-        story_b = _scoring(rubric, "b", "Story B", current.b if current else None)
+        if not required:
+            sections.append(
+                '<p class="notice">Everything below is optional: give as many or as few '
+                "scores, tags and guesses as you like.</p>"
+            )
+        current_a = current.a if current else None
+        current_b = current.b if current else None
+        story_a = _scoring(rubric, "a", "Story A", current_a, required=required)
+        story_b = _scoring(rubric, "b", "Story B", current_b, required=required)
         sections.append(f'<div class="columns">{story_a}{story_b}</div>')
         options = "".join(
-            _radio("guess", option, option, checked=current is not None and current.guess == option)
-            for option in guesses
+            _radio(
+                "guess",
+                option,
+                option,
+                checked=current is not None and current.guess == option,
+                required=required,
+            )
+            for option in view.guess_options
         )
         sections.append(
             f'<fieldset class="guess"><legend>Which condition do you think story A came '
@@ -214,7 +239,7 @@ class _Reader:
         if is_closed(self.batch):
             form = '<p class="notice">This batch is closed.</p>'
         else:
-            form = _pair_form(number, self.view.rubric, self.view.guess_options, current)
+            form = _pair_form(number, self.view, current)
         body = (
             f'{self.header(number)}<main class="columns">{_story("Story A", pair.a)}'
             f"{_story('Story B', pair.b)}</main>{self._problems(problems)}{form}"

@@ -187,6 +187,10 @@ def render_report(batch: Path) -> str:
         f"- **Pairs:** {len(key.pairs)}",
         f"- **Sources:** {sources}",
         f"- **Rubric:** {f'v{key.rubric_version}' if key.rubric_version else 'none'}",
+        "- **Marks:** preference and strength required; rubric scores, tags and the guess "
+        "optional, so the secondary sections summarise only what was given"
+        if revealed.view.optional_scores
+        else "- **Marks:** all required",
         f"- **Closed:** {closed.closed_at if closed else '-'}",
         "",
     ]

@@ -296,3 +296,63 @@ def test_same_named_conditions_are_offered_without_run_directory_names(
     page = reader(tmp_path / "batches" / "same").get("/pairs/1").text
     assert runs[0].name not in page
     assert runs[1].name not in page
+
+
+def test_an_optional_scores_batch_accepts_a_preference_alone(
+    runs: tuple[Path, Path], tmp_path: Path
+) -> None:
+    batch = build_batch(tmp_path, runs, "demo", "--optional-scores")
+    client = reader(batch)
+    page = client.get("/pairs/1").text
+    assert "optional" in page.lower()
+    assert 'name="score-a-pacing" value="1" required' not in page
+
+    response = client.post(
+        "/pairs/1", data={"preferred": "B", "strength": "2"}, follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    judgement = client.get("/api/pairs/1").json()["judgement"]
+    assert (judgement["preferred"], judgement["guess"]) == ("B", None)
+    assert judgement["a"]["scores"] == {}
+
+
+def test_an_optional_scores_batch_keeps_partial_marks_and_still_checks_them(
+    runs: tuple[Path, Path], tmp_path: Path
+) -> None:
+    client = reader(build_batch(tmp_path, runs, "demo", "--optional-scores"))
+    partial = {"preferred": "A", "strength": "3", "score-a-pacing": "4", "tags-b": ["generic"]}
+
+    assert client.post("/pairs/1", data=partial, follow_redirects=False).status_code == 303
+    assert client.post("/pairs/2", data=partial | {"score-b-coherence": "9"}).status_code == 422
+    assert client.post("/pairs/2", data=partial | {"guess": "nope"}).status_code == 422
+
+    judgement = client.get("/api/pairs/1").json()["judgement"]
+    assert judgement["a"]["scores"] == {"pacing": 4}
+    assert judgement["b"]["tags"] == ["generic"]
+
+
+def test_the_report_summarises_whatever_optional_marks_were_given(
+    runs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    batch = build_batch(tmp_path, runs, "demo", "--optional-scores")
+    key = _key(batch)
+    client = reader(batch)
+    for number, pair in enumerate(key["pairs"], start=1):
+        intact_side = "A" if pair["a"]["condition"] == "intact" else "B"
+        form: dict[str, str | list[str]] = {"preferred": intact_side, "strength": "2"}
+        if number == 1:
+            form |= {
+                f"score-{intact_side.lower()}-engagement": "5",
+                "guess": pair["a"]["condition"],
+            }
+        client.post(f"/pairs/{number}", data=form)
+    client.post("/close")
+
+    report = _report(tmp_path, capsys)
+
+    assert "| intact | 4 |" in report
+    assert "| engagement | 5.00 [5.00, 5.00] | - |" in report
+    assert "| pacing | - | - |" in report
+    assert "1 of 1 guesses right" in report
+    assert "optional" in report.lower()
