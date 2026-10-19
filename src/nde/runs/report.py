@@ -58,7 +58,10 @@ def render_report(run_dir: Path) -> str:
             *_output_body(output),
             "",
         ]
-    lines += _stories_section(manifest, read_stories(run_dir), calls)
+    stories = read_stories(run_dir)
+    lines += _stories_section(manifest, stories, calls)
+    lines += _budget_section(manifest, stories)
+    lines += _equal_budget_section(manifest)
     lines += _benchmark_section(manifest)
     lines += _structured_section(manifest)
     lines += _cost_section(manifest, calls)
@@ -305,6 +308,59 @@ def _stories_section(
             *(f"- {s.condition}/{s.brief} #{s.repetition + 1}: {s.error}" for s in failed),
             "",
         ]
+    return lines
+
+
+def _budget_section(manifest: Manifest, stories: list[StoryRecord]) -> list[str]:
+    summary = manifest.stories
+    if summary is None:
+        return []
+    lines = [
+        "## Generation budget",
+        "",
+        "Generation tokens are the input and output tokens of every call a story made: "
+        "structured-output repairs, length regenerations and revision passes included.",
+        "",
+        "| Condition | Stories | Calls | Generation tokens | Tokens per story |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for condition in summary.conditions:
+        mine = [story for story in stories if story.condition == condition.name]
+        tokens = sum(story.budget.tokens for story in mine)
+        per_story = str(round(tokens / len(mine))) if mine else "-"
+        lines.append(
+            f"| {condition.name} | {len(mine)} | {sum(story.budget.calls for story in mine)} "
+            f"| {tokens} | {per_story} |"
+        )
+    return [*lines, ""]
+
+
+def _equal_budget_section(manifest: Manifest) -> list[str]:
+    equal = None if manifest.stories is None else manifest.stories.equal_budget
+    if equal is None:
+        return []
+    first, second = equal.conditions
+    lines = [
+        "## Equal budget",
+        "",
+        f"{first} and {second} are matched per brief and repetition: the cheaper story gets "
+        f"revision passes until the generation-token budgets are within "
+        f"{_tolerance(equal.tolerance)} of the larger, with at most "
+        f"{equal.max_revision_passes} passes.",
+        "",
+        f"| Brief | Rep | {first} before | {second} before | Revised | Passes "
+        f"| {first} after | {second} after | Matched | Reason |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for match in equal.matches:
+        lines.append(
+            f"| {match.brief} | {match.repetition + 1} | {match.before.get(first, '-')} "
+            f"| {match.before.get(second, '-')} | {match.revised or '-'} | {match.passes} "
+            f"| {match.after.get(first, '-')} | {match.after.get(second, '-')} "
+            f"| {'yes' if match.matched else 'no'} | {match.reason or ''} |"
+        )
+    unmatched = sum(not match.matched for match in equal.matches)
+    lines += ["", f"{len(equal.matches) - unmatched} matched, {unmatched} not matched.", ""]
     return lines
 
 

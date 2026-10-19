@@ -140,6 +140,54 @@ manifest (`stories.out_of_range`) and in the report's **Out of length range**
 list. The Stories table shows each story's words, target, attempts and whether
 it is in range.
 
+### Generation budget and equal-budget mode
+
+A comparison between conditions should measure the method, not the compute
+spent on it (proposal §9.8, plan §8 decision 9). So every story records its
+**generation budget**: the provider calls it made and their input and output
+tokens. Everything attributed to the story counts: the plan, every prose
+call, structured-output repairs, length regenerations and revision passes.
+Cache hits count at their recorded tokens, so a re-run reports the same
+budgets. Each `stories.jsonl` line has a `budget` (`calls`, `input_tokens`,
+`output_tokens`), the Stories table shows them per story, and the report's
+**Generation budget** table gives calls and tokens per condition, in total and
+per story.
+
+**Equal-budget mode** makes two conditions comparable at equal budget:
+
+```yaml
+stories:
+  equal_budget:
+    conditions: [A, B]        # two conditions of this run
+    tolerance: 0.10           # the default: within 10% of the larger budget
+    max_revision_passes: 4    # the default
+    revision_prompt: {template: story_revision, version: 1}   # the default
+```
+
+Matching is per brief and repetition, not on average. Once both conditions
+have written their story for a brief, the cheaper one gets **revision passes**
+until the two generation-token budgets are within the tolerance of the larger.
+A revision pass rewrites the whole story on the `prose` role with the shared
+prose contract's revision prompt (`story_revision@1`), from the brief and the
+story so far. Its output goes through normalisation and length control like
+any other story, and every attempt is cached and costed.
+
+The revised story replaces the story. The original is kept as
+`story.original.md`, and each pass's files are under `revisions/<n>/`. The
+story's record counts its `revision_passes`.
+
+Matching fails, and is reported for that brief rather than accepted, when:
+
+- the budgets are still apart after `max_revision_passes` passes;
+- a pass overshoots, taking the cheaper story above the tolerance of the
+  other (a pass's cost is only known after it is made); or
+- either story failed.
+
+The manifest's `stories.equal_budget.matches` and the report's **Equal
+budget** table give, per brief, each condition's budget before and after
+matching, which condition was revised, the passes added, whether it matched,
+and why not. `configs/stories-ab-equal-budget.yaml` runs A against B this way.
+
 ### Pipelines
 
 | Pipeline | Condition | Steps |

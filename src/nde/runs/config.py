@@ -115,6 +115,26 @@ class LengthConfig(Strict):
     max_attempts: int = Field(default=3, ge=1)
 
 
+class EqualBudgetConfig(Strict):
+    """Compare two conditions at equal generation-token budget, per brief and repetition."""
+
+    conditions: list[str] = Field(min_length=2, max_length=2)
+    # Budgets match when they are within this fraction of the more expensive one.
+    tolerance: float = Field(default=0.10, gt=0, lt=1)
+    # Revision passes the cheaper condition may get, per story, before matching fails.
+    max_revision_passes: int = Field(default=4, ge=0)
+    # The shared prose contract's revision prompt.
+    revision_prompt: PromptRef = Field(
+        default_factory=lambda: PromptRef(template="story_revision", version=1)
+    )
+
+    @model_validator(mode="after")
+    def _two_different_conditions(self) -> Self:
+        if self.conditions[0] == self.conditions[1]:
+            raise ValueError("equal_budget compares two different conditions")
+        return self
+
+
 class StoriesConfig(Strict):
     """Generate one story per brief, per condition, per repetition."""
 
@@ -124,12 +144,17 @@ class StoriesConfig(Strict):
     conditions: list[ConditionSpec] = Field(min_length=1)
     repeat: int = Field(default=1, ge=1)
     length: LengthConfig = Field(default_factory=LengthConfig)
+    equal_budget: EqualBudgetConfig | None = None
 
     @model_validator(mode="after")
     def _condition_names_are_unique(self) -> Self:
         names = [condition.name for condition in self.conditions]
         if len(set(names)) != len(names):
             raise ValueError("condition names must be unique")
+        if self.equal_budget is not None:
+            for name in self.equal_budget.conditions:
+                if name not in names:
+                    raise ValueError(f"equal_budget names unknown condition {name!r}")
         return self
 
 

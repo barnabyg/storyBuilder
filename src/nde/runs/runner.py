@@ -28,6 +28,7 @@ from nde.runs.records import (
     ModelUse,
     OutputRecord,
     RunError,
+    StoriesSummary,
     StructuredMetrics,
     TemplateUse,
     write_jsonl,
@@ -207,6 +208,18 @@ def _summarise_costs(summary: CostSummary, calls: list[CallRecord]) -> None:
     summary.token_cost_usd = sum(call.token_cost_usd for call in calls)
 
 
+def _summarise_stories(summary: StoriesSummary, state: RunState) -> None:
+    summary.stories = len(state.stories)
+    summary.failed = sum(story.status == "failed" for story in state.stories)
+    summary.out_of_range = [
+        f"{story.condition}/{story.brief}#{story.repetition + 1}"
+        for story in state.stories
+        if story.status == "ok" and not story.in_range
+    ]
+    if summary.equal_budget is not None:
+        summary.equal_budget.matches = state.budget_matches
+
+
 def execute(prepared: PreparedRun, options: RunOptions) -> Path:
     """Run a prepared config. The run directory is always left with a manifest and report."""
     config = prepared.loaded.config
@@ -280,13 +293,7 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
         write_jsonl(run_dir / OUTPUTS, state.outputs)
         write_jsonl(run_dir / CALLS, state.calls)
         if manifest.stories is not None:
-            manifest.stories.stories = len(state.stories)
-            manifest.stories.failed = sum(story.status == "failed" for story in state.stories)
-            manifest.stories.out_of_range = [
-                f"{story.condition}/{story.brief}#{story.repetition + 1}"
-                for story in state.stories
-                if story.status == "ok" and not story.in_range
-            ]
+            _summarise_stories(manifest.stories, state)
             write_jsonl(run_dir / STORIES, state.stories)
         write_manifest(run_dir, manifest)
         write_report(run_dir)

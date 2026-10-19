@@ -3,7 +3,13 @@
 from dataclasses import dataclass, field
 
 from nde.llm.gateway import Completion, Gateway
-from nde.runs.records import CallRecord, OutputRecord, StoryRecord, StructuredMetrics
+from nde.runs.records import (
+    BudgetMatch,
+    CallRecord,
+    OutputRecord,
+    StoryRecord,
+    StructuredMetrics,
+)
 
 
 @dataclass
@@ -11,6 +17,7 @@ class RunState:
     outputs: list[OutputRecord] = field(default_factory=list[OutputRecord])
     calls: list[CallRecord] = field(default_factory=list[CallRecord])
     stories: list[StoryRecord] = field(default_factory=list[StoryRecord])
+    budget_matches: list[BudgetMatch] = field(default_factory=list[BudgetMatch])
     structured: dict[str, StructuredMetrics] = field(default_factory=dict[str, StructuredMetrics])
     # The call in progress, for failure records.
     current_call: str | None = None

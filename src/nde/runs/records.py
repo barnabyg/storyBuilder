@@ -119,6 +119,29 @@ class ConditionUse(_Record):
     params: dict[str, JsonValue]
 
 
+class BudgetMatch(_Record):
+    """Budget matching for one brief and repetition in equal-budget mode."""
+
+    brief: str
+    repetition: int
+    # Generation tokens (input plus output) per condition, before and after revision passes.
+    before: dict[str, int]
+    after: dict[str, int]
+    # The condition that received revision passes, if any.
+    revised: str | None = None
+    passes: int = 0
+    matched: bool
+    # Why matching failed.
+    reason: str | None = None
+
+
+class EqualBudgetSummary(_Record):
+    conditions: list[str]
+    tolerance: float
+    max_revision_passes: int
+    matches: list[BudgetMatch] = Field(default_factory=list[BudgetMatch])
+
+
 class StoriesSummary(_Record):
     """What a story run generated from."""
 
@@ -134,6 +157,7 @@ class StoriesSummary(_Record):
     failed: int = 0
     # Stories kept although still out of the length range, as "<condition>/<brief>#<n>".
     out_of_range: list[str] = Field(default_factory=list[str])
+    equal_budget: EqualBudgetSummary | None = None
 
 
 class RunError(_Record):
@@ -234,6 +258,25 @@ class LengthAttempt(_Record):
     in_range: bool
 
 
+class RevisionRecord(_Record):
+    """One equal-budget revision pass: its length-control attempts and the one kept."""
+
+    attempts: list[LengthAttempt]
+    chosen_attempt: int | None
+
+
+class Budget(_Record):
+    """What a story cost to generate: every provider call, repairs and regenerations included."""
+
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+
 class StoryRecord(_Record):
     """One generated story. Deterministic: no timings or spend, so re-runs match byte for byte."""
 
@@ -252,6 +295,10 @@ class StoryRecord(_Record):
     attempts: list[LengthAttempt] = Field(default_factory=list[LengthAttempt])
     chosen_attempt: int | None = None
     in_range: bool = False
+    # Generation budget, and the revision passes equal-budget mode added.
+    budget: Budget = Field(default_factory=Budget)
+    revision_passes: int = 0
+    revisions: list[RevisionRecord] = Field(default_factory=list[RevisionRecord])
     # Why the story could not be produced, when status is "failed".
     error: str | None = None
     # The story's files (the story and every intermediate output), relative to `path`.

@@ -80,6 +80,8 @@ class StoryContext:
     seed: int
     # The length-control attempt being written; None while planning.
     attempt: int | None = None
+    # Folder for kept files, relative to the story's, such as "revisions/1/".
+    prefix: str = ""
     # Intermediate outputs to keep beside the story, by path relative to its folder.
     files: dict[str, str] = field(default_factory=dict[str, str])
 
@@ -141,7 +143,7 @@ class StoryContext:
         length-control attempt; files kept while planning sit beside the story.
         """
         folder = "" if self.attempt is None else f"{ATTEMPTS}/{self.attempt + 1}/"
-        self.files[folder + name] = content
+        self.files[self.prefix + folder + name] = content
 
 
 class Pipeline[PlanT](ABC):

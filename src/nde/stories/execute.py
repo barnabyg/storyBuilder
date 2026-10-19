@@ -1,5 +1,6 @@
 """Prepare and execute the `stories` section of a config: one story per brief per condition."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -9,31 +10,41 @@ from pydantic import ValidationError
 from nde.briefs import BriefError, load_briefs, split_checksum
 from nde.files import write_text_lf
 from nde.llm.gateway import Gateway
+from nde.prose.revision import REVISION_VARIABLES, revise
 from nde.runs.config import (
     BriefSelection,
     ConditionSpec,
     ConfigError,
+    EqualBudgetConfig,
     LengthConfig,
     LoadedConfig,
+    PromptRef,
     RoleName,
 )
 from nde.runs.prompts import PromptTemplate, load_template
 from nde.runs.records import (
     STORY_DIR,
+    BudgetMatch,
     ConditionUse,
+    EqualBudgetSummary,
     LengthAttempt,
+    RevisionRecord,
     StoriesSummary,
     StoryRecord,
 )
 from nde.runs.state import RunState
 from nde.schema.brief import SPLITS, Brief
+from nde.stories.budget import story_budget, within
 from nde.stories.length import Draft, attempt_seed, choose, measure
-from nde.stories.pipeline import Pipeline, StepFailedError, StoryContext
+from nde.stories.pipeline import Pipeline, StepFailedError, StoryContext, derive_seed
 from nde.stories.registry import PIPELINES
 
 # The normalised story, which blind batches and judges see, and the model's raw text.
 STORY_FILE = "story.md"
 RAW_FILE = "story.raw.md"
+# The story before its first revision pass, and the folder of each pass's files.
+ORIGINAL_FILE = "story.original.md"
+REVISIONS = "revisions"
 
 
 @dataclass(frozen=True)
@@ -49,6 +60,7 @@ class PreparedStories:
     conditions: list[Condition]
     repeat: int
     length: LengthConfig
+    equal_budget: EqualBudgetConfig | None
     split_checksums: dict[str, str]
 
     @property
@@ -71,6 +83,13 @@ class PreparedStories:
             repeat=self.repeat,
             length_tolerance=self.length.tolerance,
             max_attempts=self.length.max_attempts,
+            equal_budget=None
+            if self.equal_budget is None
+            else EqualBudgetSummary(
+                conditions=self.equal_budget.conditions,
+                tolerance=self.equal_budget.tolerance,
+                max_revision_passes=self.equal_budget.max_revision_passes,
+            ),
         )
 
 
@@ -135,13 +154,24 @@ def prepare_stories(
             if ref.label not in templates:
                 templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
             templates[ref.label].render(dict.fromkeys(need.variables, "x"))
+    if stories.equal_budget is not None:
+        ref = stories.equal_budget.revision_prompt
+        if ref.label not in templates:
+            templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
+        templates[ref.label].render(dict.fromkeys(REVISION_VARIABLES, "x"))
     checksums: dict[str, str] = {}
     for split in SPLITS:
         checksum = split_checksum(briefs_dir, split)
         if checksum is not None and any(brief.split == split for brief in briefs):
             checksums[split] = checksum
     prepared = PreparedStories(
-        briefs_dir, briefs, conditions, stories.repeat, stories.length, checksums
+        briefs_dir,
+        briefs,
+        conditions,
+        stories.repeat,
+        stories.length,
+        stories.equal_budget,
+        checksums,
     )
     config = loaded.config
     if not config.budget.allow_unpriced_models and config.unpriced_models(prepared.roles):
@@ -165,32 +195,61 @@ def story_path(condition: str, brief: str, repetition: int) -> Path:
     return Path(STORY_DIR) / condition / brief / f"r{repetition + 1}"
 
 
-def _write_files(run_dir: Path, folder: Path, files: dict[str, str]) -> list[str]:
-    for name, content in files.items():
-        path = run_dir / folder / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        write_text_lf(path, content)
-    return sorted(files)
+@dataclass
+class StoryJob:
+    """A story being written: its context (with its files) and its record."""
+
+    ctx: StoryContext
+    record: StoryRecord
+    folder: Path
+
+    @property
+    def tokens(self) -> int:
+        return self.record.budget.tokens
 
 
-def _draft(run: StoryRun, ctx: StoryContext, condition: Condition, plan: object) -> list[Draft]:
-    """Write the prose until a draft is in the length range or the attempts run out."""
+def _generate(
+    run: StoryRun, ctx: StoryContext, write: Callable[[int], str], seed: int
+) -> list[Draft]:
+    """Generate prose until a draft is in the length range or the attempts run out."""
     length = run.prepared.length
     target = ctx.brief.target_words
     drafts: list[Draft] = []
     for attempt in range(length.max_attempts):
         ctx.attempt = attempt
-        seed = attempt_seed(ctx.seed, attempt)
-        raw = condition.pipeline.write(ctx, plan, seed=seed)
+        draft_seed = attempt_seed(seed, attempt)
+        raw = write(draft_seed)
         ctx.keep(RAW_FILE, raw)
-        drafts.append(measure(raw, seed=seed, target=target, tolerance=length.tolerance))
+        drafts.append(measure(raw, seed=draft_seed, target=target, tolerance=length.tolerance))
         if drafts[-1].in_range:
             break
     ctx.attempt = None
     return drafts
 
 
-def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: int) -> StoryRecord:
+def _use(job: StoryJob, drafts: list[Draft]) -> list[LengthAttempt]:
+    """Make the chosen draft the story; returns the attempts as recorded."""
+    chosen = choose(drafts, job.ctx.brief.target_words)
+    job.ctx.files[STORY_FILE] = drafts[chosen].text
+    job.ctx.files[RAW_FILE] = drafts[chosen].raw
+    job.record.words = drafts[chosen].words
+    job.record.in_range = drafts[chosen].in_range
+    job.record.chosen_attempt = chosen
+    return [LengthAttempt(seed=d.seed, words=d.words, in_range=d.in_range) for d in drafts]
+
+
+def save(run: StoryRun, job: StoryJob) -> None:
+    """Write the story's files and record its generation budget so far."""
+    for name, content in job.ctx.files.items():
+        path = run.run_dir / job.folder / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_text_lf(path, content)
+    record = job.record
+    record.files = sorted(job.ctx.files)
+    record.budget = story_budget(run.state.calls, record.condition, record.brief, record.repetition)
+
+
+def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: int) -> StoryJob:
     config = run.loaded.config
     seed = config.seed + repetition
     folder = story_path(condition.spec.name, brief.id, repetition)
@@ -215,30 +274,98 @@ def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: i
         path=folder.as_posix(),
         target_words=brief.target_words,
     )
+    job = StoryJob(ctx, record, folder)
     try:
-        drafts = _draft(run, ctx, condition, condition.pipeline.plan(ctx))
+        plan = condition.pipeline.plan(ctx)
+        drafts = _generate(
+            run, ctx, lambda draft_seed: condition.pipeline.write(ctx, plan, seed=draft_seed), seed
+        )
     except StepFailedError as failure:
         record.status = "failed"
         record.error = str(failure)
     else:
-        chosen = choose(drafts, brief.target_words)
-        ctx.files[STORY_FILE] = drafts[chosen].text
-        ctx.files[RAW_FILE] = drafts[chosen].raw
-        record.attempts = [
-            LengthAttempt(seed=d.seed, words=d.words, in_range=d.in_range) for d in drafts
-        ]
-        record.chosen_attempt = chosen
-        record.words = drafts[chosen].words
-        record.in_range = drafts[chosen].in_range
-    record.files = _write_files(run.run_dir, folder, ctx.files)
-    return record
+        record.attempts = _use(job, drafts)
+    save(run, job)
+    return job
+
+
+def revise_story(run: StoryRun, job: StoryJob, prompt: PromptRef) -> None:
+    """One revision pass: rewrite the story, under normalisation and length control."""
+    ctx, record = job.ctx, job.record
+    number = record.revision_passes + 1
+    current = ctx.files[STORY_FILE]
+    if number == 1:
+        ctx.files[ORIGINAL_FILE] = current
+    ctx.prefix = f"{REVISIONS}/{number}/"
+    try:
+        drafts = _generate(
+            run,
+            ctx,
+            lambda draft_seed: revise(ctx, current, number=number, seed=draft_seed, prompt=prompt),
+            derive_seed(ctx.seed, "revision", number),
+        )
+    finally:
+        ctx.prefix = ""
+    attempts = _use(job, drafts)
+    ctx.files[f"{REVISIONS}/{number}/{STORY_FILE}"] = ctx.files[STORY_FILE]
+    record.revisions.append(RevisionRecord(attempts=attempts, chosen_attempt=record.chosen_attempt))
+    record.revision_passes = number
+    save(run, job)
+
+
+def _passes(count: int) -> str:
+    return f"{count} revision pass{'' if count == 1 else 'es'}"
+
+
+def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetConfig) -> BudgetMatch:
+    """Give the cheaper story revision passes until the two budgets are within tolerance."""
+    first, second = (jobs[name] for name in spec.conditions)
+    match = BudgetMatch(
+        brief=first.record.brief,
+        repetition=first.record.repetition,
+        before={name: jobs[name].tokens for name in spec.conditions},
+        after={},
+        matched=False,
+    )
+    failed = [name for name in spec.conditions if jobs[name].record.status != "ok"]
+    cheaper, dearer = sorted((first, second), key=lambda job: job.tokens)
+    if failed:
+        match.reason = f"no story to match: {', '.join(failed)} failed"
+    elif not within(cheaper.tokens, dearer.tokens, spec.tolerance):
+        match.revised = cheaper.record.condition
+        while match.passes < spec.max_revision_passes:
+            revise_story(run, cheaper, spec.revision_prompt)
+            match.passes += 1
+            if cheaper.tokens > dearer.tokens * (1 + spec.tolerance):
+                match.reason = (
+                    f"overshot after {_passes(match.passes)}: {match.revised} costs "
+                    f"{cheaper.tokens} tokens against {dearer.tokens}"
+                )
+                break
+            if within(cheaper.tokens, dearer.tokens, spec.tolerance):
+                break
+    match.after = {name: jobs[name].tokens for name in spec.conditions}
+    match.matched = not failed and within(cheaper.tokens, dearer.tokens, spec.tolerance)
+    if not match.matched and match.reason is None:
+        match.reason = f"not within {spec.tolerance:.0%} after {_passes(match.passes)}"
+    return match
 
 
 def run_stories(run: StoryRun) -> None:
-    """Write every story: for each brief and repetition, every condition in turn."""
+    """Write every story: for each brief and repetition, every condition in turn.
+
+    In equal-budget mode, each brief and repetition's two stories are then
+    matched, and the matches are recorded in the manifest's stories summary.
+    """
+    stories = run.loaded.config.stories
+    spec = None if stories is None else stories.equal_budget
     for brief in run.prepared.briefs:
         for repetition in range(run.prepared.repeat):
+            jobs: dict[str, StoryJob] = {}
             # Conditions take turns, so a budget stop leaves comparable stories.
             for condition in run.prepared.conditions:
-                story = write_story(run, condition, brief, repetition)
-                run.state.stories.append(story)
+                job = write_story(run, condition, brief, repetition)
+                run.state.stories.append(job.record)
+                jobs[condition.spec.name] = job
+            if spec is not None:
+                run.state.budget_matches.append(match_budgets(run, jobs, spec))
