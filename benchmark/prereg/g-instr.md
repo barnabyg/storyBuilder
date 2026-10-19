@@ -72,7 +72,8 @@ against no preference.
 3. Generate (`configs/p1-instrument.yaml`), build the batch, and run the judge
    panel (`configs/p1-judges.yaml`), as in `docs/instrument-check.md`.
 4. Wait at least 48 hours after last working on the generating code, then read
-   all 10 pairs blind in the reader and close the batch.
+   all 10 pairs blind in the reader (skimming is allowed; see Amendments) and
+   close the batch.
 5. Run `uv run nde eval report p1-instrument` and record the result in the
    plan.
 
@@ -90,3 +91,17 @@ in more than 70% of pairs), record that with the result.
   gates.
 - **If a pipeline exceeded its cost cap:** fix the cost estimate or the cap and
   rerun the generation; the cache makes completed calls free.
+
+## Amendments
+
+Made before any pair of `p1-instrument` was read.
+
+- **19 October 2026, reading mode.** The owner judges each pair from a skim.
+  Only the preference and its strength are required. Rubric scores, failure
+  tags and the condition guess are optional and may be partial: the batch is
+  built with `nde eval batch --optional-scores`. The pass thresholds are
+  unchanged, because they use only the preference and the judge. The secondary
+  metrics summarise only the marks given, so guess accuracy, and with it the
+  "possibly unblinded" flag, may rest on few pairs or none. The batch built
+  before this amendment had not been read; it was replaced, and the judge was
+  re-run on the new batch.

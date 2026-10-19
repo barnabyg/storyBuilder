@@ -32,6 +32,10 @@ uv run nde eval batch <name> --from <run dir> <condition> --from <run dir> <cond
 - The batch records the rubric version it scores with (`--rubric-version`,
   default 1, read from `--rubric-dir`, default `benchmark/rubric`). See
   [rubric.md](rubric.md).
+- `--optional-scores` requires only the preference and its strength, for
+  skim reading. Rubric scores, failure tags and the condition guess may then
+  be left out or given in part; whatever is given is still checked. The
+  report says so, and its secondary sections summarise only the marks given.
 
 A batch lives in `batches/<name>/` (gitignored; change it with
 `--batches-dir` or `NDE_BATCHES`):

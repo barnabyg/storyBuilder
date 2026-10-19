@@ -29,7 +29,7 @@ Copy-Item .env.example .env
 
 uv run nde run configs/p1-instrument.yaml
 $run = (Get-ChildItem runs -Directory -Filter '*-p1-instrument-*' | Sort-Object Name | Select-Object -Last 1).FullName
-uv run nde eval batch p1-instrument --from $run B --from $run B-scrambled
+uv run nde eval batch p1-instrument --from $run B --from $run B-scrambled --optional-scores
 uv run nde run configs/p1-judges.yaml
 uv run nde eval serve --batch p1-instrument
 ```
