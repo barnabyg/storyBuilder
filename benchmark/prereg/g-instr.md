@@ -10,7 +10,7 @@ Drafted for the owner to confirm. Adjust the thresholds or fail actions if
 needed, then commit this file **before** reading the `p1-instrument` batch.
 The commit that confirms it is the pre-registration.
 
-- [ ] Owner confirmed on: (date of the confirming commit)
+- [x] Owner confirmed on: (date of the confirming commit)
 
 ## Hypothesis
 
