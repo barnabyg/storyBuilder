@@ -12,26 +12,29 @@ stories:
   title: An Occurrence at Owl Creek Bridge
   author: Ambrose Bierce
   source: https://www.gutenberg.org/cache/epub/375/pg375.txt
-  edition: Project Gutenberg eBook #375
-  licence_basis: Public domain in the USA (published 1890); Project Gutenberg licence text is stripped
-  sha256: null
+  edition: 'Project Gutenberg eBook #375'
+  licence_basis: Public domain in the USA (published 1890); Project Gutenberg licence
+    text is stripped
+  sha256: a64e03d1b1c8e5c24dc8a835083ab660b0690244487ec5c6f4a7884d47f882b4
   start: '*** START OF'
   end: '*** END OF'
 - id: gift-of-the-magi
   title: The Gift of the Magi
   author: O. Henry
   source: https://www.gutenberg.org/cache/epub/7256/pg7256.txt
-  edition: Project Gutenberg eBook #7256
-  licence_basis: Public domain in the USA (published 1905); Project Gutenberg licence text is stripped
-  sha256: null
+  edition: 'Project Gutenberg eBook #7256'
+  licence_basis: Public domain in the USA (published 1905); Project Gutenberg licence
+    text is stripped
+  sha256: cdf8ad2aad68e48c58d6745a8a1ec418871176a6521fb458a8abc88f9a0649a3
   start: '*** START OF'
   end: '*** END OF'
 - id: yellow-wallpaper
   title: The Yellow Wallpaper
   author: Charlotte Perkins Gilman
   source: https://www.gutenberg.org/cache/epub/1952/pg1952.txt
-  edition: Project Gutenberg eBook #1952
-  licence_basis: Public domain in the USA (published 1892); Project Gutenberg licence text is stripped
-  sha256: null
+  edition: 'Project Gutenberg eBook #1952'
+  licence_basis: Public domain in the USA (published 1892); Project Gutenberg licence
+    text is stripped
+  sha256: 20c7788eeae2fe3a0efd51a1f08b6723366a4be0778d65db219149a3522651d4
   start: '*** START OF'
   end: '*** END OF'
