@@ -183,7 +183,7 @@ class JudgeRun:
                 self.prepared.pairwise_prompt,
                 {"story_1": shown[first], "story_2": shown[second]},
             )
-            call = f"judge/{judge.family}/pair-{number}/{order}"
+            call = f"judge/{judge.label}/pair-{number}/{order}"
             verdict = self._ask(judge, call, "pairwise", prompt, PairwiseVerdict)
             record = JudgeRecord(
                 judge=judge.label,
@@ -212,7 +212,7 @@ class JudgeRun:
                     "scale_max": str(rubric.scale.max),
                 },
             )
-            call = f"judge/{judge.family}/pair-{number}/{side}"
+            call = f"judge/{judge.label}/pair-{number}/{side}"
             verdict = self._ask(judge, call, "rubric", prompt, model)
             record = JudgeRecord(
                 judge=judge.label,

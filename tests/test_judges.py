@@ -255,3 +255,16 @@ def test_a_missing_verdict_is_incomplete_not_position_inconsistent() -> None:
     # One consistent pair; pair 2 is incomplete, so 0 inconsistent and 100% consistency.
     assert "| f | f/j | 2 | 1 | 0 | 0 | 1 | 50% |" in "\n".join(lines)
     assert "| 100% |" in "\n".join(lines)
+
+
+def test_two_judges_of_one_family_have_distinct_call_ids(
+    fake_llm: FakeOpenAI, batch: Path, tmp_path: Path
+) -> None:
+    panel = _panel(("fair-judge", "f2"), ("other-judge", "f2"), ("biased-judge", "f3"))
+
+    run_dir = run(tmp_path, judge_config(fake_llm.base_url, tmp_path, panel))
+
+    calls = [json.loads(line) for line in (run_dir / "calls.jsonl").read_text("utf-8").splitlines()]
+    ids = [(c["call"], c["attempt"]) for c in calls]
+    assert len(ids) == len(set(ids))
+    assert len(list((batch / "judges").glob("*.jsonl"))) == 1
