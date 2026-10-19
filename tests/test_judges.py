@@ -268,3 +268,44 @@ def test_two_judges_of_one_family_have_distinct_call_ids(
     ids = [(c["call"], c["attempt"]) for c in calls]
     assert len(ids) == len(set(ids))
     assert len(list((batch / "judges").glob("*.jsonl"))) == 1
+
+
+def test_model_families_are_compared_without_regard_to_case(
+    fake_llm: FakeOpenAI,
+    batch: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    before = fake_llm.call_count
+    panel = _panel(("fair-judge", "Generator-Family"), ("other-judge", "f3"))
+    config = judge_config(fake_llm.base_url, tmp_path, panel)
+
+    code = main(["run", str(write_config(tmp_path, config)), "--runs-dir", str(tmp_path / "r")])
+
+    assert code == 2
+    assert "in the family 'generator-family'" in capsys.readouterr().err
+    assert fake_llm.call_count == before
+    assert batch.exists()
+
+
+def test_a_judge_panel_on_a_single_story_batch_is_a_config_error(
+    fake_llm: FakeOpenAI,
+    batch: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    view = json.loads((batch / "view.json").read_text(encoding="utf-8"))
+    view |= {"kind": "single", "stories": [p["a"] for p in view["pairs"]], "pairs": []}
+    (batch / "view.json").write_text(json.dumps(view), encoding="utf-8")
+    (batch / "sealed" / "key.json").write_text(
+        json.dumps(
+            {"created_at": "x", "seed": 1, "rubric_version": 1, "conditions": [], "items": []}
+        ),
+        encoding="utf-8",
+    )
+    config = judge_config(fake_llm.base_url, tmp_path)
+
+    code = main(["run", str(write_config(tmp_path, config)), "--runs-dir", str(tmp_path / "r")])
+
+    assert code == 2
+    assert "is not a pair batch" in capsys.readouterr().err

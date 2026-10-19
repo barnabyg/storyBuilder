@@ -20,7 +20,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model
 
 from nde.eval.batch import SIDES, BatchError, Side, View, batch_dir, read_generators, read_view
 from nde.eval.rubric import Rubric
@@ -104,9 +104,12 @@ def prepare_judges(
         return None
     try:
         batch = batch_dir(batches, judges.batch)
+        view = read_view(batch)
+        if view.kind != "pairs":
+            raise ConfigError(f"judges: batch {judges.batch!r} is not a pair batch")
         generators = read_generators(batch)
-    except (BatchError, OSError) as error:
-        raise ConfigError(f"judges: {error}") from error
+    except (BatchError, OSError, ValidationError) as error:
+        raise ConfigError(f"judges: batch {judges.batch!r} cannot be read: {error}") from error
     if not generators:
         raise ConfigError(f"judges: batch {judges.batch!r} records no generator models")
     families: set[str] = set()
@@ -125,9 +128,6 @@ def prepare_judges(
                 f"that generated the batch ({', '.join(sorted(families))}); judges must come "
                 "from other families"
             )
-    view = read_view(batch)
-    if view.kind != "pairs":
-        raise ConfigError(f"judges: batch {judges.batch!r} is not a pair batch")
     if "rubric" in judges.modes and view.rubric is None:
         raise ConfigError(f"judges: batch {judges.batch!r} has no rubric for rubric mode")
     needs = [(judges.pairwise_prompt, PAIRWISE_VARIABLES), (judges.rubric_prompt, RUBRIC_VARIABLES)]
