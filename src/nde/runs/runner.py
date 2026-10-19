@@ -1,7 +1,6 @@
 """Run an experiment config and record it as a run directory."""
 
 import secrets
-import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -15,6 +14,7 @@ from nde.eval.judges import (
     run_judges,
     write_records,
 )
+from nde.gitinfo import git
 from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
 from nde.llm.config import ModelBinding
 from nde.llm.errors import ProviderError
@@ -109,21 +109,6 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
     return PreparedRun(loaded=loaded, templates=templates, stories=stories, judges=judges)
 
 
-def _git(args: list[str], cwd: Path) -> str | None:
-    try:
-        # S603/S607: fixed git arguments; git is resolved from PATH as a developer prerequisite.
-        completed = subprocess.run(  # noqa: S603
-            ["git", *args],  # noqa: S607
-            cwd=cwd,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return completed.stdout.strip()
-
-
 def _new_run_dir(runs_dir: Path, name: str, started: datetime) -> Path:
     stamp = started.strftime("%Y%m%dT%H%M%SZ")
     run_dir = runs_dir / f"{stamp}-{name}-{secrets.token_hex(3)}"
@@ -137,8 +122,8 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
     manifest = Manifest(
         name=config.name,
         status="running",
-        git_sha=_git(["rev-parse", "HEAD"], loaded.directory) or "unknown",
-        git_dirty=bool(_git(["status", "--porcelain"], loaded.directory)),
+        git_sha=git(["rev-parse", "HEAD"], loaded.directory) or "unknown",
+        git_dirty=bool(git(["status", "--porcelain"], loaded.directory)),
         config_path=str(loaded.path),
         config_hash=loaded.hash,
         seed=config.seed,
