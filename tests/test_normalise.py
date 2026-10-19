@@ -121,3 +121,16 @@ def test_a_story_ending_that_only_starts_like_a_sign_off_is_kept(ending: str) ->
 )
 def test_model_sign_offs_are_removed(sign_off: str) -> None:
     assert normalise(f"She walked to the shore.\n\n{sign_off}") == "She walked to the shore.\n"
+
+
+@pytest.mark.parametrize("marker", ["II", "III.", "IV", "2", "12.", "XIV"])
+def test_bare_section_numerals_are_removed(marker: str) -> None:
+    text = f"The rope tightened.\n\n{marker}\n\nPeyton Farquhar was a planter."
+
+    assert normalise(text) == "The rope tightened.\n\nPeyton Farquhar was a planter.\n"
+
+
+def test_a_one_word_paragraph_that_is_not_a_numeral_is_kept() -> None:
+    text = "She waited.\n\nNothing.\n\nThen the door opened."
+
+    assert normalise(text) == text + "\n"

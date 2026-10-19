@@ -8,8 +8,8 @@ see the normalised form. The rules are deterministic:
    becomes three full stops.
 3. Code fences, Markdown headings, horizontal rules and scene-break lines
    (`***`, `* * *`, `---`, `#`) are removed, as are scene or chapter titles
-   ("Scene 2", "Chapter Three: The Storm") and labels such as "Title:" or
-   "Word count:".
+   ("Scene 2", "Chapter Three: The Storm"), bare section numbers ("II", "3."),
+   and labels such as "Title:" or "Word count:".
 4. Markdown and HTML markup is reduced to its text: emphasis, inline code,
    links, block quotes, list bullets and tags.
 5. A model preamble ("Here is your story:") and a leading title line are
@@ -50,6 +50,12 @@ _WHITESPACE = re.compile(r"\s+")
 
 _NUMBER = r"([0-9]+|[ivxlc]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
 _SCENE_TITLE = re.compile(rf"^(scene|chapter|part|act)\s+{_NUMBER}\b[^.!?]*$", re.IGNORECASE)
+# A bare section number: digits, or a well-formed upper-case Roman numeral, as Bierce
+# and others number their parts and some models number scenes. Strict and upper-case,
+# so one-word paragraphs such as "Mild." stay.
+_NUMERAL = re.compile(
+    r"^(?=[MDCLXVI\d])([0-9]+|M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3}))\.?$"
+)
 _LABEL = re.compile(r"^\(?\s*(title|word count|words|length)\s*:", re.IGNORECASE)
 _MAX_TITLE_CHARS = 80
 
@@ -110,6 +116,8 @@ def _paragraphs(text: str) -> list[str]:
         if not line or _LABEL.match(line):
             continue
         if len(line) <= _MAX_TITLE_CHARS and _SCENE_TITLE.match(line):
+            continue
+        if _NUMERAL.match(line):
             continue
         paragraphs.append(line)
     return paragraphs
