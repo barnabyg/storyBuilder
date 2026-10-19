@@ -266,7 +266,7 @@ def test_same_named_conditions_are_offered_without_run_directory_names(
 ) -> None:
     monkeypatch.setenv("FAKE_API_KEY", "test-key")
     fake_llm.default = seeded_story
-    runs = []
+    runs: list[Path] = []
     for seed in (100, 200):
         config = story_config(fake_llm.base_url, [INTACT], briefs={"ids": BRIEFS[:2]})
         config["seed"] = seed
