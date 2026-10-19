@@ -171,6 +171,7 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
             batch=judges.batch.name,
             batch_dir=str(judges.batch),
             modes=list(judges.modes),
+            rubric_version=None if judges.view.rubric is None else judges.view.rubric.version,
             panel=[
                 ModelUse(role="judge", provider=j.provider, model=j.model, family=j.family)
                 for j in judges.panel

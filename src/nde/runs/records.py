@@ -168,6 +168,8 @@ class JudgesSummary(_Record):
     batch_dir: str
     modes: list[str]
     panel: list[ModelUse]
+    # The rubric the batch, and so rubric mode, scores with; None for batches without one.
+    rubric_version: int | None = None
     records: int = 0
     # Verdicts still invalid after their repairs.
     errors: int = 0

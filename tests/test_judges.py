@@ -309,3 +309,13 @@ def test_a_judge_panel_on_a_single_story_batch_is_a_config_error(
 
     assert code == 2
     assert "is not a pair batch" in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("batch")
+def test_a_judge_run_records_the_rubric_version_it_used(
+    fake_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    run_dir = run(tmp_path, judge_config(fake_llm.base_url, tmp_path))
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["judges"]["rubric_version"] == 1
