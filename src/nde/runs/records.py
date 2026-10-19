@@ -23,6 +23,8 @@ CALLS = "calls.jsonl"
 REPORT = "report.md"
 STORIES = "stories.jsonl"
 STORY_DIR = "stories"
+# A story's normalised text, in its folder under STORY_DIR.
+STORY_FILE = "story.md"
 
 type RunStatus = Literal["running", "succeeded", "failed", "aborted"]
 

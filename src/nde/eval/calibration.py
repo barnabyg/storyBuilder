@@ -21,26 +21,19 @@ from pydantic import BaseModel, ConfigDict
 
 from nde.corpus.provenance import read_texts
 from nde.eval.batch import (
-    KEY,
-    SEALED,
-    VIEW,
     BatchError,
     Source,
     View,
-    is_closed,
     read_closed,
     read_scores,
-    read_view,
-    read_warnings,
+    read_sealed,
+    write_batch,
 )
 from nde.eval.rubric import Rubric
-from nde.eval.stats import bootstrap_mean_ci
-from nde.files import write_text_lf
-from nde.runs.records import read_stories
+from nde.eval.sections import BOOTSTRAP_SEED, mean_ci, warnings_section
+from nde.runs.records import STORY_FILE, read_stories
 
 HUMAN = "human"
-BOOTSTRAP_SEED = 0
-STORY_FILE = "story.md"
 
 
 class CalibrationItem(BaseModel):
@@ -130,28 +123,13 @@ def build_calibration_batch(batches_dir: Path, spec: CalibrationSpec) -> Path:
         conditions=[source.condition for source in sources],
         items=[item for item, _ in items],
     )
-    (batch / SEALED).mkdir(parents=True)
-    write_text_lf(batch / VIEW, view.model_dump_json(indent=2) + "\n")
-    write_text_lf(batch / SEALED / KEY, key.model_dump_json(indent=2) + "\n")
+    write_batch(batch, view, key)
     return batch
-
-
-def read_calibration_key(batch: Path) -> CalibrationKey:
-    if not is_closed(batch):
-        raise BatchError("the batch is still open; close it in the reader first")
-    return CalibrationKey.model_validate_json((batch / SEALED / KEY).read_text(encoding="utf-8"))
-
-
-def _cell(values: list[int]) -> str:
-    if not values:
-        return "-"
-    low, high = bootstrap_mean_ci(values, seed=BOOTSTRAP_SEED)
-    return f"{sum(values) / len(values):.2f} [{low:.2f}, {high:.2f}]"
 
 
 def render_calibration_report(batch: Path, view: View) -> str:
     """Scores by source for a closed calibration batch; raises BatchError while it is open."""
-    key = read_calibration_key(batch)
+    key = read_sealed(batch, CalibrationKey)
     rubric = view.rubric
     if rubric is None:  # pragma: no cover - calibration batches always carry a rubric
         raise BatchError("the calibration batch has no rubric")
@@ -174,9 +152,7 @@ def render_calibration_report(batch: Path, view: View) -> str:
         f"- **Closed:** {closed.closed_at if closed else '-'}",
         "",
     ]
-    warnings = read_warnings(batch)
-    if warnings:
-        lines += ["## Warnings", "", *(f"- {w.at}: {w.warning}" for w in warnings), ""]
+    lines += warnings_section(batch)
     lines += [
         "## Rubric scores by source",
         "",
@@ -187,7 +163,7 @@ def render_calibration_report(batch: Path, view: View) -> str:
         f"| Dimension | {' | '.join(sources)} |",
         f"| --- |{' --- |' * len(sources)}",
         *(
-            f"| {d} | {' | '.join(_cell(scores[s][d]) for s in sources)} |"
+            f"| {d} | {' | '.join(mean_ci(scores[s][d]) for s in sources)} |"
             for d in rubric.dimension_ids
         ),
         "",
@@ -211,7 +187,3 @@ def render_calibration_report(batch: Path, view: View) -> str:
         "",
     ]
     return "\n".join(lines)
-
-
-def is_calibration(batch: Path) -> bool:
-    return read_view(batch).kind == "single"

@@ -24,6 +24,7 @@ from nde.runs.config import (
 from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.records import (
     STORY_DIR,
+    STORY_FILE,
     BudgetMatch,
     ConditionUse,
     EqualBudgetSummary,
@@ -46,7 +47,6 @@ from nde.stories.pipeline import (
 from nde.stories.registry import PIPELINES
 
 # The normalised story, which blind batches and judges see, and the model's raw text.
-STORY_FILE = "story.md"
 RAW_FILE = "story.raw.md"
 # The story before its first revision pass, and the folder of each pass's files.
 ORIGINAL_FILE = "story.original.md"

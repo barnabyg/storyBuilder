@@ -19,20 +19,18 @@ from nde.eval.batch import (
     read_judgements,
     read_key,
     read_view,
-    read_warnings,
 )
 from nde.eval.calibration import render_calibration_report
 from nde.eval.judge_report import PairLabels, judges_section
 from nde.eval.judges import read_records
 from nde.eval.rubric import Rubric
-from nde.eval.stats import binomial_two_sided, bootstrap_mean_ci
+from nde.eval.sections import BOOTSTRAP_SEED, mean_ci, warnings_section
+from nde.eval.stats import binomial_two_sided
 from nde.files import write_text_lf
 
 REPORT = "report.md"
 # Guesses right in more than this share of pairs flag the batch as possibly unblinded.
 UNBLINDED_THRESHOLD = 0.70
-# Fixed, so a report regenerates identically.
-BOOTSTRAP_SEED = 0
 
 
 class _Revealed:
@@ -98,14 +96,7 @@ def _rubric_section(revealed: _Revealed, rubric: Rubric) -> list[str]:
         *_table(revealed.names, "Dimension"),
     ]
     for dimension in rubric.dimension_ids:
-        cells: list[str] = []
-        for name in revealed.names:
-            values = scores[name][dimension]
-            if values:
-                low, high = bootstrap_mean_ci(values, seed=BOOTSTRAP_SEED)
-                cells.append(f"{sum(values) / len(values):.2f} [{low:.2f}, {high:.2f}]")
-            else:
-                cells.append("-")
+        cells = [mean_ci(scores[name][dimension]) for name in revealed.names]
         lines.append(f"| {dimension} | {' | '.join(cells)} |")
     return [*lines, ""]
 
@@ -199,9 +190,7 @@ def render_report(batch: Path) -> str:
         f"- **Closed:** {closed.closed_at if closed else '-'}",
         "",
     ]
-    warnings = read_warnings(batch)
-    if warnings:
-        lines += ["## Warnings", "", *(f"- {w.at}: {w.warning}" for w in warnings), ""]
+    lines += warnings_section(batch)
     lines += _preferences(revealed)
     rubric = revealed.view.rubric
     if rubric is not None:

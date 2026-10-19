@@ -32,7 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from nde.eval.rubric import Rubric
 from nde.files import append_line, write_text_lf
-from nde.runs.records import read_manifest, read_stories
+from nde.runs.records import STORY_FILE, read_manifest, read_stories
 
 DEFAULT_BATCHES_DIR = Path("batches")
 VIEW = "view.json"
@@ -44,7 +44,6 @@ SCORES = "scores.jsonl"
 SINGLE = "story"
 WARNINGS = "reader-warnings.jsonl"
 CLOSED = "closed.json"
-STORY_FILE = "story.md"
 
 type Side = Literal["A", "B"]
 SIDES: tuple[Side, Side] = ("A", "B")
@@ -265,10 +264,22 @@ def build_batch(
         rubric_version=None if rubric is None else rubric.version,
         generators=_generators(sources),
     )
-    (batch_dir / SEALED).mkdir(parents=True)
-    write_text_lf(batch_dir / VIEW, view.model_dump_json(indent=2) + "\n")
-    write_text_lf(batch_dir / SEALED / KEY, key.model_dump_json(indent=2) + "\n")
+    write_batch(batch_dir, view, key)
     return batch_dir
+
+
+def write_batch(batch: Path, view: View, key: BaseModel) -> None:
+    """Create a batch: the reader's view, and the key sealed apart from it."""
+    (batch / SEALED).mkdir(parents=True)
+    write_text_lf(batch / VIEW, view.model_dump_json(indent=2) + "\n")
+    write_text_lf(batch / SEALED / KEY, key.model_dump_json(indent=2) + "\n")
+
+
+def read_sealed[T: BaseModel](batch: Path, model: type[T]) -> T:
+    """The sealed key. Refuses while the batch is open, so nothing reveals it early."""
+    if not is_closed(batch):
+        raise BatchError("the batch is still open; close it in the reader first")
+    return model.model_validate_json((batch / SEALED / KEY).read_text(encoding="utf-8"))
 
 
 def batch_dir(batches_dir: Path, name: str) -> Path:
@@ -436,7 +447,5 @@ def read_generators(batch: Path) -> list[GeneratorUse]:
 
 
 def read_key(batch: Path) -> Key:
-    """The sealed key. Refuses while the batch is open, so nothing reveals it early."""
-    if not is_closed(batch):
-        raise BatchError("the batch is still open; close it in the reader first")
-    return Key.model_validate_json((batch / SEALED / KEY).read_text(encoding="utf-8"))
+    """A pair batch's sealed key; refuses while the batch is open."""
+    return read_sealed(batch, Key)
