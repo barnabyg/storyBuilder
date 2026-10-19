@@ -300,3 +300,35 @@ def test_the_calibration_report_refuses_an_open_batch(
     assert main(["eval", "report", "calib", "--batches-dir", str(tmp_path / "batches")]) == 2
     assert "still open" in capsys.readouterr().err
     assert calibration.exists()
+
+
+def test_building_a_batch_verifies_the_fetched_sources(
+    fake_llm: FakeOpenAI,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    text_server: dict[str, str],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    text_server["/story.txt"] = GUTENBERG_TEXT
+    manifest = _manifest(tmp_path, text_server["base"])
+    assert _fetch(manifest) == 0
+    texts = manifest.parent / "calibration"
+    (texts / "test-story.md").write_text("A different story entirely.\n", encoding="utf-8")
+    first, _ = two_runs(fake_llm, tmp_path)
+
+    code = main(["eval", "calibration", "calib", "--humans", str(manifest), "--from",
+                 str(first), "intact", "--batches-dir", str(tmp_path / "batches"),
+                 "--rubric-dir", str(REPO / "benchmark" / "rubric")])
+
+    assert code == 0
+    view = json.loads((tmp_path / "batches" / "calib" / "view.json").read_text("utf-8"))
+    assert STORY in view["stories"]
+    assert "A different story entirely.\n" not in view["stories"]
+
+    (texts / "test-story.source.txt").write_text(GUTENBERG_TEXT + "x", encoding="utf-8")
+    code = main(["eval", "calibration", "calib2", "--humans", str(manifest), "--from",
+                 str(first), "intact", "--batches-dir", str(tmp_path / "batches"),
+                 "--rubric-dir", str(REPO / "benchmark" / "rubric")])
+    assert code == 2
+    assert "checksum mismatch" in capsys.readouterr().err

@@ -180,14 +180,20 @@ def import_story(manifest_path: Path, story_id: str, file: Path) -> HumanStory:
 
 
 def read_texts(manifest_path: Path) -> dict[str, tuple[HumanStory, str]]:
-    """Every fetched story's record and normalised text, by ID."""
+    """Every fetched story's record and normalised text, by ID.
+
+    Each source is verified against its recorded checksum again, and the text is
+    extracted afresh from it, so an edited source or story file cannot slip in.
+    """
     manifest = read_manifest(manifest_path)
     texts: dict[str, tuple[HumanStory, str]] = {}
     for story in manifest.stories:
-        path = story_path(manifest_path, story.id)
-        if not path.is_file() or story.sha256 is None:
+        source = source_path(manifest_path, story.id)
+        if not source.is_file() or story.sha256 is None:
             raise ProvenanceError(
                 f"{story.id} has not been fetched; run `uv run nde calibration fetch`"
             )
-        texts[story.id] = (story, path.read_text(encoding="utf-8"))
+        data = source.read_bytes()
+        _checked(story, data)
+        texts[story.id] = (story, extract(data.decode("utf-8-sig"), story))
     return texts
