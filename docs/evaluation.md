@@ -225,8 +225,14 @@ committed stories are from Project Gutenberg's single-story ebooks:
 | The Yellow Wallpaper | Charlotte Perkins Gilman | #1952 (about 6,000 words, above the 2,000 to 5,000 aim) |
 
 To add a story from a collection, set `start` and `end` to lines that bracket
-it. Standard Ebooks texts are preferred where a clean single-story source
-exists; download one by hand and use `nde calibration import`.
+it.
+
+The plan prefers Standard Ebooks. These three come from Project Gutenberg
+because Gutenberg publishes each of them as a single-story plain-text ebook
+that `fetch` can download and extract unattended; Standard Ebooks publishes
+short stories inside collections, as XHTML. To use a Standard Ebooks text,
+save the story as plain text, add a record with markers that bracket it, and
+run `nde calibration import <id> <file>`.
 
 ```powershell
 uv run nde calibration fetch

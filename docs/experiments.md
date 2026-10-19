@@ -65,7 +65,11 @@ two dev briefs:
 
 ```yaml
 roles:
-  prose: {provider: deepseek, model: deepseek-flash, params: {max_tokens: 5000}}
+  prose:
+    provider: deepseek
+    model: deepseek-flash
+    family: deepseek       # the model family, recorded per model (judges must differ)
+    params: {max_tokens: 5000}
 
 stories:
   briefs_dir: ../benchmark          # relative to the config file (default ../benchmark)
@@ -490,6 +494,13 @@ Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
 | `outputs.jsonl` | one line per call: call ID, repetition, model, seed and the raw output text |
 | `calls.jsonl` | one line per provider call (including repair attempts): the reported model ID, template, tokens, cost, latency, retries and whether it was a cache hit |
 | `stories.jsonl`, `stories/` | story runs only; see [Story-generation runs](#story-generation-runs) |
+| `judgements.jsonl` | judge-panel runs only: every judge verdict, by pair and shown position; see [evaluation.md](evaluation.md#llm-judge-panel) |
+
+The manifest records each model's role, provider, model and `family`. Story
+runs add a `stories` section (brief IDs, frozen-split checksums, conditions,
+length settings, out-of-range stories and any equal-budget matches) and
+judge-panel runs a `judges` section (the batch, modes, panel, rubric version
+and verdict counts).
 | `report.md` | generated from the files above |
 
 Regenerate a report with `uv run nde report <run dir>`.
