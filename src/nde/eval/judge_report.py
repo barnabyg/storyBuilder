@@ -141,6 +141,14 @@ def judges_section(
         *(_pairwise_row(judge, pairs, names) for judge in judges),
         "",
     ]
+    shared = sorted({record.judge for record in latest if record.shares_generator_family})
+    lines += [
+        f"**Family separation waived:** {judge} shares a family with a model that "
+        "generated these stories, so its verdicts may favour them (self-preference)."
+        for judge in shared
+    ]
+    if shared:
+        lines.append("")
     if errors:
         lines += [f"{errors} judge verdicts were still invalid after their repairs.", ""]
     if rubric is not None and any(record.mode == "rubric" for record in latest):

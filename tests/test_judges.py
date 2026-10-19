@@ -142,8 +142,8 @@ def test_a_rerun_of_the_judges_is_free(fake_llm: FakeOpenAI, tmp_path: Path) -> 
 @pytest.mark.parametrize(
     ("panel", "message"),
     [
-        (_panel(("fair-judge", "same"), ("other-judge", "same")), "at least two model families"),
-        (_panel(("fair-judge", "f2")), "at least two model families"),
+        (_panel(("fair-judge", "same"), ("other-judge", "same")), "at least 2 model families"),
+        (_panel(("fair-judge", "f2")), "at least 2 model families"),
         (
             _panel(("fair-judge", "generator-family"), ("other-judge", "f3")),
             "judge fake/fair-judge is in the family 'generator-family'",
@@ -319,3 +319,36 @@ def test_a_judge_run_records_the_rubric_version_it_used(
 
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["judges"]["rubric_version"] == 1
+
+
+def test_a_config_can_explicitly_waive_the_family_rules_and_reports_say_so(
+    fake_llm: FakeOpenAI, batch: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = judge_config(fake_llm.base_url, tmp_path, _panel(("fair-judge", "generator-family")))
+    config["judges"] |= {"min_families": 1, "allow_generator_families": True}
+
+    run_dir = run(tmp_path, config)
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    [waiver] = manifest["warnings"]
+    assert "fake/fair-judge shares the family 'generator-family'" in waiver
+    assert "## Warnings" in (run_dir / "report.md").read_text(encoding="utf-8")
+    assert all(r["shares_generator_family"] for r in _judge_records(batch))
+    _owner_reads(batch, [True, True, True, False])
+    capsys.readouterr()
+    assert main(["eval", "report", "demo", "--batches-dir", str(tmp_path / "batches")]) == 0
+    report = capsys.readouterr().out
+    assert "**Family separation waived:** fake/fair-judge" in report
+
+
+def test_by_default_the_family_rules_hold(
+    fake_llm: FakeOpenAI, batch: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = judge_config(fake_llm.base_url, tmp_path, _panel(("fair-judge", "generator-family")))
+    config["judges"] |= {"min_families": 1}
+
+    code = main(["run", str(write_config(tmp_path, config)), "--runs-dir", str(tmp_path / "r")])
+
+    assert code == 2
+    assert "judges must come from other families" in capsys.readouterr().err
+    assert batch.exists()

@@ -100,7 +100,7 @@ def _instrument_reply(body: Json) -> Reply:
 
 
 def _point_providers_at(fake: FakeOpenAI, monkeypatch: pytest.MonkeyPatch) -> None:
-    for provider in ("DEEPSEEK", "OPENAI", "ANTHROPIC", "MISTRAL"):
+    for provider in ("DEEPSEEK", "OPENAI"):
         monkeypatch.setenv(f"NDE_{provider}_BASE_URL", fake.base_url)
         monkeypatch.setenv(f"{provider}_API_KEY", "test-key")
 
@@ -151,8 +151,9 @@ def test_the_instrument_check_runs_end_to_end(
     verdicts = list((batches / "p1-instrument" / "judges").glob("*.jsonl"))
     assert len(verdicts) == 1
     lines = verdicts[0].read_text(encoding="utf-8").splitlines()
-    # 10 pairs x 2 judges x (2 orders + 2 stories).
-    assert len(lines) == 80
+    # 10 pairs x 1 judge x (2 orders + 2 stories).
+    assert len(lines) == 40
+    assert all(json.loads(line)["shares_generator_family"] for line in lines)
 
 
 def test_the_instrument_config_meets_the_plan() -> None:

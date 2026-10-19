@@ -82,6 +82,8 @@ class JudgeRecord(BaseModel):
     tags: list[str] | None = None
     # Set when the judge's output stayed invalid after its repairs.
     error: str | None = None
+    # The judge shares a family with the batch's generators (a waived family rule).
+    shares_generator_family: bool = False
 
 
 @dataclass(frozen=True)
@@ -92,6 +94,19 @@ class PreparedJudges:
     modes: list[JudgeMode]
     pairwise_prompt: PromptRef
     rubric_prompt: PromptRef
+    # Judges allowed to share a generator's family (judges.allow_generator_families).
+    shared_family: frozenset[str] = frozenset()
+
+    @property
+    def waivers(self) -> list[str]:
+        """One warning per judge that shares a family with the batch's generators."""
+        return [
+            f"family separation waived: judge {judge.label} shares the family "
+            f"{judge.family!r} with a model that generated batch {self.batch.name!r}, so "
+            "self-preference bias is not controlled for it"
+            for judge in self.panel
+            if judge.label in self.shared_family
+        ]
 
 
 def prepare_judges(
@@ -121,8 +136,9 @@ def prepare_judges(
                 "that free) and rebuild the batch"
             )
         families.add(generator.family.lower())
+    shared = frozenset(j.label for j in judges.panel if j.family in families)
     for judge in judges.panel:
-        if judge.family in families:
+        if judge.label in shared and not judges.allow_generator_families:
             raise ConfigError(
                 f"judges: judge {judge.label} is in the family {judge.family!r}, like a model "
                 f"that generated the batch ({', '.join(sorted(families))}); judges must come "
@@ -134,7 +150,13 @@ def prepare_judges(
     for ref, variables in needs:
         require_template(templates, loaded.prompts_dir, ref, dict.fromkeys(variables, "x"))
     return PreparedJudges(
-        batch, view, judges.panel, judges.modes, judges.pairwise_prompt, judges.rubric_prompt
+        batch,
+        view,
+        judges.panel,
+        judges.modes,
+        judges.pairwise_prompt,
+        judges.rubric_prompt,
+        shared,
     )
 
 
@@ -187,6 +209,7 @@ class JudgeRun:
                 judge=judge.label,
                 family=judge.family or "",
                 mode="pairwise",
+                shares_generator_family=judge.label in self.prepared.shared_family,
                 pair=number,
                 order=order,
             )
@@ -216,6 +239,7 @@ class JudgeRun:
                 judge=judge.label,
                 family=judge.family or "",
                 mode="rubric",
+                shares_generator_family=judge.label in self.prepared.shared_family,
                 pair=number,
                 story=cast("Side", side),
             )

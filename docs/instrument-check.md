@@ -13,7 +13,7 @@ order with freshly written prose. See P1.8 and the Phase 1 exit gate in
 | --- | --- |
 | B-scrambled condition | `baseline_b_scrambled` (`src/nde/stories/scrambled.py`): B's outline for the brief (the same cached call), scenes shuffled with a seeded permutation that is never the identity, prose regenerated through the shared prose contract. The permutation is kept as `permutation.json` beside the story. |
 | Generation config | `configs/p1-instrument.yaml`: B and B-scrambled on the 10 dev briefs, planner `gpt-6-luna`, prose `deepseek-flash`, per-run cap $2 |
-| Judge config | `configs/p1-judges.yaml`: pairwise and rubric modes on batch `p1-instrument`. **You choose the panel**: two families other than openai and deepseek. The committed proposal (Anthropic Haiku 5.5 and Mistral Small) needs its model IDs, endpoints and prices checked. |
+| Judge config | `configs/p1-judges.yaml`: pairwise and rubric modes on batch `p1-instrument`, with one judge, `gpt-6.1-sol` at medium reasoning effort (your choice). It shares the planner's OpenAI family, so the family rules are waived explicitly and the reports say so. Check its model ID and price. |
 | Pre-registration | `benchmark/prereg/g-instr.md`: hypothesis, primary metric, n = 10, thresholds and fail actions, copied from the plan for you to confirm |
 
 ## From a clean checkout to the reader
@@ -25,8 +25,7 @@ git clone https://github.com/barnabyg/storyBuilder.git
 Set-Location storyBuilder
 uv sync
 Copy-Item .env.example .env
-# Edit .env: DEEPSEEK_API_KEY, OPENAI_API_KEY, and the judge panel's keys
-# (ANTHROPIC_API_KEY and MISTRAL_API_KEY for the committed proposal).
+# Edit .env: DEEPSEEK_API_KEY and OPENAI_API_KEY (planner and judge).
 
 uv run nde run configs/p1-instrument.yaml
 $run = (Get-ChildItem runs -Directory -Filter '*-p1-instrument-*' | Sort-Object Name | Select-Object -Last 1).FullName
@@ -42,8 +41,9 @@ Expected:
   and the cost per condition. Stories still outside the length range after 3
   attempts are listed under **Out of length range**.
 - `nde eval batch` prints `built batch 'p1-instrument': 10 pairs`.
-- `nde run configs/p1-judges.yaml` prints `run succeeded`. Its report shows 80
-  judge calls (10 pairs, 2 judges, 2 orders plus 2 stories), and the verdicts
+- `nde run configs/p1-judges.yaml` prints `run succeeded`. Its report shows 40
+  judge calls (10 pairs, 2 orders plus 2 stories) and a family-separation
+  warning, and the verdicts
   are in `batches\p1-instrument\judges\`.
 - `nde eval serve` prints the reader's address,
   `http://127.0.0.1:8770/`, and warns if the generating code changed less than
@@ -68,5 +68,6 @@ uv run nde eval report p1-instrument
 
 The report reveals the key, with the owner's win counts and binomial p-value,
 rubric means, failure tags, guess accuracy (and the possibly-unblinded flag),
-and each judge family's agreement, kappa and position consistency. Record the
+and the judge's agreement, kappa and position consistency, flagged as sharing
+the planner's family. Record the
 result in the Phase 1 section of the plan.
