@@ -204,8 +204,19 @@ schema simplification and no mid-tier model are needed.
 
 **Exit gate:**
 - The owner prefers intact B over scrambled in **≥9 of 10 pairs**.
-- Both judge families agree with the owner in ≥80% of those pairs.
+- Both judge families agree with the owner in ≥80% of those pairs (for
+  G-instr: the single judge; see the judge decision below).
 - The A and B pipelines run end to end within the cost caps.
+
+**G-instr judge decision (19 October 2026):** the judge panel is one model,
+OpenAI `gpt-6.1-sol` at medium reasoning effort (`configs/p1-judges.yaml`).
+Only OpenAI and DeepSeek APIs are available and the stories come from both
+families, so no judge can satisfy the family rules of §3.1 and §4. They are
+waived explicitly in the judge config (`judges.min_families: 1`,
+`judges.allow_generator_families: true`), and every run manifest and batch
+report flags the waiver. In G-instr both conditions share the planner and
+prose models, so self-preference cannot favour either one; revisit the
+panel before Phase 3, where conditions differ in their planners.
 
 **Fail action:** if the owner cannot reliably detect gross structural damage, the stories are too short or the prose dominates. Increase the target length or restrict reading to targeted excerpts before going further. If the judges fail where the owner succeeds, drop judges from screening and budget more owner reading time.
 

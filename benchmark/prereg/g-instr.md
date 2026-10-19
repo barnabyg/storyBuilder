@@ -29,14 +29,20 @@ prose, from the same planner, prose model and templates.
 - Both: `planner` `openai/gpt-6-luna`, `prose` `deepseek/deepseek-flash`, the
   shared prose contract (`scene_prose@1`), normalisation, and length control
   (within 10% of 2,000 words, up to 3 attempts).
+- **Judge:** one LLM judge, OpenAI `gpt-6.1-sol` at medium reasoning effort
+  (`configs/p1-judges.yaml`), in pairwise mode (both orders) and rubric mode.
+  It shares the OpenAI family with the planner, so the plan's family rules are
+  waived by the owner's choice: only OpenAI and DeepSeek APIs are available.
+  Both conditions use the same planner outline and prose model, so
+  self-preference cannot favour one condition over the other in this check.
 
 ## Primary metric
 
 The owner's forced-choice preference per pair in the blind batch
 `p1-instrument`: the number of pairs in which the intact B story is preferred.
 
-Secondary, reported but not deciding the gate: each judge family's agreement
-with the owner and Cohen's kappa, position consistency, rubric means, failure
+Secondary, reported but not deciding the gate: the judge's Cohen's kappa
+against the owner, position consistency, rubric means, failure
 tags, and the owner's condition-guess accuracy.
 
 ## Sample size
@@ -51,8 +57,8 @@ noted in the result.
 The gate passes only if all three hold:
 
 1. The owner prefers intact B in **at least 9 of 10** pairs.
-2. **Both** judge families agree with the owner in **at least 80%** of the
-   pairs (position-inconsistent pairs count as disagreement).
+2. The judge (`gpt-6.1-sol`) agrees with the owner in **at least 80%** of the
+   pairs (position-inconsistent and incomplete pairs count as disagreement).
 3. The A and B pipelines ran end to end within their cost caps
    (`configs/stories-ab.yaml` and `configs/p1-instrument.yaml`).
 
@@ -79,8 +85,8 @@ in more than 70% of pairs), record that with the result.
   stories are too short or the prose dominates. Increase the target length, or
   restrict reading to targeted excerpts, then rerun the check before going
   further.
-- **If the judges fail where the owner succeeds** (either family below 80%
-  agreement): drop the judges from screening and budget more owner reading
-  time for later gates.
+- **If the judge fails where the owner succeeds** (below 80% agreement): drop
+  the judge from screening and budget more owner reading time for later
+  gates.
 - **If a pipeline exceeded its cost cap:** fix the cost estimate or the cap and
   rerun the generation; the cache makes completed calls free.
