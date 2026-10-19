@@ -1,0 +1,17 @@
+id: brief-04
+split: dev
+genre: historical fiction
+premise: >-
+  In 1858 London, during the summer of the Great Stink, a mudlark girl finds a
+  surveyor's notebook in the Thames that proves the new sewer route will flood
+  her district.
+protagonist:
+  name: Nell Harker
+  description: a twelve-year-old mudlark who cannot read but has an exact memory for places
+central_conflict: >-
+  To be believed, Nell needs the help of the surveyor's clerk who lost the
+  notebook, and he would lose his post if anyone learned he had lost it.
+themes: [class, being heard, ingenuity]
+ending_constraint:
+  kind: happy
+  detail: The route is changed because of Nell, and she gets credit in a way that changes her prospects.

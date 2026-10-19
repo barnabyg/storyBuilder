@@ -1,0 +1,17 @@
+id: brief-02
+split: dev
+genre: science fiction
+premise: >-
+  A maintenance technician on a generation ship discovers that the ship's
+  navigation log has been quietly edited for decades to hide that it changed
+  course.
+protagonist:
+  name: Tomas Okafor
+  description: a meticulous junior technician who trusts records more than people
+central_conflict: >-
+  The council that ordered the edits believes the truth would cause a mutiny;
+  Tomas believes the passengers have a right to choose where they are going.
+themes: [truth, consent, institutional trust]
+ending_constraint:
+  kind: ambiguous
+  detail: The truth is announced, and the story ends before anyone knows how the passengers will react.

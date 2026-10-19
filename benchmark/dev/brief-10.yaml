@@ -1,0 +1,16 @@
+id: brief-10
+split: dev
+genre: domestic drama
+premise: >-
+  A retired schoolteacher with early dementia begins writing letters to her
+  former pupils to apologise for things she can no longer be sure she did.
+protagonist:
+  name: Margaret Osei
+  description: a formidable, private former headmistress losing her grip on her memory
+central_conflict: >-
+  Her son wants the letters stopped before they embarrass the family, and one
+  former pupil writes back accusing her of something she cannot remember.
+themes: [memory, guilt, dignity]
+ending_constraint:
+  kind: ambiguous
+  detail: The story never settles whether the accusation is true, and Margaret chooses how to answer it anyway.

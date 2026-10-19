@@ -1,0 +1,22 @@
+system: >-
+  You are a skilled fiction writer. You write a short story one scene at a
+  time, in plain prose.
+user: |-
+  You are writing a short story from this brief:
+
+  $brief
+
+  The whole story is planned as these scenes, in this order:
+
+  $plan
+
+  $story_so_far
+
+  Now write scene $scene_number of $scene_count, about $scene_words words. It
+  must realise these beats, in order:
+
+  $scene
+
+  Write only the scene's prose, continuing naturally from what came before.
+  Do not resolve anything that a later scene is planned to resolve. No title,
+  heading, scene number, notes or commentary.

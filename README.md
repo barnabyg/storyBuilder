@@ -31,6 +31,11 @@ uv run nde run configs/smoke.yaml
 See [docs/experiments.md](docs/experiments.md) for configs, prompt templates and
 run directories.
 The G0 model benchmark is described in [docs/benchmark.md](docs/benchmark.md).
+Benchmark briefs (format, drafting, freezing) are described in
+[docs/briefs.md](docs/briefs.md), and the rubric in [docs/rubric.md](docs/rubric.md).
+Blind evaluation (batches, the reader and reports) is described in
+[docs/evaluation.md](docs/evaluation.md), and the Phase 1 instrument check in
+[docs/instrument-check.md](docs/instrument-check.md).
 
 ## Verification
 
@@ -60,8 +65,10 @@ names what it suppresses (`# noqa: <rule>`, or `# pragma: allowlist secret` for
 a secret-scan false positive) and has its justification beside it.
 The only broader exceptions are the per-file ignores for `tests/**` in
 `pyproject.toml` (assert statements and literal expected values), justified
-there, and the `prompts/checksums.json` secret-scan exclusion, justified in
-`src/nde/verify/steps.py`. The code has no type-checker suppressions.
+there, and the secret-scan exclusions for checksum files (`prompts/checksums.json`,
+`benchmark/frozen.json`, `tests/fixtures/frozen-split/frozen.json`,
+`benchmark/rubric/checksums.json`,
+`data/manifest.calibration.yaml`), justified in `src/nde/verify/steps.py`. The code has no type-checker suppressions.
 
 CI (`.github/workflows/verify.yml`) runs the same command headless on every
 push and pull request.

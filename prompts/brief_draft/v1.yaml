@@ -1,0 +1,20 @@
+system: >-
+  You are a fiction editor drafting story briefs for a benchmark of short-story
+  generators. You answer with a single JSON object and no other text.
+user: >-
+  Draft $count briefs for short stories of about 2,000 words in five to eight
+  scenes. Each brief gives a genre, a premise (the situation the story starts
+  from, in one or two sentences), a protagonist (a name and a one-sentence
+  description), the central conflict, one to four themes, and an ending
+  constraint: a kind (happy, tragic, bittersweet, ambiguous, twist or open)
+  and one sentence saying what the ending must do.
+
+
+  Make the briefs varied: spread them across genres, ending kinds, settings,
+  periods and kinds of conflict (with another person, with a group, with
+  nature, with oneself). Every brief must support a complete arc with setup
+  and payoff in about 2,000 words. Avoid stock premises, chosen-one plots and
+  twists that depend on a single hidden fact.
+
+
+  $guidance

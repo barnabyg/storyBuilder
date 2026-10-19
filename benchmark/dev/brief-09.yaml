@@ -1,0 +1,16 @@
+id: brief-09
+split: dev
+genre: adventure
+premise: >-
+  Two estranged sisters attempt to finish their late father's unfinished
+  winter crossing of a frozen lake to scatter his ashes on the far shore.
+protagonist:
+  name: Kari Lund
+  description: the younger sister, a reckless guide who resents being cast as the irresponsible one
+central_conflict: >-
+  The ice is weaker than their father's maps say, and the sisters disagree
+  about whether to turn back, each blaming the other for his death.
+themes: [sibling rivalry, risk, inheritance]
+ending_constraint:
+  kind: bittersweet
+  detail: They do not reach the far shore, but they scatter the ashes together and are reconciled.

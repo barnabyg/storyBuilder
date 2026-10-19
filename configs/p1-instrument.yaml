@@ -1,0 +1,68 @@
+# Gate G-instr, generation: Baseline B against B-scrambled on the 10 dev briefs
+# (docs/instrument-check.md, benchmark/prereg/g-instr.md).
+#
+#   uv run nde run configs/p1-instrument.yaml
+#
+# B-scrambled takes B's outline for each brief (from the cache), shuffles its
+# scene order with a seeded permutation that is never the original, and writes
+# fresh prose through the shared prose contract. Both conditions use the same
+# planner, prose model and templates, so scene order is the only difference.
+#
+# Needs DEEPSEEK_API_KEY and OPENAI_API_KEY in the environment or in `.env`.
+# CHECK BEFORE RUNNING: model IDs and prices against the providers' lists.
+name: p1-instrument
+seed: 2310
+prompts_dir: ../prompts
+
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    base_url_env: NDE_DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    timeout_s: 300
+  openai:
+    base_url: https://api.openai.com/v1
+    base_url_env: NDE_OPENAI_BASE_URL
+    api_key_env: OPENAI_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: true
+    timeout_s: 180
+
+roles:
+  planner:                    # the G0 decision
+    provider: openai
+    model: gpt-6-luna
+    family: openai
+    params: {reasoning_effort: none, temperature: 0.7, max_completion_tokens: 3000}
+  prose:
+    provider: deepseek
+    model: deepseek-flash
+    family: deepseek
+    # A scene is about 300-400 words (under 600 tokens); the cap bounds each
+    # call's cost reservation.
+    params: {thinking: {type: disabled}, temperature: 0.8, max_tokens: 1500}
+
+stories:
+  briefs_dir: ../benchmark
+  briefs: {split: dev}
+  repeat: 1
+  length: {tolerance: 0.10, max_attempts: 3}
+  conditions:
+    - name: B
+      pipeline: baseline_b
+    - name: B-scrambled
+      pipeline: baseline_b_scrambled
+
+structured:
+  max_repairs: 2
+
+prices:
+  # DeepSeek pricing page, checked 2026-10-18: peak rates (off-peak is half).
+  deepseek/deepseek-flash: {input_per_mtok: 0.30, output_per_mtok: 1.20}
+  # OpenAI model page, checked 2026-10-18.
+  openai/gpt-6-luna: {input_per_mtok: 0.10, output_per_mtok: 0.50}
+
+budget:
+  # 20 stories of 5-8 scenes, with up to 3 prose attempts each, reserve at most
+  # about $0.08 per story at these caps; actual spend is far lower.
+  per_run_usd: 2.00
+  per_day_usd: 5.00

@@ -1,0 +1,16 @@
+system: >-
+  You are a skilled fiction writer. You write complete, finished short stories.
+user: >-
+  Write a complete short story from this brief.
+
+
+  $brief
+
+
+  Length: about $target_words words, told in $min_scenes to $max_scenes
+  scenes.
+
+
+  Write only the story itself, in plain prose paragraphs: no title, no
+  headings, no scene numbers or labels, no notes and no commentary before or
+  after it.

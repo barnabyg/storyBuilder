@@ -1,0 +1,16 @@
+id: brief-08
+split: dev
+genre: comedy
+premise: >-
+  A wedding speechwriter for hire accidentally sends the bride's speech to the
+  groom and the groom's to the bride on the morning of the wedding.
+protagonist:
+  name: Gideon Pike
+  description: a fastidious ghostwriter who prides himself on never being noticed
+central_conflict: >-
+  Each speech reveals something the couple has hidden from the other, and
+  Gideon has six hours to fix it without either learning he exists.
+themes: [honesty, invisibility, love]
+ending_constraint:
+  kind: twist
+  detail: The couple turn out to have hired him to engineer this exact mix-up, and Gideon is the one being matched with someone.

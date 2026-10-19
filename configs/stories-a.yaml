@@ -1,0 +1,43 @@
+# Baseline A on two dev briefs: one prompt from brief to story (docs/experiments.md).
+#
+#   uv run nde run configs/stories-a.yaml
+#
+# Needs DEEPSEEK_API_KEY in the environment or in `.env` (see .env.example).
+name: stories-a
+seed: 1500
+prompts_dir: ../prompts
+
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    base_url_env: NDE_DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    timeout_s: 300
+
+roles:
+  prose:
+    provider: deepseek
+    model: deepseek-flash
+    family: deepseek          # recorded per model, for the judges' family rule
+    # About 2,000 words is roughly 2,700 tokens; leave headroom for longer drafts.
+    params: {thinking: {type: disabled}, temperature: 0.8, max_tokens: 5000}
+
+stories:
+  briefs_dir: ../benchmark
+  briefs: {ids: [brief-01, brief-02]}
+  repeat: 1
+  # Stories must be within 10% of the brief's target length (normalised words);
+  # an out-of-range story is regenerated up to 3 times in all, then kept and flagged.
+  length: {tolerance: 0.10, max_attempts: 3}
+  conditions:
+    - name: A
+      pipeline: baseline_a
+
+prices:
+  # DeepSeek pricing page, checked 2026-10-18: peak rates (off-peak is half),
+  # cache-miss input, so recorded costs and budget checks err on the high side.
+  deepseek/deepseek-flash: {input_per_mtok: 0.30, output_per_mtok: 1.20}
+
+budget:
+  per_run_usd: 0.10
+  per_day_usd: 5.00

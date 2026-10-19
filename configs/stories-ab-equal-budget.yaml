@@ -1,0 +1,70 @@
+# Baselines A and B at equal generation budget on two dev briefs
+# (docs/experiments.md#equal-budget-mode).
+#
+#   uv run nde run configs/stories-ab-equal-budget.yaml
+#
+# A is usually the cheaper condition, so it gets revision passes (the shared
+# prose contract's story_revision@1) until each brief's budgets are within 10%.
+#
+# A: one prompt from brief to story. B: a beat outline on the planner role
+# (gpt-6-luna, the G0 decision), then prose scene by scene through the shared
+# prose contract. Both use the same prose model.
+#
+# Needs DEEPSEEK_API_KEY and OPENAI_API_KEY in the environment or in `.env`.
+name: stories-ab-equal-budget
+seed: 1700
+prompts_dir: ../prompts
+
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    base_url_env: NDE_DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    timeout_s: 300
+  openai:
+    base_url: https://api.openai.com/v1
+    base_url_env: NDE_OPENAI_BASE_URL
+    api_key_env: OPENAI_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: true
+    timeout_s: 180
+
+roles:
+  planner:
+    provider: openai
+    model: gpt-6-luna
+    family: openai
+    params: {reasoning_effort: none, temperature: 0.7, max_completion_tokens: 3000}
+  prose:
+    provider: deepseek
+    model: deepseek-flash
+    family: deepseek          # recorded per model, for the judges' family rule
+    # A whole story (A) is about 2,700 tokens; a scene (B) far less.
+    params: {thinking: {type: disabled}, temperature: 0.8, max_tokens: 5000}
+
+stories:
+  briefs_dir: ../benchmark
+  briefs: {ids: [brief-01, brief-02]}
+  repeat: 1
+  length: {tolerance: 0.10, max_attempts: 3}
+  conditions:
+    - name: A
+      pipeline: baseline_a
+    - name: B
+      pipeline: baseline_b
+  equal_budget:
+    conditions: [A, B]
+    tolerance: 0.10
+    max_revision_passes: 4
+
+structured:
+  max_repairs: 2
+
+prices:
+  # DeepSeek pricing page, checked 2026-10-18: peak rates (off-peak is half).
+  deepseek/deepseek-flash: {input_per_mtok: 0.30, output_per_mtok: 1.20}
+  # OpenAI model page, checked 2026-10-18.
+  openai/gpt-6-luna: {input_per_mtok: 0.10, output_per_mtok: 0.50}
+
+budget:
+  per_run_usd: 1.00
+  per_day_usd: 5.00

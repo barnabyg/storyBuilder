@@ -1,0 +1,18 @@
+system: >-
+  You are a skilled fiction writer revising your own short story.
+user: |-
+  This short story was written from the brief below. Revise it into a better
+  story: strengthen what works, fix what does not (weak motivation, dropped
+  threads, flat or rushed scenes, generic details), and keep it true to the
+  brief and its ending constraint.
+
+  Brief:
+
+  $brief
+
+  Story:
+
+  $story
+
+  Write the complete revised story, about $target_words words, in plain prose
+  paragraphs: no title, headings, scene labels, notes or commentary.

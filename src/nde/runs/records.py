@@ -3,7 +3,10 @@
 - `manifest.json`: what ran, from what, and how it ended (`Manifest`).
 - `outputs.jsonl`: one `OutputRecord` per call. Deterministic: re-running a run
   from cache produces a byte-identical file.
-- `calls.jsonl`: one `CallRecord` per call, with timings and usage.
+- `calls.jsonl`: one `CallRecord` per provider call, with timings and usage.
+- `stories.jsonl` and `stories/`: for story runs, one `StoryRecord` per story,
+  and each story's files under `stories/<condition>/<brief>/r<repetition>/`.
+  Deterministic, like `outputs.jsonl`.
 - `report.md`: generated from the three files above, never edited by hand.
 """
 
@@ -18,6 +21,10 @@ MANIFEST = "manifest.json"
 OUTPUTS = "outputs.jsonl"
 CALLS = "calls.jsonl"
 REPORT = "report.md"
+STORIES = "stories.jsonl"
+STORY_DIR = "stories"
+# A story's normalised text, in its folder under STORY_DIR.
+STORY_FILE = "story.md"
 
 type RunStatus = Literal["running", "succeeded", "failed", "aborted"]
 
@@ -30,6 +37,7 @@ class ModelUse(_Record):
     role: str
     provider: str
     model: str
+    family: str | None = None
 
 
 class TemplateUse(_Record):
@@ -108,6 +116,67 @@ class BenchmarkSummary(_Record):
     rows: list[BenchmarkRow]
 
 
+class ConditionUse(_Record):
+    name: str
+    pipeline: str
+    params: dict[str, JsonValue]
+
+
+class BudgetMatch(_Record):
+    """Budget matching for one brief and repetition in equal-budget mode."""
+
+    brief: str
+    repetition: int
+    # Generation tokens (input plus output) per condition, before and after revision passes.
+    before: dict[str, int]
+    after: dict[str, int]
+    # The condition that received revision passes, if any.
+    revised: str | None = None
+    passes: int = 0
+    matched: bool
+    # Why matching failed.
+    reason: str | None = None
+
+
+class EqualBudgetSummary(_Record):
+    conditions: list[str]
+    tolerance: float
+    max_revision_passes: int
+    matches: list[BudgetMatch] = Field(default_factory=list[BudgetMatch])
+
+
+class StoriesSummary(_Record):
+    """What a story run generated from."""
+
+    briefs_dir: str
+    brief_ids: list[str]
+    # Checksum of each frozen split the briefs come from (see nde.briefs).
+    split_checksums: dict[str, str]
+    conditions: list[ConditionUse]
+    repeat: int
+    length_tolerance: float
+    max_attempts: int
+    stories: int = 0
+    failed: int = 0
+    # Stories kept although still out of the length range, as "<condition>/<brief>#<n>".
+    out_of_range: list[str] = Field(default_factory=list[str])
+    equal_budget: EqualBudgetSummary | None = None
+
+
+class JudgesSummary(_Record):
+    """What a judge-panel run judged."""
+
+    batch: str
+    batch_dir: str
+    modes: list[str]
+    panel: list[ModelUse]
+    # The rubric the batch, and so rubric mode, scores with; None for batches without one.
+    rubric_version: int | None = None
+    records: int = 0
+    # Verdicts still invalid after their repairs.
+    errors: int = 0
+
+
 class RunError(_Record):
     """Why a run failed: a common provider error type (see nde.llm.errors) or "internal"."""
 
@@ -143,6 +212,10 @@ class Manifest(_Record):
     structured: dict[str, StructuredMetrics] = Field(default_factory=dict[str, StructuredMetrics])
     # Set for benchmark configs: the per-candidate comparison for gate G0.
     benchmark: BenchmarkSummary | None = None
+    # Set for story runs.
+    stories: StoriesSummary | None = None
+    # Set for judge-panel runs.
+    judges: JudgesSummary | None = None
     files: dict[str, str] = Field(
         default_factory=lambda: {"outputs": OUTPUTS, "calls": CALLS, "report": REPORT}
     )
@@ -166,6 +239,12 @@ class OutputRecord(_Record):
 class CallRecord(_Record):
     call: str
     repetition: int
+    # For story runs: the brief, condition and pipeline step the call served.
+    brief: str | None = None
+    condition: str | None = None
+    step: str | None = None
+    # For prose steps: which length-control attempt the call served (0 for the first).
+    story_attempt: int | None = None
     # 0 for the first request; 1, 2, ... for structured-output repair requests.
     attempt: int = 0
     provider: str
@@ -187,7 +266,73 @@ class CallRecord(_Record):
     token_cost_usd: float
 
 
-def write_jsonl(path: Path, records: list[OutputRecord] | list[CallRecord]) -> None:
+type StoryStatus = Literal["ok", "failed"]
+
+
+class LengthAttempt(_Record):
+    """One generation of a story's prose, measured on its normalised text."""
+
+    seed: int
+    words: int
+    in_range: bool
+
+
+class RevisionRecord(_Record):
+    """One equal-budget revision pass: its length-control attempts and the one kept."""
+
+    attempts: list[LengthAttempt]
+    chosen_attempt: int | None
+
+
+class Budget(_Record):
+    """What a story cost to generate: every provider call, repairs and regenerations included."""
+
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+
+class StoryRecord(_Record):
+    """One generated story. Deterministic: no timings or spend, so re-runs match byte for byte."""
+
+    brief: str
+    condition: str
+    pipeline: str
+    repetition: int
+    seed: int
+    status: StoryStatus
+    # Folder of the story's files, relative to the run directory.
+    path: str
+    # Words in the normalised story.
+    words: int = 0
+    target_words: int = 0
+    # Every prose generation, in order; the story is the chosen one (0-based index).
+    attempts: list[LengthAttempt] = Field(default_factory=list[LengthAttempt])
+    chosen_attempt: int | None = None
+    in_range: bool = False
+    # Generation budget, and the revision passes equal-budget mode added.
+    budget: Budget = Field(default_factory=Budget)
+    revision_passes: int = 0
+    revisions: list[RevisionRecord] = Field(default_factory=list[RevisionRecord])
+
+    @property
+    def final_attempts(self) -> list[LengthAttempt]:
+        """The length-control attempts of the text the story now holds."""
+        return self.revisions[-1].attempts if self.revisions else self.attempts
+
+    # Why the story could not be produced, when status is "failed".
+    error: str | None = None
+    # The story's files (the story and every intermediate output), relative to `path`.
+    files: list[str] = Field(default_factory=list[str])
+
+
+def write_jsonl(
+    path: Path, records: list[OutputRecord] | list[CallRecord] | list[StoryRecord]
+) -> None:
     write_text_lf(path, "".join(record.model_dump_json() + "\n" for record in records))
 
 
@@ -197,6 +342,10 @@ def read_outputs(run_dir: Path) -> list[OutputRecord]:
 
 def read_calls(run_dir: Path) -> list[CallRecord]:
     return [CallRecord.model_validate_json(line) for line in _lines(run_dir / CALLS)]
+
+
+def read_stories(run_dir: Path) -> list[StoryRecord]:
+    return [StoryRecord.model_validate_json(line) for line in _lines(run_dir / STORIES)]
 
 
 def read_manifest(run_dir: Path) -> Manifest:

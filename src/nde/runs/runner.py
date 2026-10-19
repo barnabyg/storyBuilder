@@ -1,39 +1,59 @@
 """Run an experiment config and record it as a run directory."""
 
 import secrets
-import subprocess
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from nde.eval.judges import (
+    JUDGEMENTS,
+    JudgeRun,
+    PreparedJudges,
+    prepare_judges,
+    run_judges,
+    write_records,
+)
+from nde.gitinfo import git
 from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
 from nde.llm.config import ModelBinding
 from nde.llm.errors import ProviderError
-from nde.llm.gateway import Completion, Gateway, Prompt
+from nde.llm.gateway import Gateway, Prompt
 from nde.llm.ledger import DEFAULT_LEDGER_PATH, BudgetExceededError, CostLedger, Pricing
 from nde.llm.structured import StructuredOutputError
 from nde.runs.benchmark import benchmark_rows
-from nde.runs.config import CallSpec, ConfigError, LoadedConfig, load_config
-from nde.runs.prompts import PromptTemplate, load_template
+from nde.runs.config import (
+    CallSpec,
+    ConfigError,
+    ExperimentConfig,
+    LoadedConfig,
+    RoleName,
+    load_config,
+)
+from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.records import (
     CALLS,
     OUTPUTS,
+    STORIES,
     BenchmarkSummary,
     CacheSummary,
     CallRecord,
     CostSummary,
+    JudgesSummary,
     Manifest,
     ModelUse,
     OutputRecord,
     RunError,
+    StoriesSummary,
     StructuredMetrics,
     TemplateUse,
     write_jsonl,
     write_manifest,
 )
 from nde.runs.report import write_report
+from nde.runs.state import Attribution, RunState, record_calls_since
 from nde.schema import RESPONSE_MODELS
+from nde.stories.execute import PreparedStories, StoryRun, prepare_stories, run_stories
 
 type Clock = Callable[[], datetime]
 
@@ -56,15 +76,10 @@ class RunOptions:
 class PreparedRun:
     loaded: LoadedConfig
     templates: dict[str, PromptTemplate]
-
-
-@dataclass
-class RunState:
-    outputs: list[OutputRecord] = field(default_factory=list[OutputRecord])
-    calls: list[CallRecord] = field(default_factory=list[CallRecord])
-    structured: dict[str, StructuredMetrics] = field(default_factory=dict[str, StructuredMetrics])
-    # The call in progress, for failure records.
-    current_call: str | None = None
+    # Every (role, model) the run uses: calls, story pipelines and judges.
+    bindings: list[tuple[RoleName, ModelBinding]]
+    stories: PreparedStories | None = None
+    judges: PreparedJudges | None = None
 
 
 def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
@@ -73,33 +88,23 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
     config = loaded.config
     templates: dict[str, PromptTemplate] = {}
     for call in config.calls:
-        ref = call.prompt
-        if ref.label not in templates:
-            templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
-        templates[ref.label].render(call.variables)
-    for provider_name in sorted({binding.provider for binding in config.used_bindings()}):
+        require_template(templates, loaded.prompts_dir, call.prompt, call.variables)
+    stories = prepare_stories(loaded, templates)
+    bindings = config.role_bindings([] if stories is None else stories.roles)
+    unpriced = config.unpriced_warnings(binding for _, binding in bindings)
+    if unpriced and not config.budget.allow_unpriced_models:
+        raise ConfigError("; ".join(unpriced))
+    for provider_name in sorted({binding.provider for _, binding in bindings}):
         provider = config.providers[provider_name]
         if provider.api_key_env and not environ.get(provider.api_key_env):
             raise ConfigError(
                 f"provider {provider_name!r} needs the environment variable "
                 f"{provider.api_key_env}; set it or add it to .env (see .env.example)"
             )
-    return PreparedRun(loaded=loaded, templates=templates)
-
-
-def _git(args: list[str], cwd: Path) -> str | None:
-    try:
-        # S603/S607: fixed git arguments; git is resolved from PATH as a developer prerequisite.
-        completed = subprocess.run(  # noqa: S603
-            ["git", *args],  # noqa: S607
-            cwd=cwd,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return completed.stdout.strip()
+    judges = prepare_judges(loaded, templates)
+    return PreparedRun(
+        loaded=loaded, templates=templates, bindings=bindings, stories=stories, judges=judges
+    )
 
 
 def _new_run_dir(runs_dir: Path, name: str, started: datetime) -> Path:
@@ -112,17 +117,19 @@ def _new_run_dir(runs_dir: Path, name: str, started: datetime) -> Path:
 def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> Manifest:
     loaded = prepared.loaded
     config = loaded.config
-    return Manifest(
+    manifest = Manifest(
         name=config.name,
         status="running",
-        git_sha=_git(["rev-parse", "HEAD"], loaded.directory) or "unknown",
-        git_dirty=bool(_git(["status", "--porcelain"], loaded.directory)),
+        git_sha=git(["rev-parse", "HEAD"], loaded.directory) or "unknown",
+        git_dirty=bool(git(["status", "--porcelain"], loaded.directory)),
         config_path=str(loaded.path),
         config_hash=loaded.hash,
         seed=config.seed,
         models=[
-            ModelUse(role=role, provider=binding.provider, model=binding.model)
-            for role, binding in config.role_bindings()
+            ModelUse(
+                role=role, provider=binding.provider, model=binding.model, family=binding.family
+            )
+            for role, binding in prepared.bindings
         ],
         prompt_templates=[
             TemplateUse(template=template.name, version=template.version, sha256=template.sha256)
@@ -135,9 +142,26 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
         cost=CostSummary(
             per_run_cap_usd=config.budget.per_run_usd, per_day_cap_usd=config.budget.per_day_usd
         ),
-        warnings=config.unpriced_warnings(),
+        warnings=config.unpriced_warnings(binding for _, binding in prepared.bindings),
         started_at=started.isoformat(),
+        stories=None if prepared.stories is None else prepared.stories.summary(),
     )
+    if prepared.stories is not None:
+        manifest.files["stories"] = STORIES
+    if prepared.judges is not None:
+        judges = prepared.judges
+        manifest.judges = JudgesSummary(
+            batch=judges.batch.name,
+            batch_dir=str(judges.batch),
+            modes=list(judges.modes),
+            rubric_version=None if judges.view.rubric is None else judges.view.rubric.version,
+            panel=[
+                ModelUse(role="judge", provider=j.provider, model=j.model, family=j.family)
+                for j in judges.panel
+            ],
+        )
+        manifest.files["judgements"] = JUDGEMENTS
+    return manifest
 
 
 @dataclass(frozen=True)
@@ -190,32 +214,7 @@ def _run_call(gateway: Gateway, prepared: PreparedRun, run: CallRun, state: RunS
         state.outputs.append(output)
     finally:
         # Record every provider call made, even when a budget cap stopped a repair loop.
-        for attempt, completion in enumerate(gateway.history[first_attempt:]):
-            state.calls.append(_call_record(gateway, call, repetition, attempt, completion))
-
-
-def _call_record(
-    gateway: Gateway, call: CallSpec, repetition: int, attempt: int, completion: Completion
-) -> CallRecord:
-    result = completion.result
-    return CallRecord(
-        call=call.id,
-        repetition=repetition,
-        attempt=attempt,
-        provider=completion.binding.provider,
-        model=completion.binding.model,
-        reported_model=result.model,
-        template=completion.prompt.template,
-        template_version=completion.prompt.version,
-        seed=completion.seed,
-        input_tokens=result.input_tokens,
-        output_tokens=result.output_tokens,
-        latency_s=result.latency_s,
-        cached=completion.cached,
-        cost_usd=completion.cost_usd,
-        retries=completion.retries,
-        token_cost_usd=gateway.token_cost(completion),
-    )
+        record_calls_since(gateway, state, first_attempt, Attribution(call.id, repetition))
 
 
 def _summarise_costs(summary: CostSummary, calls: list[CallRecord]) -> None:
@@ -225,15 +224,20 @@ def _summarise_costs(summary: CostSummary, calls: list[CallRecord]) -> None:
     summary.token_cost_usd = sum(call.token_cost_usd for call in calls)
 
 
-def execute(prepared: PreparedRun, options: RunOptions) -> Path:
-    """Run a prepared config. The run directory is always left with a manifest and report."""
-    config = prepared.loaded.config
-    started = options.clock()
-    run_dir = _new_run_dir(options.runs_dir, config.name, started)
-    manifest = _manifest(prepared, options, started)
-    write_manifest(run_dir, manifest)
-    state = RunState()
-    gateway = Gateway(
+def _summarise_stories(summary: StoriesSummary, state: RunState) -> None:
+    summary.stories = len(state.stories)
+    summary.failed = sum(story.status == "failed" for story in state.stories)
+    summary.out_of_range = [
+        f"{story.condition}/{story.brief}#{story.repetition + 1}"
+        for story in state.stories
+        if story.status == "ok" and not story.in_range
+    ]
+    if summary.equal_budget is not None:
+        summary.equal_budget.matches = state.budget_matches
+
+
+def _gateway(config: ExperimentConfig, options: RunOptions) -> Gateway:
+    return Gateway(
         config.providers,
         environ=options.environ,
         cache=None if options.cache_mode == "bypass" else ResponseCache(options.cache_path),
@@ -246,6 +250,83 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
             clock=options.clock,
         ),
     )
+
+
+def _judge_run(prepared: PreparedRun, gateway: Gateway, state: RunState) -> JudgeRun | None:
+    if prepared.judges is None:
+        return None
+    config = prepared.loaded.config
+    return JudgeRun(
+        gateway=gateway,
+        prepared=prepared.judges,
+        templates=prepared.templates,
+        state=state,
+        seed=config.seed,
+        max_repairs=config.structured.max_repairs,
+        records=[],
+    )
+
+
+@dataclass(frozen=True)
+class _Finish:
+    """What execute() hands to _finish(), however the run ended."""
+
+    run_dir: Path
+    manifest: Manifest
+    state: RunState
+    gateway: Gateway
+    judge_run: JudgeRun | None
+
+
+def _finish(prepared: PreparedRun, options: RunOptions, end: _Finish) -> None:
+    """Summarise and write every run file; runs whether the run succeeded or not."""
+    config = prepared.loaded.config
+    manifest, state, gateway, run_dir = end.manifest, end.state, end.gateway, end.run_dir
+    if gateway.ledger is not None:
+        manifest.cost.day_spent_usd = gateway.ledger.day_spent()
+    gateway.close()
+    _summarise_costs(manifest.cost, state.calls)
+    manifest.structured = state.structured
+    if config.benchmark is not None:
+        manifest.benchmark = BenchmarkSummary(
+            role=config.benchmark.role,
+            threshold=config.benchmark.threshold,
+            rows=benchmark_rows(
+                state.calls,
+                state.structured,
+                threshold=config.benchmark.threshold,
+                models=[candidate.label for candidate in config.benchmark.candidates],
+            ),
+        )
+    manifest.cache.hits = gateway.cache_stats.hits
+    manifest.cache.misses = gateway.cache_stats.misses
+    if manifest.status == "running":
+        manifest.status = "failed"
+    manifest.finished_at = options.clock().isoformat()
+    write_jsonl(run_dir / OUTPUTS, state.outputs)
+    write_jsonl(run_dir / CALLS, state.calls)
+    if manifest.stories is not None:
+        _summarise_stories(manifest.stories, state)
+        write_jsonl(run_dir / STORIES, state.stories)
+    if end.judge_run is not None and manifest.judges is not None:
+        records = end.judge_run.records
+        manifest.judges.records = len(records)
+        manifest.judges.errors = sum(record.error is not None for record in records)
+        write_records(run_dir, end.judge_run.prepared.batch, records)
+    write_manifest(run_dir, manifest)
+    write_report(run_dir)
+
+
+def execute(prepared: PreparedRun, options: RunOptions) -> Path:
+    """Run a prepared config. The run directory is always left with a manifest and report."""
+    config = prepared.loaded.config
+    started = options.clock()
+    run_dir = _new_run_dir(options.runs_dir, config.name, started)
+    manifest = _manifest(prepared, options, started)
+    write_manifest(run_dir, manifest)
+    state = RunState()
+    gateway = _gateway(config, options)
+    judge_run = _judge_run(prepared, gateway, state)
     try:
         for call in config.calls:
             for repetition in range(call.repeat):
@@ -253,6 +334,14 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
                 for binding in config.bindings_for(call):
                     state.current_call = call.id
                     _run_call(gateway, prepared, CallRun(call, binding, repetition), state)
+        if prepared.stories is not None:
+            run_stories(
+                StoryRun(
+                    gateway, prepared.loaded, prepared.templates, prepared.stories, run_dir, state
+                )
+            )
+        if judge_run is not None:
+            run_judges(judge_run)
         manifest.status = "succeeded"
     except BudgetExceededError as error:
         manifest.status = "aborted"
@@ -268,31 +357,7 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
         manifest.error = RunError(type="internal", message=repr(error), call=state.current_call)
         raise
     finally:
-        if gateway.ledger is not None:
-            manifest.cost.day_spent_usd = gateway.ledger.day_spent()
-        gateway.close()
-        _summarise_costs(manifest.cost, state.calls)
-        manifest.structured = state.structured
-        if config.benchmark is not None:
-            manifest.benchmark = BenchmarkSummary(
-                role=config.benchmark.role,
-                threshold=config.benchmark.threshold,
-                rows=benchmark_rows(
-                    state.calls,
-                    state.structured,
-                    threshold=config.benchmark.threshold,
-                    models=[candidate.label for candidate in config.benchmark.candidates],
-                ),
-            )
-        manifest.cache.hits = gateway.cache_stats.hits
-        manifest.cache.misses = gateway.cache_stats.misses
-        if manifest.status == "running":
-            manifest.status = "failed"
-        manifest.finished_at = options.clock().isoformat()
-        write_jsonl(run_dir / OUTPUTS, state.outputs)
-        write_jsonl(run_dir / CALLS, state.calls)
-        write_manifest(run_dir, manifest)
-        write_report(run_dir)
+        _finish(prepared, options, _Finish(run_dir, manifest, state, gateway, judge_run))
     return run_dir
 
 

@@ -8,6 +8,7 @@ import pytest
 
 from nde.cli import main
 from nde.runs import prompts
+from nde.runs.config import load_config
 from nde.runs.runner import prepare
 from tests.conftest import REPO, base_config, write_config
 from tests.fake_openai import FakeOpenAI, completion
@@ -47,7 +48,7 @@ def test_smoke_run_records_manifest_output_and_report(
     assert re.fullmatch(r"[0-9a-f]{40}", str(manifest["git_sha"]))
     assert re.fullmatch(r"[0-9a-f]{64}", str(manifest["config_hash"]))
     assert manifest["models"] == [
-        {"role": "prose", "provider": "deepseek", "model": "deepseek-flash"}
+        {"role": "prose", "provider": "deepseek", "model": "deepseek-flash", "family": None}
     ]
     assert manifest["prompt_templates"] == [
         {"template": "smoke", "version": 1, "sha256": manifest["prompt_templates"][0]["sha256"]}
@@ -183,6 +184,27 @@ def test_committed_configs_are_valid(config: Path) -> None:
         "OPENAI_API_KEY": "k",
     }  # pragma: allowlist secret - fake values
 
+    loaded = load_config(config)
+    if loaded.config.judges is not None:
+        # A judge config names a batch that only exists once its stories are generated;
+        # the end-to-end instrument test prepares and runs it against a real batch.
+        return
+
     prepared = prepare(config, keys)
 
-    assert prepared.loaded.config.calls
+    assert prepared.loaded.config.calls or prepared.stories
+
+
+def test_prompts_lock_check_reports_without_writing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    prompts_dir = tmp_path / "prompts"
+    (prompts_dir / "smoke").mkdir(parents=True)
+    (prompts_dir / "smoke" / "v1.yaml").write_text("user: Hello $setting.\n", encoding="utf-8")
+
+    assert main(["prompts", "lock", "--dir", str(prompts_dir), "--check"]) == 2
+
+    assert "UNRECORDED smoke@1: run `nde prompts lock`" in capsys.readouterr().err
+    assert not (prompts_dir / "checksums.json").exists()
+    assert main(["prompts", "lock", "--dir", str(prompts_dir)]) == 0
+    assert main(["prompts", "lock", "--dir", str(prompts_dir), "--check"]) == 0

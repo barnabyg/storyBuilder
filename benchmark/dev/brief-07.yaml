@@ -1,0 +1,16 @@
+id: brief-07
+split: dev
+genre: fantasy
+premise: >-
+  In a city where debts are paid in years of one's life, a moneylender's
+  apprentice is ordered to collect the final year owed by her own grandmother.
+protagonist:
+  name: Ilse Marrow
+  description: a dutiful apprentice who has never questioned the trade that raised her
+central_conflict: >-
+  Refusing the collection forfeits Ilse's apprenticeship and her own years;
+  completing it kills the woman who raised her.
+themes: [debt, duty, what is owed to family]
+ending_constraint:
+  kind: open
+  detail: Ilse finds a third way that breaks the guild's rules, and the story ends as the guild comes for her.

@@ -6,17 +6,19 @@ including its prompt templates and API-key variables, before any network call.
 
 import hashlib
 import json
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Self
 
 import yaml
-from pydantic import Field, ValidationError, field_validator, model_validator
+from pydantic import Field, JsonValue, ValidationError, field_validator, model_validator
 
 from nde.llm.config import ModelBinding, ProviderConfig, Strict
 from nde.llm.ledger import DEFAULT_ASSUMED_OUTPUT_TOKENS, Price
 from nde.llm.structured import DEFAULT_MAX_REPAIRS
 from nde.schema import RESPONSE_MODELS
+from nde.schema.brief import Split
 
 type RoleName = Literal["annotator", "planner", "prose", "critic", "judge"]
 
@@ -83,6 +85,110 @@ class BenchmarkConfig(Strict):
         return self
 
 
+class BriefSelection(Strict):
+    """Which briefs a story run uses: a whole split, listed IDs, or listed IDs within a split."""
+
+    split: Split | None = None
+    ids: list[str] | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _names_something(self) -> Self:
+        if self.split is None and self.ids is None:
+            raise ValueError("name a split or brief ids")
+        return self
+
+
+class ConditionSpec(Strict):
+    """A condition: a registered generation pipeline and its parameters."""
+
+    name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]*$")
+    pipeline: str
+    params: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
+
+
+class LengthConfig(Strict):
+    """Length control: stories must be within `tolerance` of their brief's target length."""
+
+    # Allowed deviation from the target word count, as a fraction (0.10 is ±10%).
+    tolerance: float = Field(default=0.10, gt=0, lt=1)
+    # Prose generations per story, the first included, before an out-of-range story is kept.
+    max_attempts: int = Field(default=3, ge=1)
+
+
+class EqualBudgetConfig(Strict):
+    """Compare two conditions at equal generation-token budget, per brief and repetition."""
+
+    conditions: list[str] = Field(min_length=2, max_length=2)
+    # Budgets match when they are within this fraction of the more expensive one.
+    tolerance: float = Field(default=0.10, gt=0, lt=1)
+    # Revision passes the cheaper condition may get, per story, before matching fails.
+    max_revision_passes: int = Field(default=4, ge=0)
+    # The shared prose contract's revision prompt.
+    revision_prompt: PromptRef = Field(
+        default_factory=lambda: PromptRef(template="story_revision", version=1)
+    )
+
+    @model_validator(mode="after")
+    def _two_different_conditions(self) -> Self:
+        if self.conditions[0] == self.conditions[1]:
+            raise ValueError("equal_budget compares two different conditions")
+        return self
+
+
+class StoriesConfig(Strict):
+    """Generate one story per brief, per condition, per repetition."""
+
+    # Benchmark folder with the briefs, relative to the config file.
+    briefs_dir: str = "../benchmark"
+    briefs: BriefSelection
+    conditions: list[ConditionSpec] = Field(min_length=1)
+    repeat: int = Field(default=1, ge=1)
+    length: LengthConfig = Field(default_factory=LengthConfig)
+    equal_budget: EqualBudgetConfig | None = None
+
+    @model_validator(mode="after")
+    def _condition_names_are_unique(self) -> Self:
+        names = [condition.name for condition in self.conditions]
+        if len(set(names)) != len(names):
+            raise ValueError("condition names must be unique")
+        if self.equal_budget is not None:
+            for name in self.equal_budget.conditions:
+                if name not in names:
+                    raise ValueError(f"equal_budget names unknown condition {name!r}")
+        return self
+
+
+type JudgeMode = Literal["pairwise", "rubric"]
+
+
+class JudgesConfig(Strict):
+    """An LLM judge panel for a blind batch: the `judge` role, one model per panel member."""
+
+    batch: str
+    # Where batches live, relative to the config file.
+    batches_dir: str = "../batches"
+    panel: list[ModelBinding] = Field(min_length=1)
+    modes: list[JudgeMode] = Field(default_factory=lambda: ["pairwise", "rubric"], min_length=1)
+    pairwise_prompt: PromptRef = Field(
+        default_factory=lambda: PromptRef(template="judge_pairwise", version=1)
+    )
+    rubric_prompt: PromptRef = Field(
+        default_factory=lambda: PromptRef(template="judge_rubric", version=1)
+    )
+
+    @model_validator(mode="after")
+    def _panel_spans_two_families(self) -> Self:
+        labels = [judge.label for judge in self.panel]
+        if len(set(labels)) != len(labels):
+            raise ValueError("judges must be distinct provider/model pairs")
+        for judge in self.panel:
+            if judge.family is None:
+                raise ValueError(f"judge {judge.label} has no family; set `family` on it")
+        if len({judge.family for judge in self.panel}) < 2:  # noqa: PLR2004 - the plan's rule
+            raise ValueError("the judge panel needs at least two model families")
+        return self
+
+
 class ExperimentConfig(Strict):
     name: str
     seed: int
@@ -90,16 +196,22 @@ class ExperimentConfig(Strict):
     prompts_dir: str = "../prompts"
     providers: dict[str, ProviderConfig]
     roles: dict[RoleName, ModelBinding] = Field(default_factory=dict[RoleName, ModelBinding])
-    calls: list[CallSpec] = Field(min_length=1)
+    calls: list[CallSpec] = Field(default_factory=list[CallSpec])
     # USD per million tokens, keyed by "provider/model".
     prices: dict[str, Price] = Field(default_factory=dict[str, Price])
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     structured: StructuredConfig = Field(default_factory=StructuredConfig)
     benchmark: BenchmarkConfig | None = None
+    stories: StoriesConfig | None = None
+    judges: JudgesConfig | None = None
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:
+        if not self.calls and self.stories is None and self.judges is None:
+            raise ValueError("a config needs `calls`, `stories` or `judges`")
         bindings = [(f"role {role!r}", binding) for role, binding in self.roles.items()]
+        if self.judges is not None:
+            bindings += [("judge", judge) for judge in self.judges.panel]
         if self.benchmark is not None:
             bindings += [("benchmark candidate", c) for c in self.benchmark.candidates]
             if all(call.role != self.benchmark.role for call in self.calls):
@@ -113,8 +225,9 @@ class ExperimentConfig(Strict):
         ids = [call.id for call in self.calls]
         if len(set(ids)) != len(ids):
             raise ValueError("call ids must be unique")
-        if not self.budget.allow_unpriced_models and self.unpriced_models():
-            raise ValueError("; ".join(self.unpriced_warnings()))
+        unpriced = self.unpriced_warnings(binding for _, binding in self.role_bindings())
+        if unpriced and not self.budget.allow_unpriced_models:
+            raise ValueError("; ".join(unpriced))
         return self
 
     def bindings_for(self, call: CallSpec) -> list[ModelBinding]:
@@ -123,25 +236,31 @@ class ExperimentConfig(Strict):
             return list(self.benchmark.candidates)
         return [self.roles[call.role]] if call.role in self.roles else []
 
-    def role_bindings(self) -> list[tuple[RoleName, ModelBinding]]:
-        """Every (role, model) some call uses, once per model, in call order."""
+    def role_bindings(self, extra: Sequence[RoleName] = ()) -> list[tuple[RoleName, ModelBinding]]:
+        """Every (role, model) the config uses, once per model, in a stable order.
+
+        The models of calls, then of the `extra` roles (those a story run's
+        pipelines use, which only preparing the config can tell), then the judges.
+        """
         seen: dict[str, tuple[RoleName, ModelBinding]] = {}
         for call in self.calls:
             for binding in self.bindings_for(call):
                 seen.setdefault(binding.label, (call.role, binding))
+        for role in extra:
+            if role in self.roles:
+                seen.setdefault(self.roles[role].label, (role, self.roles[role]))
+        if self.judges is not None:
+            for judge in self.judges.panel:
+                seen.setdefault(judge.label, ("judge", judge))
         return list(seen.values())
 
-    def used_bindings(self) -> list[ModelBinding]:
-        return [binding for _, binding in self.role_bindings()]
-
-    def unpriced_models(self) -> list[str]:
-        return [b.label for b in self.used_bindings() if b.label not in self.prices]
-
-    def unpriced_warnings(self) -> list[str]:
+    def unpriced_warnings(self, bindings: Iterable[ModelBinding]) -> list[str]:
+        """A warning for each of `bindings` that has no price."""
         return [
-            f"model {label} has no price; add it to `prices` or set "
+            f"model {binding.label} has no price; add it to `prices` or set "
             "budget.allow_unpriced_models (its calls then cost $0 and bypass the caps)"
-            for label in self.unpriced_models()
+            for binding in bindings
+            if binding.label not in self.prices
         ]
 
 
@@ -157,6 +276,16 @@ class LoadedConfig:
     @property
     def prompts_dir(self) -> Path:
         return (self.directory / self.config.prompts_dir).resolve()
+
+    @property
+    def batches_dir(self) -> Path | None:
+        judges = self.config.judges
+        return None if judges is None else (self.directory / judges.batches_dir).resolve()
+
+    @property
+    def briefs_dir(self) -> Path | None:
+        stories = self.config.stories
+        return None if stories is None else (self.directory / stories.briefs_dir).resolve()
 
     @property
     def hash(self) -> str:
