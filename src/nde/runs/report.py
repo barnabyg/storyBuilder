@@ -201,6 +201,13 @@ def _benchmark_section(manifest: Manifest) -> list[str]:
     ]
 
 
+PLUS_MINUS = chr(0xB1)
+
+
+def _tolerance(fraction: float) -> str:
+    return f"{PLUS_MINUS} {fraction:.0%}"
+
+
 def _story_calls(calls: list[CallRecord]) -> dict[tuple[str, str, int], list[CallRecord]]:
     """Calls per story, keyed by (condition, brief, repetition)."""
     grouped: dict[tuple[str, str, int], list[CallRecord]] = {}
@@ -239,16 +246,24 @@ def _stories_section(
         "",
         "Token cost is at list price, cache hits included; new spend is what this run paid.",
         "",
-        "| Brief | Condition | Rep | Words | Status | Calls | Input tokens | Output tokens "
-        "| Token cost | New spend | Files |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        f"Words are counted on the normalised story; the length tolerance is "
+        f"{_tolerance(summary.length_tolerance)}, with at most {summary.max_attempts} attempts.",
+        "",
+        "| Brief | Condition | Rep | Words | Target | Attempts | In range | Status | Calls "
+        "| Input tokens | Output tokens | Token cost | New spend | Files |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for story in stories:
-        links = " ".join(f"[{Path(name).stem}]({story.path}/{name})" for name in story.files)
+        # Attempt folders hold every generation; link only the story and its plan files.
+        links = " ".join(
+            f"[{name}]({story.path}/{name})" for name in story.files if "/" not in name
+        )
         story_calls = per_story.get((story.condition, story.brief, story.repetition), [])
         lines.append(
             f"| {story.brief} | {story.condition} | {story.repetition + 1} | {story.words} "
-            f"| {story.status} | {_usage(story_calls)} | {links} |"
+            f"| {story.target_words} | {len(story.attempts)} "
+            f"| {'yes' if story.in_range else 'no'} | {story.status} "
+            f"| {_usage(story_calls)} | {links} |"
         )
     lines += [
         "",
@@ -267,6 +282,21 @@ def _stories_section(
             f"| {_usage(condition_calls)} | {_usd(token_cost / len(mine) if mine else None)} |"
         )
     lines.append("")
+    out_of_range = [story for story in stories if story.status == "ok" and not story.in_range]
+    if out_of_range:
+        lines += [
+            "### Out of length range",
+            "",
+            "Kept, but still outside the length range after every attempt:",
+            "",
+            *(
+                f"- {s.condition}/{s.brief} #{s.repetition + 1}: {s.words} words after "
+                f"{len(s.attempts)} attempts (target {s.target_words} "
+                f"{_tolerance(summary.length_tolerance)})"
+                for s in out_of_range
+            ),
+            "",
+        ]
     failed = [story for story in stories if story.status == "failed"]
     if failed:
         lines += [

@@ -25,6 +25,7 @@ class Attribution:
     brief: str | None = None
     condition: str | None = None
     step: str | None = None
+    story_attempt: int | None = None
 
 
 def call_record(
@@ -37,6 +38,7 @@ def call_record(
         brief=attribution.brief,
         condition=attribution.condition,
         step=attribution.step,
+        story_attempt=attribution.story_attempt,
         attempt=attempt,
         provider=completion.binding.provider,
         model=completion.binding.model,

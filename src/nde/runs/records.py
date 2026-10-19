@@ -128,8 +128,12 @@ class StoriesSummary(_Record):
     split_checksums: dict[str, str]
     conditions: list[ConditionUse]
     repeat: int
+    length_tolerance: float
+    max_attempts: int
     stories: int = 0
     failed: int = 0
+    # Stories kept although still out of the length range, as "<condition>/<brief>#<n>".
+    out_of_range: list[str] = Field(default_factory=list[str])
 
 
 class RunError(_Record):
@@ -196,6 +200,8 @@ class CallRecord(_Record):
     brief: str | None = None
     condition: str | None = None
     step: str | None = None
+    # For prose steps: which length-control attempt the call served (0 for the first).
+    story_attempt: int | None = None
     # 0 for the first request; 1, 2, ... for structured-output repair requests.
     attempt: int = 0
     provider: str
@@ -220,6 +226,14 @@ class CallRecord(_Record):
 type StoryStatus = Literal["ok", "failed"]
 
 
+class LengthAttempt(_Record):
+    """One generation of a story's prose, measured on its normalised text."""
+
+    seed: int
+    words: int
+    in_range: bool
+
+
 class StoryRecord(_Record):
     """One generated story. Deterministic: no timings or spend, so re-runs match byte for byte."""
 
@@ -231,7 +245,13 @@ class StoryRecord(_Record):
     status: StoryStatus
     # Folder of the story's files, relative to the run directory.
     path: str
+    # Words in the normalised story.
     words: int = 0
+    target_words: int = 0
+    # Every prose generation, in order; the story is the chosen one (0-based index).
+    attempts: list[LengthAttempt] = Field(default_factory=list[LengthAttempt])
+    chosen_attempt: int | None = None
+    in_range: bool = False
     # Why the story could not be produced, when status is "failed".
     error: str | None = None
     # The story's files (the story and every intermediate output), relative to `path`.

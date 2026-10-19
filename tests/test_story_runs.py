@@ -68,7 +68,7 @@ def test_the_report_lists_stories_with_words_and_cost_per_story_and_condition(
     report = (run_dir / "report.md").read_text(encoding="utf-8")
     assert "## Stories" in report
     assert "| brief-01 | A | 1 | 2000 |" in report
-    assert "[story](stories/A/brief-01/r1/story.md)" in report
+    assert "[story.md](stories/A/brief-01/r1/story.md)" in report
     assert "### Per condition" in report
     # 2 calls of 10 input and 2,000 output tokens at $0.1 / $0.2 per million.
     assert "| A | 2 | 0 | 2 | 20 | 4000 | $0.0008 |" in report

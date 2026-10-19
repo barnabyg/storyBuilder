@@ -25,6 +25,9 @@ stories:
   briefs_dir: ../benchmark
   briefs: {ids: [brief-01, brief-02]}
   repeat: 1
+  # Stories must be within 10% of the brief's target length (normalised words);
+  # an out-of-range story is regenerated up to 3 times in all, then kept and flagged.
+  length: {tolerance: 0.10, max_attempts: 3}
   conditions:
     - name: A
       pipeline: baseline_a

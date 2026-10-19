@@ -106,6 +106,15 @@ class ConditionSpec(Strict):
     params: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
 
 
+class LengthConfig(Strict):
+    """Length control: stories must be within `tolerance` of their brief's target length."""
+
+    # Allowed deviation from the target word count, as a fraction (0.10 is ±10%).
+    tolerance: float = Field(default=0.10, gt=0, lt=1)
+    # Prose generations per story, the first included, before an out-of-range story is kept.
+    max_attempts: int = Field(default=3, ge=1)
+
+
 class StoriesConfig(Strict):
     """Generate one story per brief, per condition, per repetition."""
 
@@ -114,6 +123,7 @@ class StoriesConfig(Strict):
     briefs: BriefSelection
     conditions: list[ConditionSpec] = Field(min_length=1)
     repeat: int = Field(default=1, ge=1)
+    length: LengthConfig = Field(default_factory=LengthConfig)
 
     @model_validator(mode="after")
     def _condition_names_are_unique(self) -> Self:

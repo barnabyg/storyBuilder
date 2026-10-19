@@ -13,6 +13,7 @@ Every call goes through a `StoryContext`, which records the brief, condition
 and step it served, and keeps intermediate outputs beside the story.
 """
 
+import hashlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -28,6 +29,14 @@ from nde.runs.prompts import PromptTemplate
 from nde.runs.records import StructuredMetrics
 from nde.runs.state import Attribution, RunState, record_calls_since
 from nde.schema.brief import Brief
+
+ATTEMPTS = "attempts"
+
+
+def derive_seed(seed: int, *labels: object) -> int:
+    """A deterministic seed for a sub-step, such as a regeneration, derived from `seed`."""
+    material = ":".join(str(part) for part in (seed, *labels)).encode("utf-8")
+    return int.from_bytes(hashlib.sha256(material).digest()[:4], "big") & 0x7FFFFFFF
 
 
 @dataclass(frozen=True)
@@ -69,7 +78,9 @@ class StoryContext:
     condition: str
     repetition: int
     seed: int
-    # Intermediate outputs to keep beside the story, by file name.
+    # The length-control attempt being written; None while planning.
+    attempt: int | None = None
+    # Intermediate outputs to keep beside the story, by path relative to its folder.
     files: dict[str, str] = field(default_factory=dict[str, str])
 
     def _prompt(self, ref: PromptRef, variables: Mapping[str, str]) -> Prompt:
@@ -77,12 +88,16 @@ class StoryContext:
         return Prompt(template.name, template.version, template.render(variables))
 
     def _attribution(self, step: str) -> Attribution:
+        call = f"{self.condition}/{self.brief.id}/{step}"
+        if self.attempt:
+            call += f" (attempt {self.attempt + 1})"
         return Attribution(
-            call=f"{self.condition}/{self.brief.id}/{step}",
+            call=call,
             repetition=self.repetition,
             brief=self.brief.id,
             condition=self.condition,
             step=step,
+            story_attempt=self.attempt,
         )
 
     def complete(self, step: Step, *, seed: int) -> str:
@@ -120,8 +135,13 @@ class StoryContext:
         return result.value
 
     def keep(self, name: str, content: str) -> None:
-        """Keep an intermediate output, such as an outline, as a file beside the story."""
-        self.files[name] = content
+        """Keep an intermediate output as a file beside the story.
+
+        Files kept while writing go under `attempts/<n>/`, one folder per
+        length-control attempt; files kept while planning sit beside the story.
+        """
+        folder = "" if self.attempt is None else f"{ATTEMPTS}/{self.attempt + 1}/"
+        self.files[folder + name] = content
 
 
 class Pipeline[PlanT](ABC):

@@ -9,15 +9,31 @@ from pydantic import ValidationError
 from nde.briefs import BriefError, load_briefs, split_checksum
 from nde.files import write_text_lf
 from nde.llm.gateway import Gateway
-from nde.runs.config import BriefSelection, ConditionSpec, ConfigError, LoadedConfig, RoleName
+from nde.runs.config import (
+    BriefSelection,
+    ConditionSpec,
+    ConfigError,
+    LengthConfig,
+    LoadedConfig,
+    RoleName,
+)
 from nde.runs.prompts import PromptTemplate, load_template
-from nde.runs.records import STORY_DIR, ConditionUse, StoriesSummary, StoryRecord
+from nde.runs.records import (
+    STORY_DIR,
+    ConditionUse,
+    LengthAttempt,
+    StoriesSummary,
+    StoryRecord,
+)
 from nde.runs.state import RunState
 from nde.schema.brief import SPLITS, Brief
 from nde.stories import PIPELINES
+from nde.stories.length import Draft, attempt_seed, choose, measure
 from nde.stories.pipeline import Pipeline, StepFailedError, StoryContext
 
+# The normalised story, which blind batches and judges see, and the model's raw text.
 STORY_FILE = "story.md"
+RAW_FILE = "story.raw.md"
 
 
 @dataclass(frozen=True)
@@ -32,6 +48,7 @@ class PreparedStories:
     briefs: list[Brief]
     conditions: list[Condition]
     repeat: int
+    length: LengthConfig
     split_checksums: dict[str, str]
 
     @property
@@ -52,6 +69,8 @@ class PreparedStories:
                 for c in self.conditions
             ],
             repeat=self.repeat,
+            length_tolerance=self.length.tolerance,
+            max_attempts=self.length.max_attempts,
         )
 
 
@@ -121,7 +140,9 @@ def prepare_stories(
         checksum = split_checksum(briefs_dir, split)
         if checksum is not None and any(brief.split == split for brief in briefs):
             checksums[split] = checksum
-    prepared = PreparedStories(briefs_dir, briefs, conditions, stories.repeat, checksums)
+    prepared = PreparedStories(
+        briefs_dir, briefs, conditions, stories.repeat, stories.length, checksums
+    )
     config = loaded.config
     if not config.budget.allow_unpriced_models and config.unpriced_models(prepared.roles):
         raise ConfigError("; ".join(config.unpriced_warnings(prepared.roles)))
@@ -152,6 +173,23 @@ def _write_files(run_dir: Path, folder: Path, files: dict[str, str]) -> list[str
     return sorted(files)
 
 
+def _draft(run: StoryRun, ctx: StoryContext, condition: Condition, plan: object) -> list[Draft]:
+    """Write the prose until a draft is in the length range or the attempts run out."""
+    length = run.prepared.length
+    target = ctx.brief.target_words
+    drafts: list[Draft] = []
+    for attempt in range(length.max_attempts):
+        ctx.attempt = attempt
+        seed = attempt_seed(ctx.seed, attempt)
+        raw = condition.pipeline.write(ctx, plan, seed=seed)
+        ctx.keep(RAW_FILE, raw)
+        drafts.append(measure(raw, seed=seed, target=target, tolerance=length.tolerance))
+        if drafts[-1].in_range:
+            break
+    ctx.attempt = None
+    return drafts
+
+
 def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: int) -> StoryRecord:
     config = run.loaded.config
     seed = config.seed + repetition
@@ -175,16 +213,23 @@ def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: i
         seed=seed,
         status="ok",
         path=folder.as_posix(),
+        target_words=brief.target_words,
     )
     try:
-        plan = condition.pipeline.plan(ctx)
-        text = condition.pipeline.write(ctx, plan, seed=seed)
+        drafts = _draft(run, ctx, condition, condition.pipeline.plan(ctx))
     except StepFailedError as failure:
         record.status = "failed"
         record.error = str(failure)
     else:
-        ctx.files[STORY_FILE] = text
-        record.words = len(text.split())
+        chosen = choose(drafts, brief.target_words)
+        ctx.files[STORY_FILE] = drafts[chosen].text
+        ctx.files[RAW_FILE] = drafts[chosen].raw
+        record.attempts = [
+            LengthAttempt(seed=d.seed, words=d.words, in_range=d.in_range) for d in drafts
+        ]
+        record.chosen_attempt = chosen
+        record.words = drafts[chosen].words
+        record.in_range = drafts[chosen].in_range
     record.files = _write_files(run.run_dir, folder, ctx.files)
     return record
 
@@ -195,4 +240,5 @@ def run_stories(run: StoryRun) -> None:
         for repetition in range(run.prepared.repeat):
             # Conditions take turns, so a budget stop leaves comparable stories.
             for condition in run.prepared.conditions:
-                run.state.stories.append(write_story(run, condition, brief, repetition))
+                story = write_story(run, condition, brief, repetition)
+                run.state.stories.append(story)

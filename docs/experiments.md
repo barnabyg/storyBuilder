@@ -89,6 +89,57 @@ Stories are written brief by brief: for each brief and repetition, every
 condition in turn, so a budget stop leaves comparable stories. Repetition *i*
 uses seed + *i* for every condition.
 
+### Normalisation and length control
+
+These are the story-level leakage controls from §4 of the
+[implementation plan](IMPLEMENTATION_PLAN.md). They apply to every condition,
+so neither format nor length can reveal which condition wrote a story.
+
+**Normalisation.** Every story is stored raw (`story.raw.md`) and normalised
+(`story.md`). Blind batches and judges only see the normalised form. The rules
+(`src/nde/stories/normalise.py`) are deterministic:
+
+- Curly quotation marks become straight ones; an ellipsis character becomes
+  three full stops; non-breaking and other special spaces become spaces.
+- Markdown headings, code fences, horizontal rules and scene-break lines
+  (`***`, `* * *`, `---`) are removed, as are scene and chapter titles
+  ("Scene 2", "Chapter Three: The Storm") and labels such as "Title:" or
+  "Word count:".
+- Markdown and HTML markup (emphasis, inline code, links, block quotes, list
+  bullets, tags) is reduced to its text.
+- A model preamble ("Here is your story:"), a leading title line and
+  sign-offs ("The End", "I hope you enjoyed...") are removed.
+- Every remaining line is a paragraph, with whitespace collapsed; paragraphs
+  are separated by one blank line.
+
+Scene breaks are dropped rather than standardised, because some conditions
+produce them and others do not.
+
+**Length control.** A story must be within a tolerance of its brief's
+`target_words`, counted in words on the normalised story:
+
+```yaml
+stories:
+  length:
+    tolerance: 0.10     # the default: within 10% of the target
+    max_attempts: 3     # the default: the first generation and two regenerations
+```
+
+An out-of-range story's prose is regenerated on a new seed, up to
+`max_attempts` generations in all. The first attempt uses the story's seed;
+regeneration *k* uses a seed derived deterministically from it, so a re-run is
+still free and byte-identical. Only the prose phase is regenerated: a
+pipeline's plan (such as an outline) is kept. Every attempt is cached and
+costed, and its files are kept under `attempts/<k>/` in the story's folder.
+`stories.jsonl` records each attempt's seed, word count and whether it was in
+range, and which one was kept.
+
+A story still out of range after the last attempt is kept, not dropped: the
+attempt closest to the target becomes the story, and it is flagged in the
+manifest (`stories.out_of_range`) and in the report's **Out of length range**
+list. The Stories table shows each story's words, target, attempts and whether
+it is in range.
+
 ### Pipelines
 
 | Pipeline | Condition | Steps |
@@ -102,10 +153,10 @@ version: 1}`).
 
 | File | Contents |
 | --- | --- |
-| `stories/<condition>/<brief>/r<n>/story.md` | the story; intermediate outputs (such as an outline) sit beside it |
-| `stories.jsonl` | one line per story: brief, condition, pipeline, repetition, seed, status, word count and its files |
-| `calls.jsonl` | as for every run; each line also names the `brief`, `condition` and pipeline `step` it served |
-| `manifest.json` | the `stories` section: brief IDs, the checksum of each frozen split they come from, conditions and repetitions |
+| `stories/<condition>/<brief>/r<n>/story.md` | the normalised story; `story.raw.md` beside it is the model's text, plan outputs (such as an outline) sit beside it too, and each length-control attempt's files are under `attempts/<k>/` |
+| `stories.jsonl` | one line per story: brief, condition, pipeline, repetition, seed, status, word count, target, length attempts and its files |
+| `calls.jsonl` | as for every run; each line also names the `brief`, `condition`, pipeline `step` and length-control `story_attempt` it served |
+| `manifest.json` | the `stories` section: brief IDs, the checksum of each frozen split they come from, conditions, repetitions, the length settings and any stories still out of range |
 
 The report's **Stories** section lists every story with its word count,
 calls, tokens and cost, and a **Per condition** table gives the totals and the
@@ -128,6 +179,8 @@ A pipeline is a subclass of `nde.stories.pipeline.Pipeline` with:
 - `plan(ctx)`: calls that are never regenerated, such as an outline (return
   `None` if there are none);
 - `write(ctx, plan, seed=...)`: the prose calls; returns the raw story text.
+  Length control may call it several times with different seeds, so it must
+  not change the plan.
 
 Every call goes through the `StoryContext`: `ctx.complete(step, seed=...)` and
 `ctx.structured(step, Model, seed=...)` take a `Step` (its name in

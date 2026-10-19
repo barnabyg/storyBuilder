@@ -282,6 +282,11 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
         if manifest.stories is not None:
             manifest.stories.stories = len(state.stories)
             manifest.stories.failed = sum(story.status == "failed" for story in state.stories)
+            manifest.stories.out_of_range = [
+                f"{story.condition}/{story.brief}#{story.repetition + 1}"
+                for story in state.stories
+                if story.status == "ok" and not story.in_range
+            ]
             write_jsonl(run_dir / STORIES, state.stories)
         write_manifest(run_dir, manifest)
         write_report(run_dir)
