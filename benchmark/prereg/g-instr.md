@@ -105,3 +105,44 @@ Made before any pair of `p1-instrument` was read.
   "possibly unblinded" flag, may rest on few pairs or none. The batch built
   before this amendment had not been read; it was replaced, and the judge was
   re-run on the new batch.
+
+## Attempt 2
+
+Attempt 1 did not pass (7 of 10; see the Phase 1 section of the plan). The
+owner saw the scrambled sequences but judged "which is better" by the quality
+of the writing. Per the owner's decision of 19 October 2026, attempt 2 measures
+structure on its own. Everything below was committed before any attempt 2 pair
+was read, and it overrides the sections above where they differ.
+
+- [ ] Owner confirmed attempt 2 (tick and commit before reading)
+
+**Stories.** Fresh B and B-scrambled stories on the same 10 dev briefs from
+`configs/p1-instrument-2.yaml` (seed 2410), with the B-scrambled permutation
+seeded per brief (attempt 1 used one order for every brief). The batch is
+`p1-instrument-2`, built with `--optional-scores --primary-score coherence`.
+The judge is `configs/p1-judges-2.yaml`: the same model and settings as
+attempt 1, on the new batch.
+
+**Reading.** The owner skims each story in full. In every pair the owner gives
+a coherence score (1–5) for both stories (required) and the overall
+preference with its strength (required). All other marks are optional.
+
+**Primary metric.** The pairs in which intact B has the higher coherence score.
+A tie counts as not detected.
+
+**Pass thresholds.** The gate passes only if all three hold:
+
+1. Intact B scores higher on coherence than B-scrambled in **at least 9 of
+   10** pairs (two-sided exact binomial p ≈ 0.021 at 9).
+2. The judge's coherence picks (from its rubric-mode scores, ties included)
+   agree with the owner's in **at least 80%** of the pairs.
+3. The pipelines ran within their cost caps.
+
+**Secondary.** The owner's overall preference, the judge's pairwise
+preference and position consistency, and any optional marks given.
+
+**Fail actions.** If the owner still cannot separate intact from scrambled
+stories on coherence (fewer than 9 of 10), restrict reading to targeted
+excerpts (the first paragraph of each scene and the ending) or increase the
+target length, then rerun. If the judge fails where the owner succeeds, drop
+the judge from screening.
