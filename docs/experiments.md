@@ -107,8 +107,8 @@ so neither format nor length can reveal which condition wrote a story.
   three full stops; non-breaking and other special spaces become spaces.
 - Markdown headings, code fences, horizontal rules and scene-break lines
   (`***`, `* * *`, `---`) are removed, as are scene and chapter titles
-  ("Scene 2", "Chapter Three: The Storm") and labels such as "Title:" or
-  "Word count:".
+  ("Scene 2", "Chapter Three: The Storm"), bare section numbers ("II", "3."),
+  and labels such as "Title:" or "Word count:".
 - Markdown and HTML markup (emphasis, inline code, links, block quotes, list
   bullets, tags) is reduced to its text.
 - A model preamble ("Here is your story:"), a leading title line and
