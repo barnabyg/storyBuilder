@@ -25,6 +25,7 @@ from tests.stories import (
     stories,
     story_config,
     story_files,
+    story_text,
 )
 
 BASELINE_B = {"name": "B", "pipeline": "baseline_b"}
@@ -259,3 +260,28 @@ def test_the_committed_ab_config_runs_both_conditions(
 
     [run_dir] = list(runs.iterdir())
     assert {r["condition"] for r in stories(run_dir)} == {"A", "B"}
+
+
+def test_chatter_a_model_adds_inside_a_scene_is_removed_from_the_story(
+    b_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    def chatty(body: Json) -> Reply:
+        if "Now write scene" in last_user_message(body):
+            text = story_text(400)
+            return completion(
+                f"Here is the scene:\n\n**Night Watch**\n\n{text}\n\nI hope this works!"
+            )
+        return fake_b(body)
+
+    b_llm.default = chatty
+
+    run_dir = run(
+        tmp_path, story_config(b_llm.base_url, [BASELINE_B], briefs={"ids": ["brief-01"]})
+    )
+
+    [record] = stories(run_dir)
+    story = (run_dir / record["path"] / "story.md").read_text(encoding="utf-8")
+    assert "Here is" not in story
+    assert "Night Watch" not in story
+    assert "I hope" not in story
+    assert record["words"] == 2000

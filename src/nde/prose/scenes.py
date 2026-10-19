@@ -8,8 +8,9 @@ them unchanged; a new condition supplies its own scene list.
 Each scene is written from the brief, the whole plan, the current scene's
 beats (plus optional free-text notes, for richer planners) and a compact
 summary of the scenes written so far: the planned summaries of the earlier
-scenes and the last paragraph of the previous scene. The scenes are joined
-with blank lines; normalisation then makes them one continuous story.
+scenes and the last paragraph of the previous scene. Each scene is normalised
+on its own, so chatter a model adds around a scene never lands mid-story, and
+the scenes are joined with blank lines into one continuous story.
 """
 
 from collections.abc import Sequence
@@ -86,4 +87,6 @@ def write_scenes(
         text = ctx.complete(Step(scene_step(index), PROSE_ROLE, prompt, variables), seed=seed)
         ctx.keep(f"{scene_step(index)}.md", text)
         written.append(text)
-    return "\n\n".join(text.strip() for text in written)
+    # Normalise each scene, not just the whole story: a preamble, title or sign-off the
+    # model adds to a later scene would otherwise survive in the middle of the story.
+    return "\n\n".join(normalise(text).strip() for text in written)
