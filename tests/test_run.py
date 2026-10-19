@@ -8,6 +8,7 @@ import pytest
 
 from nde.cli import main
 from nde.runs import prompts
+from nde.runs.config import load_config
 from nde.runs.runner import prepare
 from tests.conftest import REPO, base_config, write_config
 from tests.fake_openai import FakeOpenAI, completion
@@ -182,6 +183,12 @@ def test_committed_configs_are_valid(config: Path) -> None:
         "DEEPSEEK_API_KEY": "k",
         "OPENAI_API_KEY": "k",
     }  # pragma: allowlist secret - fake values
+
+    loaded = load_config(config)
+    if loaded.config.judges is not None:
+        # A judge config names a batch that only exists once its stories are generated;
+        # the end-to-end instrument test prepares and runs it against a real batch.
+        return
 
     prepared = prepare(config, keys)
 

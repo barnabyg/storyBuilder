@@ -1,0 +1,59 @@
+# Gate G-instr, LLM judge panel over the p1-instrument batch (docs/evaluation.md).
+#
+#   uv run nde run configs/p1-judges.yaml
+#
+# OWNER: choose the panel (see #22). The batch's stories come from the openai
+# (planner) and deepseek (prose) families, so judges must come from two other
+# families. The proposal below uses Anthropic and Mistral through their
+# OpenAI-compatible chat-completions endpoints. Replace either judge freely:
+# set `family` on every judge.
+#
+# Needs ANTHROPIC_API_KEY and MISTRAL_API_KEY in the environment or in `.env`.
+# CHECK BEFORE RUNNING: both model IDs, both base URLs and both prices against
+# the providers' current documentation.
+name: p1-judges
+seed: 2320
+prompts_dir: ../prompts
+
+providers:
+  anthropic:
+    base_url: https://api.anthropic.com/v1
+    base_url_env: NDE_ANTHROPIC_BASE_URL
+    api_key_env: ANTHROPIC_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: false          # the schema goes in the prompt
+    timeout_s: 180
+  mistral:
+    base_url: https://api.mistral.ai/v1
+    base_url_env: NDE_MISTRAL_BASE_URL
+    api_key_env: MISTRAL_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: false
+    timeout_s: 180
+
+judges:
+  batch: p1-instrument
+  batches_dir: ../batches
+  modes: [pairwise, rubric]
+  panel:
+    - provider: anthropic
+      model: claude-haiku-5-5
+      family: anthropic
+      params: {max_tokens: 2000}
+    - provider: mistral
+      model: mistral-small-latest
+      family: mistral
+      params: {temperature: 0.2, max_tokens: 2000}
+
+structured:
+  max_repairs: 2
+
+prices:
+  # Anthropic's model list (Claude API skill, cached 2026-10-06): prompts up to 100K tokens.
+  anthropic/claude-haiku-5-5: {input_per_mtok: 0.10, output_per_mtok: 0.50}
+  # Third-party price listing for Mistral Small 4 (2026-09); NOT checked against
+  # Mistral's own price list.
+  mistral/mistral-small-latest: {input_per_mtok: 0.15, output_per_mtok: 0.60}
+
+budget:
+  # 10 pairs x 2 judges x 4 calls of two stories (~6K tokens) or one (~3K).
+  per_run_usd: 1.00
+  per_day_usd: 5.00

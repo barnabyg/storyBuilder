@@ -194,6 +194,7 @@ and why not. `configs/stories-ab-equal-budget.yaml` runs A against B this way.
 | --- | --- | --- |
 | `baseline_a` | Baseline A | one call on `prose` with `story_a@1`: brief to complete story |
 | `baseline_b` | Baseline B | a beat outline on `planner` (`beat_outline@1`, structured, with repair), then one call per scene on `prose` through the shared prose contract |
+| `baseline_b_scrambled` | B-scrambled (gate G-instr) | B's outline (the same cached call), scenes shuffled with a seeded permutation that is never the original order, then fresh prose through the shared prose contract; see [instrument-check.md](instrument-check.md) |
 
 Parameters: `baseline_a` takes `prompt` (default `{template: story_a,
 version: 1}`); `baseline_b` takes `outline_prompt` (default
