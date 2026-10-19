@@ -7,7 +7,6 @@ Loading a template whose text no longer matches its checksum fails: changing a
 template's text requires a new version. `nde prompts lock` records new versions.
 """
 
-import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -17,7 +16,7 @@ from string import Template
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from nde.files import write_text_lf
+from nde.files import checksum_lf, write_text_lf
 from nde.llm.client import Message
 from nde.runs.config import ConfigError
 
@@ -57,11 +56,6 @@ def _substitute(text: str, variables: Mapping[str, str]) -> str:
     return Template(text).substitute(variables)
 
 
-def _checksum(data: bytes) -> str:
-    # Hash LF-normalised text so a CRLF checkout cannot change a template's identity.
-    return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
-
-
 def template_path(prompts_dir: Path, name: str, version: int) -> Path:
     return prompts_dir / name / f"v{version}.yaml"
 
@@ -81,7 +75,7 @@ def load_template(prompts_dir: Path, name: str, version: int) -> PromptTemplate:
         data = path.read_bytes()
     except OSError as error:
         raise ConfigError(f"prompt template {label} not found at {path}") from error
-    digest = _checksum(data)
+    digest = checksum_lf(data)
     recorded = read_checksums(prompts_dir).get(label)
     if recorded is None:
         raise ConfigError(
@@ -103,7 +97,7 @@ def _versions(prompts_dir: Path) -> dict[str, str]:
     for path in sorted(prompts_dir.glob("*/v*.yaml")):
         version = path.stem.removeprefix("v")
         if version.isdigit():
-            found[f"{path.parent.name}@{int(version)}"] = _checksum(path.read_bytes())
+            found[f"{path.parent.name}@{int(version)}"] = checksum_lf(path.read_bytes())
     return found
 
 

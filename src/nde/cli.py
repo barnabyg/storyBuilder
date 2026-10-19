@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from nde import __version__
+from nde import __version__, briefs
 from nde.env import load_dotenv
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
@@ -15,6 +15,7 @@ from nde.runs.config import ConfigError
 from nde.runs.records import read_manifest
 from nde.runs.report import write_report
 from nde.runs.runner import RunOptions, run_experiment
+from nde.schema.brief import SPLITS
 
 EXIT_OK = 0
 EXIT_RUN_FAILED = 1
@@ -68,6 +69,24 @@ def build_parser() -> argparse.ArgumentParser:
     prompt_commands = prompt.add_subparsers(dest="prompts_command", required=True)
     lock = prompt_commands.add_parser("lock", help="record checksums of new template versions")
     lock.add_argument("--dir", type=Path, default=Path("prompts"), help="templates (./prompts)")
+
+    brief = commands.add_parser("briefs", help="check, freeze and draft benchmark briefs")
+    brief_commands = brief.add_subparsers(dest="briefs_command", required=True)
+    brief_check = brief_commands.add_parser("check", help="validate every brief and frozen split")
+    brief_freeze = brief_commands.add_parser("freeze", help="record the checksums of a split")
+    brief_freeze.add_argument("split", choices=SPLITS)
+    brief_drafts = brief_commands.add_parser("drafts", help="write a run's drafted briefs out")
+    brief_drafts.add_argument("run_dir", type=Path, help="a run of configs/draft-briefs.yaml")
+    brief_drafts.add_argument(
+        "--out", type=Path, default=Path("benchmark/drafts"), help="(./benchmark/drafts)"
+    )
+    for sub in (brief_check, brief_freeze):
+        sub.add_argument(
+            "--dir",
+            type=Path,
+            default=briefs.DEFAULT_BENCHMARK_DIR,
+            help="benchmark folder (./benchmark)",
+        )
     return parser
 
 
@@ -103,6 +122,35 @@ def _prompts_lock(args: argparse.Namespace) -> int:
     return EXIT_USAGE if changed else EXIT_OK
 
 
+def _briefs(args: argparse.Namespace) -> int:
+    if args.briefs_command == "drafts":
+        try:
+            written = briefs.write_drafts(args.run_dir, args.out)
+        except briefs.BriefError as error:
+            print(f"nde briefs drafts: {error}", file=sys.stderr)
+            return EXIT_RUN_FAILED
+        print(f"wrote {len(written)} draft briefs to {args.out} for review")
+        return EXIT_OK
+    if args.briefs_command == "freeze":
+        try:
+            frozen = briefs.freeze(args.dir, args.split)
+        except briefs.BriefError as error:
+            print(f"nde briefs freeze: {error}", file=sys.stderr)
+            return EXIT_RUN_FAILED
+        print(f"froze the {args.split} split: {len(frozen)} briefs")
+        return EXIT_OK
+    result = briefs.check(args.dir)
+    for problem in result.problems:
+        print(problem, file=sys.stderr)
+    if not result.passed:
+        print(f"brief check FAILED: {len(result.problems)} problems", file=sys.stderr)
+        return EXIT_RUN_FAILED
+    counts = ", ".join(f"{split}: {len(files)}" for split, files in result.briefs.items())
+    total = sum(len(files) for files in result.briefs.values())
+    print(f"{total} briefs valid ({counts})")
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     # Before parsing, so `.env` can also supply option defaults such as NDE_CACHE.
     load_dotenv(Path(".env"))
@@ -112,6 +160,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run(args)
     if args.command == "report":
         return _report(args)
+    if args.command == "briefs":
+        return _briefs(args)
     if args.command == "prompts":
         return _prompts_lock(args)
     parser.print_help()

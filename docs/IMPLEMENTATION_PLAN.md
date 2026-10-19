@@ -404,5 +404,5 @@ These do not block Phase 0.
 
 1. **GPU access** for Phase 6: a local card (which one?) or rented. This is needed before P6 to size the base model.
 2. **Git remote and CI host**, needed in P0.1. GitHub Actions is assumed.
-3. **Brief authorship** in P1.1: whether the owner writes the 40 briefs, or an LLM drafts them for the owner to curate. Owner-written briefs carry less model bias; drafted ones are faster.
+3. **Brief authorship** in P1.1: **resolved.** Briefs are drafted by an LLM through `configs/draft-briefs.yaml` and curated by the owner (see `docs/briefs.md`). Owner-written briefs would carry less model bias; drafted ones are faster.
 4. **External panel:** whether and when to add other readers before any result leaves the project.

@@ -1,0 +1,56 @@
+# Draft candidate briefs for the owner to curate (docs/briefs.md).
+#
+# Each repetition asks the planner model for `count` briefs as structured
+# output (nde.schema.brief.BriefDrafts). Drafts are cached and costed like any
+# run; they never land in a split by themselves. Write them out for review with
+#
+#   uv run nde run configs/draft-briefs.yaml
+#   uv run nde briefs drafts <run dir> --out benchmark/drafts
+#
+# then edit or reject them, give each kept brief an id and split, and move it
+# to benchmark/<split>/<id>.yaml.
+#
+# BEFORE RUNNING: check the model ID and price against OpenAI's current lists,
+# and set OPENAI_API_KEY in `.env`.
+name: draft-briefs
+seed: 1301
+prompts_dir: ../prompts
+
+providers:
+  openai:
+    base_url: https://api.openai.com/v1
+    base_url_env: NDE_OPENAI_BASE_URL
+    api_key_env: OPENAI_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: true
+    timeout_s: 180
+
+roles:
+  planner:
+    provider: openai
+    model: gpt-6-luna
+    # A higher temperature than planning runs, for variety across drafts.
+    params: {reasoning_effort: none, temperature: 1.0, max_completion_tokens: 8000}
+
+calls:
+  # Four batches of ten: about 40 candidates, enough to curate 30 test briefs.
+  - id: draft
+    role: planner
+    prompt: {template: brief_draft, version: 1}
+    variables:
+      count: "10"
+      # Steer the drafts here. To avoid near-duplicates of existing briefs,
+      # list their premises: "Do not reuse these premises: ...".
+      guidance: Favour concrete, specific settings and people over generic ones.
+    response_model: brief_drafts
+    repeat: 4
+
+structured:
+  max_repairs: 2
+
+prices:
+  # OpenAI model page, checked 2026-10-18.
+  openai/gpt-6-luna: {input_per_mtok: 0.10, output_per_mtok: 0.50}
+
+budget:
+  per_run_usd: 0.20
+  per_day_usd: 5.00

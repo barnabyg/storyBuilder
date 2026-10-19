@@ -44,3 +44,6 @@ desktop.ini
 # nde local state: response cache, cost ledger and run directories
 /.nde/
 /runs/
+
+# Draft briefs awaiting curation (docs/briefs.md)
+/benchmark/drafts/

@@ -1,0 +1,16 @@
+id: brief-03
+split: dev
+genre: crime
+premise: >-
+  A night-shift pharmacist notices that the same elderly customer has been
+  filling prescriptions for a man who died three months ago.
+protagonist:
+  name: Priya Raman
+  description: a tired, scrupulous pharmacist two weeks from quitting her job
+central_conflict: >-
+  The customer is selling the pills to pay for her own care, and reporting her
+  would ruin her, while staying silent makes Priya complicit.
+themes: [complicity, mercy, the cost of rules]
+ending_constraint:
+  kind: twist
+  detail: The final scene reveals that the dead man arranged the scheme himself before he died, which recasts every earlier scene.
