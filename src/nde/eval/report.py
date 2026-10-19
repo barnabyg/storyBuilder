@@ -21,6 +21,7 @@ from nde.eval.batch import (
     read_view,
     read_warnings,
 )
+from nde.eval.calibration import render_calibration_report
 from nde.eval.judge_report import PairLabels, judges_section
 from nde.eval.judges import read_records
 from nde.eval.rubric import Rubric
@@ -218,6 +219,9 @@ def render_report(batch: Path) -> str:
 
 
 def write_report(batch: Path) -> str:
-    report = render_report(batch)
+    view = read_view(batch)
+    report = (
+        render_calibration_report(batch, view) if view.kind == "single" else render_report(batch)
+    )
     write_text_lf(batch / REPORT, report)
     return report

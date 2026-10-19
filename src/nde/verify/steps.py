@@ -21,6 +21,9 @@ _SECRET_SCAN_EXCLUDES: dict[str, str] = {
     # SHA-256 checksums of the briefs in frozen splits, for the same reasons.
     "benchmark/frozen.json": "frozen brief split checksums",
     "benchmark/rubric/checksums.json": "rubric version checksums",
+    # SHA-256 checksums recorded for each calibration source; YAML written by
+    # `nde calibration fetch`, which cannot place inline pragmas.
+    "data/manifest.calibration.yaml": "calibration source checksums",
 }
 
 

@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from nde import __version__, briefs
+from nde.corpus import provenance
 from nde.env import load_dotenv
 from nde.eval import cli as eval_cli
 from nde.eval import rubric
@@ -76,6 +77,24 @@ def build_parser() -> argparse.ArgumentParser:
         commands.add_parser("eval", help="blind evaluation: batches, reader, reports")
     )
 
+    corpus = commands.add_parser("calibration", help="fetch the human calibration stories")
+    corpus_commands = corpus.add_subparsers(dest="calibration_command", required=True)
+    corpus_fetch = corpus_commands.add_parser(
+        "fetch", help="fetch, or reuse and verify, every story in the provenance manifest"
+    )
+    corpus_import = corpus_commands.add_parser(
+        "import", help="use a local copy of a story's source instead of downloading it"
+    )
+    corpus_import.add_argument("id", help="the story's id in the manifest")
+    corpus_import.add_argument("file", type=Path, help="the source file")
+    for sub in (corpus_fetch, corpus_import):
+        sub.add_argument(
+            "--manifest",
+            type=Path,
+            default=provenance.DEFAULT_MANIFEST,
+            help="(./data/manifest.calibration.yaml)",
+        )
+
     rubric_parser = commands.add_parser("rubric", help="manage versions of the rubric")
     rubric_commands = rubric_parser.add_subparsers(dest="rubric_command", required=True)
     rubric_lock = rubric_commands.add_parser("lock", help="record checksums of new versions")
@@ -138,6 +157,21 @@ def _prompts_lock(args: argparse.Namespace) -> int:
     return EXIT_USAGE if changed else EXIT_OK
 
 
+def _calibration(args: argparse.Namespace) -> int:
+    try:
+        if args.calibration_command == "import":
+            stories = [provenance.import_story(args.manifest, args.id, args.file)]
+        else:
+            stories = provenance.fetch(args.manifest)
+    except provenance.ProvenanceError as error:
+        print(f"nde calibration {args.calibration_command}: {error}", file=sys.stderr)
+        return EXIT_RUN_FAILED
+    for story in stories:
+        print(f"{story.id}: {story.title} ({story.author}), sha256 {story.sha256}")
+    print(f"texts are in {provenance.texts_dir(args.manifest)}; commit {args.manifest}")
+    return EXIT_OK
+
+
 def _rubric_lock(args: argparse.Namespace) -> int:
     if args.check:
         unrecorded, changed = rubric.check(args.dir)
@@ -187,6 +221,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "report": _report,
     "eval": eval_cli.run,
     "rubric": _rubric_lock,
+    "calibration": _calibration,
     "briefs": _briefs,
     "prompts": _prompts_lock,
 }

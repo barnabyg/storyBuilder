@@ -6,8 +6,10 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from nde.corpus.provenance import DEFAULT_MANIFEST, ProvenanceError
 from nde.eval import batch as batches
 from nde.eval import report
+from nde.eval.calibration import CalibrationSpec, build_calibration_batch
 from nde.eval.leakage import generating_code_warning
 from nde.eval.reader import DEFAULT_PORT, HOST
 from nde.eval.rubric import DEFAULT_RUBRIC_DIR, RubricError, load_rubric
@@ -52,6 +54,32 @@ def configure(evaluation: argparse.ArgumentParser) -> None:
     serve.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"(default {DEFAULT_PORT})")
     _batches_dir_option(serve)
 
+    calibration = sub.add_parser(
+        "calibration", help="build a single-story calibration batch of human and generated stories"
+    )
+    calibration.add_argument("name", help="batch name, e.g. p1-calibration")
+    calibration.add_argument(
+        "--humans", type=Path, default=DEFAULT_MANIFEST, help="(./data/manifest.calibration.yaml)"
+    )
+    calibration.add_argument(
+        "--from",
+        dest="sources",
+        nargs=2,
+        action="append",
+        metavar=("RUN_DIR", "CONDITION"),
+        default=[],
+        help="a run directory and one of its conditions; repeat for each condition",
+    )
+    calibration.add_argument(
+        "--per-source", type=int, default=2, help="stories from each --from (default 2)"
+    )
+    calibration.add_argument("--seed", type=int, help="shuffle seed (default: random)")
+    calibration.add_argument(
+        "--rubric-dir", type=Path, default=DEFAULT_RUBRIC_DIR, help="(./benchmark/rubric)"
+    )
+    calibration.add_argument("--rubric-version", type=int, default=1, help="rubric version (1)")
+    _batches_dir_option(calibration)
+
     reveal = sub.add_parser("report", help="reveal the key of a closed batch and report it")
     reveal.add_argument("name", help="batch name")
     _batches_dir_option(reveal)
@@ -69,6 +97,23 @@ def _build(args: argparse.Namespace) -> int:
     )
     pairs = len(batches.read_view(path).pairs)
     print(f"built batch {args.name!r}: {pairs} pairs in {path}")
+    print(f"read it with: uv run nde eval serve --batch {args.name}")
+    return EXIT_OK
+
+
+def _calibration(args: argparse.Namespace) -> int:
+    sources = [batches.Source(Path(run), condition) for run, condition in args.sources]
+    spec = CalibrationSpec(
+        name=args.name,
+        humans=args.humans,
+        sources=sources,
+        per_source=args.per_source,
+        rubric=load_rubric(args.rubric_dir, args.rubric_version),
+        seed=args.seed,
+    )
+    path = build_calibration_batch(args.batches_dir, spec)
+    stories = len(batches.read_view(path).stories)
+    print(f"built calibration batch {args.name!r}: {stories} stories in {path}")
     print(f"read it with: uv run nde eval serve --batch {args.name}")
     return EXIT_OK
 
@@ -96,9 +141,14 @@ def _report(args: argparse.Namespace) -> int:
 
 
 def run(args: argparse.Namespace) -> int:
-    handlers = {"batch": _build, "serve": _serve, "report": _report}
+    handlers = {
+        "batch": _build,
+        "calibration": _calibration,
+        "serve": _serve,
+        "report": _report,
+    }
     try:
         return handlers[args.eval_command](args)
-    except (batches.BatchError, RubricError) as error:
+    except (batches.BatchError, RubricError, ProvenanceError) as error:
         print(f"nde eval {args.eval_command}: {error}", file=sys.stderr)
         return EXIT_USAGE

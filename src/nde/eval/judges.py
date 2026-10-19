@@ -126,6 +126,8 @@ def prepare_judges(
                 "from other families"
             )
     view = read_view(batch)
+    if view.kind != "pairs":
+        raise ConfigError(f"judges: batch {judges.batch!r} is not a pair batch")
     if "rubric" in judges.modes and view.rubric is None:
         raise ConfigError(f"judges: batch {judges.batch!r} has no rubric for rubric mode")
     needs = [(judges.pairwise_prompt, PAIRWISE_VARIABLES), (judges.rubric_prompt, RUBRIC_VARIABLES)]

@@ -39,6 +39,9 @@ VIEW = "view.json"
 SEALED = "sealed"
 KEY = "key.json"
 JUDGEMENTS = "judgements.jsonl"
+SCORES = "scores.jsonl"
+# Field prefix for the one story of a single-story batch.
+SINGLE = "story"
 WARNINGS = "reader-warnings.jsonl"
 CLOSED = "closed.json"
 STORY_FILE = "story.md"
@@ -71,11 +74,19 @@ class ShownPair(_Record):
 class View(_Record):
     """Everything the reader may see."""
 
-    pairs: list[ShownPair]
+    # pairs: story pairs with a preference; single: one story at a time, scores only.
+    kind: Literal["pairs", "single"] = "pairs"
+    pairs: list[ShownPair] = Field(default_factory=list[ShownPair])
+    stories: list[str] = Field(default_factory=list[str])
     # The rubric to score each story with; None for batches built before rubric scoring.
     rubric: Rubric | None = None
     # The conditions offered for "which condition was A?", sorted by name.
     guess_options: list[str] = Field(default_factory=list[str])
+
+    @property
+    def size(self) -> int:
+        """Pairs, or stories in a single-story batch."""
+        return len(self.stories) if self.kind == "single" else len(self.pairs)
 
 
 class StorySource(_Record):
@@ -134,6 +145,14 @@ class Judgement(_Record):
     guess: str | None = None
     a: StoryScores | None = None
     b: StoryScores | None = None
+
+
+class ScoreRecord(_Record):
+    """A single-story batch's scores for one story."""
+
+    item: int = Field(ge=1)
+    story: StoryScores
+    at: str
 
 
 class ReaderWarning(_Record):
@@ -271,6 +290,20 @@ def read_judgements(batch: Path) -> dict[int, Judgement]:
     return latest
 
 
+def read_scores(batch: Path) -> dict[int, ScoreRecord]:
+    """The latest scores of each story of a single-story batch, by story number."""
+    latest: dict[int, ScoreRecord] = {}
+    for line in _jsonl(batch / SCORES):
+        record = ScoreRecord.model_validate_json(line)
+        latest[record.item] = record
+    return latest
+
+
+def judged(batch: Path, view: View) -> set[int]:
+    """The numbers of the pairs, or stories, judged so far."""
+    return set(read_scores(batch) if view.kind == "single" else read_judgements(batch))
+
+
 def is_closed(batch: Path) -> bool:
     return (batch / CLOSED).is_file()
 
@@ -336,6 +369,26 @@ def parse_judgement(view: View, pair: int, fields: Mapping[str, Sequence[str]]) 
     return judgement
 
 
+def parse_scores(view: View, item: int, fields: Mapping[str, Sequence[str]]) -> ScoreRecord:
+    """One story's scores from submitted form fields; raises InvalidJudgementError."""
+    if view.rubric is None or not 1 <= item <= len(view.stories):
+        raise BatchError(f"no story {item}")
+    problems: list[str] = []
+    scores = _scores(fields, view.rubric, SINGLE, problems)
+    if problems:
+        raise InvalidJudgementError(problems)
+    return ScoreRecord(item=item, story=scores, at=datetime.now(UTC).isoformat())
+
+
+def record_scores(batch: Path, record: ScoreRecord) -> None:
+    """Append a story's scores, durably, before returning."""
+    if is_closed(batch):
+        raise BatchError("the batch is closed; scores cannot change")
+    with (batch / SCORES).open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(record.model_dump_json() + "\n")
+        handle.flush()
+
+
 def record_judgement(batch: Path, judgement: Judgement) -> None:
     """Append a judgement, durably, before returning."""
     if is_closed(batch):
@@ -358,11 +411,12 @@ def read_warnings(batch: Path) -> list[ReaderWarning]:
 def close_batch(batch: Path) -> Closed:
     if is_closed(batch):
         raise BatchError("the batch is already closed")
-    pairs = len(read_view(batch).pairs)
-    judged = len(read_judgements(batch))
-    if judged < pairs:
-        raise BatchError(f"{pairs - judged} of {pairs} pairs are not judged yet")
-    closed = Closed(closed_at=datetime.now(UTC).isoformat(), judged=judged)
+    view = read_view(batch)
+    done = len(judged(batch, view))
+    unit = "stories" if view.kind == "single" else "pairs"
+    if done < view.size:
+        raise BatchError(f"{view.size - done} of {view.size} {unit} are not judged yet")
+    closed = Closed(closed_at=datetime.now(UTC).isoformat(), judged=done)
     write_text_lf(batch / CLOSED, closed.model_dump_json(indent=2) + "\n")
     return closed
 

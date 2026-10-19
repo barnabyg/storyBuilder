@@ -195,3 +195,72 @@ one row per judge (so per family on a typical panel):
 
 A **Judge rubric scores** table gives each judge's mean score per dimension
 and condition. If a judge is run again, its latest verdicts count.
+
+## Calibration batch
+
+Before any gate reading, the owner scores a **calibration batch** to anchor
+the rubric scale: 3 to 5 public-domain human short stories mixed with a few
+Baseline A and B stories from dev-brief runs, shuffled and read one at a
+time. See P1.9 of the plan.
+
+### Human stories and provenance
+
+`data/manifest.calibration.yaml` is the committed provenance manifest. Each
+story has an `id`, `title`, `author`, `source` (download URL), `edition`,
+`licence_basis` and `sha256`, plus the `start` and `end` markers its text lies
+between (Project Gutenberg's `*** START OF` and `*** END OF` by default). The
+committed stories are from Project Gutenberg's single-story ebooks:
+
+| Story | Author | eBook |
+| --- | --- | --- |
+| An Occurrence at Owl Creek Bridge | Ambrose Bierce | #375 |
+| The Gift of the Magi | O. Henry | #7256 |
+| The Yellow Wallpaper | Charlotte Perkins Gilman | #1952 (about 6,000 words, above the 2,000 to 5,000 aim) |
+
+To add a story from a collection, set `start` and `end` to lines that bracket
+it. Standard Ebooks texts are preferred where a clean single-story source
+exists; download one by hand and use `nde calibration import`.
+
+```powershell
+uv run nde calibration fetch
+```
+
+downloads each source into `data/calibration/` (gitignored), or reuses the
+copy already there. The first fetch records each source's SHA-256 in the
+manifest: **commit the manifest afterwards**. Every later fetch verifies the
+source against it and stops with `checksum mismatch` if it changed. The story
+text is extracted from between the markers, unwrapped into paragraphs,
+stripped of its title and credit lines, and normalised exactly like a
+generated story. Check the extracted `data/calibration/<id>.md` files once:
+any byline or heading left in them would reveal a human source.
+
+`uv run nde calibration import <id> <file>` uses a local copy of a source
+instead of downloading it, with the same checksum rules.
+
+### The command sequence
+
+```powershell
+uv run nde calibration fetch
+uv run nde run configs/stories-ab.yaml
+$run = (Get-ChildItem runs -Directory -Filter '*-stories-ab-*' | Sort-Object Name | Select-Object -Last 1).FullName
+uv run nde eval calibration p1-calibration --from $run A --from $run B
+uv run nde eval serve --batch p1-calibration
+```
+
+`nde eval calibration` mixes every fetched human story with `--per-source`
+stories (default 2, sampled with the seed) from each `--from` run and
+condition, and shuffles them. The reader then shows **one story at a time**
+with only the rubric scores and failure tags: no pairing, preference or
+condition guess. Every dimension must be scored. The source of each story
+(human, A or B) is kept in the sealed key and never shown before the batch is
+closed.
+
+When every story is scored, close the batch on the overview page, then:
+
+```powershell
+uv run nde eval report p1-calibration
+```
+
+The calibration report gives each rubric dimension's mean score by source
+(human, then each condition), with bootstrap intervals, failure-tag counts by
+source, and the revealed source of every story.
