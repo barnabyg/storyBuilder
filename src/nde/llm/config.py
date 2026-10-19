@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
 
 
 class Strict(BaseModel):
@@ -47,6 +47,12 @@ class ModelBinding(Strict):
     # The model family (e.g. "openai", "deepseek"), recorded per model rather than inferred
     # from the provider, for the rule that judges come from other families than generators.
     family: str | None = Field(default=None, min_length=1)
+
+    @field_validator("family")
+    @classmethod
+    def _family_is_case_insensitive(cls, family: str | None) -> str | None:
+        """Families compare in lower case, so "OpenAI" and "openai" are one family."""
+        return None if family is None else family.strip().lower()
 
     @property
     def label(self) -> str:

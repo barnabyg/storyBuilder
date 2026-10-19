@@ -117,7 +117,7 @@ def prepare_judges(
                 "`family` on its role in the generating config, re-run it (the cache makes "
                 "that free) and rebuild the batch"
             )
-        families.add(generator.family)
+        families.add(generator.family.lower())
     for judge in judges.panel:
         if judge.family in families:
             raise ConfigError(
