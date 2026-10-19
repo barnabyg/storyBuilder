@@ -5,7 +5,8 @@ outline with B's seed, so it gets the very same outline (from the cache when B
 ran first), shuffles the scene order with a seeded permutation that is never
 the identity, and writes new prose for the shuffled scene list through the
 shared prose contract. It never reuses B's scene prose: the shuffled plan
-changes every scene prompt. The permutation is kept beside the story.
+changes every scene prompt. The permutation is seeded by the story's seed and
+the brief, so briefs get different orders, and is kept beside the story.
 """
 
 import json
@@ -38,6 +39,7 @@ class BaselineBScrambled(BaselineB):
     @override
     def plan(self, ctx: StoryContext) -> BeatOutline:
         outline = super().plan(ctx)
-        order = scramble(len(outline.scenes), ctx.seed)
+        # The brief is part of the seed, so each brief gets its own scene order.
+        order = scramble(len(outline.scenes), derive_seed(ctx.seed, ctx.brief.id))
         ctx.keep(PERMUTATION_FILE, json.dumps(order) + "\n")
         return outline.model_copy(update={"scenes": [outline.scenes[i] for i in order]})

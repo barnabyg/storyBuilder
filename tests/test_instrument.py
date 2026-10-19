@@ -184,3 +184,17 @@ def test_the_pre_registration_is_complete() -> None:
     assert "9 of 10" in text
     assert "80%" in text
     assert "TBD" not in text
+
+
+def test_each_brief_gets_its_own_scramble(b_llm: FakeOpenAI, tmp_path: Path) -> None:
+    briefs = [f"brief-{n:02d}" for n in range(1, 7)]
+    config = story_config(b_llm.base_url, [B_SCRAMBLED], briefs={"ids": briefs})
+
+    run_dir = run(tmp_path, config)
+
+    orders = {
+        (run_dir / r["path"] / "permutation.json").read_text(encoding="utf-8")
+        for r in stories(run_dir)
+    }
+    # Six briefs, all with five scenes: one shared permutation would mean one order.
+    assert len(orders) > 1
