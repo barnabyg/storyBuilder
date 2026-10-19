@@ -317,9 +317,22 @@ def test_building_a_batch_verifies_the_fetched_sources(
     (texts / "test-story.md").write_text("A different story entirely.\n", encoding="utf-8")
     first, _ = two_runs(fake_llm, tmp_path)
 
-    code = main(["eval", "calibration", "calib", "--humans", str(manifest), "--from",
-                 str(first), "intact", "--batches-dir", str(tmp_path / "batches"),
-                 "--rubric-dir", str(REPO / "benchmark" / "rubric")])
+    code = main(
+        [
+            "eval",
+            "calibration",
+            "calib",
+            "--humans",
+            str(manifest),
+            "--from",
+            str(first),
+            "intact",
+            "--batches-dir",
+            str(tmp_path / "batches"),
+            "--rubric-dir",
+            str(REPO / "benchmark" / "rubric"),
+        ]
+    )
 
     assert code == 0
     view = json.loads((tmp_path / "batches" / "calib" / "view.json").read_text("utf-8"))
@@ -327,8 +340,78 @@ def test_building_a_batch_verifies_the_fetched_sources(
     assert "A different story entirely.\n" not in view["stories"]
 
     (texts / "test-story.source.txt").write_text(GUTENBERG_TEXT + "x", encoding="utf-8")
-    code = main(["eval", "calibration", "calib2", "--humans", str(manifest), "--from",
-                 str(first), "intact", "--batches-dir", str(tmp_path / "batches"),
-                 "--rubric-dir", str(REPO / "benchmark" / "rubric")])
+    code = main(
+        [
+            "eval",
+            "calibration",
+            "calib2",
+            "--humans",
+            str(manifest),
+            "--from",
+            str(first),
+            "intact",
+            "--batches-dir",
+            str(tmp_path / "batches"),
+            "--rubric-dir",
+            str(REPO / "benchmark" / "rubric"),
+        ]
+    )
     assert code == 2
     assert "checksum mismatch" in capsys.readouterr().err
+
+
+def test_calibration_sources_need_distinct_condition_names(
+    fake_llm: FakeOpenAI,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    text_server: dict[str, str],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    text_server["/story.txt"] = GUTENBERG_TEXT
+    manifest = _manifest(tmp_path, text_server["base"])
+    assert _fetch(manifest) == 0
+    first, _ = two_runs(fake_llm, tmp_path)
+
+    code = main(
+        [
+            "eval",
+            "calibration",
+            "calib",
+            "--humans",
+            str(manifest),
+            "--from",
+            str(first),
+            "intact",
+            "--from",
+            str(first),
+            "intact",
+            "--batches-dir",
+            str(tmp_path / "batches"),
+            "--rubric-dir",
+            str(REPO / "benchmark" / "rubric"),
+        ]
+    )
+
+    assert code == 2
+    assert "distinct condition names" in capsys.readouterr().err
+
+
+def test_importing_a_missing_file_fails_cleanly(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    manifest = _manifest(tmp_path, "http://unused.invalid")
+
+    code = main(
+        [
+            "calibration",
+            "import",
+            "test-story",
+            str(tmp_path / "nope.txt"),
+            "--manifest",
+            str(manifest),
+        ]
+    )
+
+    assert code == 1
+    assert "cannot read" in capsys.readouterr().err

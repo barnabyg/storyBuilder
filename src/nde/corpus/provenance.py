@@ -173,7 +173,11 @@ def import_story(manifest_path: Path, story_id: str, file: Path) -> HumanStory:
     matches = [story for story in manifest.stories if story.id == story_id]
     if not matches:
         raise ProvenanceError(f"no story {story_id!r} in {manifest_path}")
-    stored = _store(manifest_path, matches[0], file.read_bytes())
+    try:
+        data = file.read_bytes()
+    except OSError as error:
+        raise ProvenanceError(f"cannot read {file}: {error}") from error
+    stored = _store(manifest_path, matches[0], data)
     manifest.stories = [stored if s.id == story_id else s for s in manifest.stories]
     write_manifest(manifest_path, manifest)
     return stored
