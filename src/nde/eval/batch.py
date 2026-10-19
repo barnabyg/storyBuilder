@@ -31,7 +31,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from nde.eval.rubric import Rubric
-from nde.files import write_text_lf
+from nde.files import append_line, write_text_lf
 from nde.runs.records import read_manifest, read_stories
 
 DEFAULT_BATCHES_DIR = Path("batches")
@@ -391,24 +391,19 @@ def record_scores(batch: Path, record: ScoreRecord) -> None:
     """Append a story's scores, durably, before returning."""
     if is_closed(batch):
         raise BatchError("the batch is closed; scores cannot change")
-    with (batch / SCORES).open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(record.model_dump_json() + "\n")
-        handle.flush()
+    append_line(batch / SCORES, record.model_dump_json())
 
 
 def record_judgement(batch: Path, judgement: Judgement) -> None:
     """Append a judgement, durably, before returning."""
     if is_closed(batch):
         raise BatchError("the batch is closed; judgements cannot change")
-    with (batch / JUDGEMENTS).open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(judgement.model_dump_json() + "\n")
-        handle.flush()
+    append_line(batch / JUDGEMENTS, judgement.model_dump_json())
 
 
 def record_warning(batch: Path, warning: str) -> None:
     entry = ReaderWarning(at=datetime.now(UTC).isoformat(), warning=warning)
-    with (batch / WARNINGS).open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(entry.model_dump_json() + "\n")
+    append_line(batch / WARNINGS, entry.model_dump_json())
 
 
 def read_warnings(batch: Path) -> list[ReaderWarning]:
