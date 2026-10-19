@@ -29,7 +29,7 @@ from nde.llm.config import ModelBinding
 from nde.llm.gateway import Gateway, Prompt
 from nde.llm.structured import StructuredOutputError
 from nde.runs.config import ConfigError, JudgeMode, LoadedConfig, PromptRef
-from nde.runs.prompts import PromptTemplate, load_template
+from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.records import StructuredMetrics
 from nde.runs.state import Attribution, RunState, record_calls_since
 
@@ -132,9 +132,7 @@ def prepare_judges(
         raise ConfigError(f"judges: batch {judges.batch!r} has no rubric for rubric mode")
     needs = [(judges.pairwise_prompt, PAIRWISE_VARIABLES), (judges.rubric_prompt, RUBRIC_VARIABLES)]
     for ref, variables in needs:
-        if ref.label not in templates:
-            templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
-        templates[ref.label].render(dict.fromkeys(variables, "x"))
+        require_template(templates, loaded.prompts_dir, ref, dict.fromkeys(variables, "x"))
     return PreparedJudges(
         batch, view, judges.panel, judges.modes, judges.pairwise_prompt, judges.rubric_prompt
     )

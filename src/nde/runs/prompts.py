@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from nde import versioned
 from nde.files import checksum_lf
 from nde.llm.client import Message
-from nde.runs.config import ConfigError
+from nde.runs.config import ConfigError, PromptRef
 
 CHECKSUMS = versioned.CHECKSUMS
 
@@ -81,6 +81,23 @@ def load_template(prompts_dir: Path, name: str, version: int) -> PromptTemplate:
     except (yaml.YAMLError, ValidationError) as error:
         raise ConfigError(f"prompt template {label} is malformed: {error}") from error
     return PromptTemplate(name, version, parsed.system, parsed.user, checksum_lf(data))
+
+
+def require_template(
+    templates: dict[str, PromptTemplate],
+    prompts_dir: Path,
+    ref: PromptRef,
+    variables: Mapping[str, str],
+) -> PromptTemplate:
+    """Load `ref` into `templates` once and check it renders with `variables`.
+
+    Raises ConfigError, so configs fail before any call. Callers that only know
+    variable names pass placeholder values: `dict.fromkeys(names, "x")`.
+    """
+    if ref.label not in templates:
+        templates[ref.label] = load_template(prompts_dir, ref.template, ref.version)
+    templates[ref.label].render(variables)
+    return templates[ref.label]
 
 
 def check(prompts_dir: Path) -> tuple[list[str], list[str]]:

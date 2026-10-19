@@ -30,7 +30,7 @@ from nde.runs.config import (
     RoleName,
     load_config,
 )
-from nde.runs.prompts import PromptTemplate, load_template
+from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.records import (
     CALLS,
     OUTPUTS,
@@ -90,10 +90,7 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
     config = loaded.config
     templates: dict[str, PromptTemplate] = {}
     for call in config.calls:
-        ref = call.prompt
-        if ref.label not in templates:
-            templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
-        templates[ref.label].render(call.variables)
+        require_template(templates, loaded.prompts_dir, call.prompt, call.variables)
     stories = prepare_stories(loaded, templates)
     story_roles = [] if stories is None else stories.roles
     for provider_name in sorted(

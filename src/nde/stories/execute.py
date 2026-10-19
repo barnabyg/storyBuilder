@@ -21,7 +21,7 @@ from nde.runs.config import (
     PromptRef,
     RoleName,
 )
-from nde.runs.prompts import PromptTemplate, load_template
+from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.records import (
     STORY_DIR,
     BudgetMatch,
@@ -36,7 +36,13 @@ from nde.runs.state import RunState
 from nde.schema.brief import SPLITS, Brief
 from nde.stories.budget import story_budget, within
 from nde.stories.length import Draft, attempt_seed, choose, measure
-from nde.stories.pipeline import Pipeline, StepFailedError, StoryContext, derive_seed
+from nde.stories.pipeline import (
+    Pipeline,
+    StepFailedError,
+    StoryContext,
+    TemplateNeed,
+    derive_seed,
+)
 from nde.stories.registry import PIPELINES
 
 # The normalised story, which blind batches and judges see, and the model's raw text.
@@ -148,17 +154,13 @@ def prepare_stories(
         return None
     briefs = _select_briefs(stories.briefs, briefs_dir)
     conditions = [_condition(loaded, spec) for spec in stories.conditions]
-    for condition in conditions:
-        for need in condition.pipeline.templates():
-            ref = need.prompt
-            if ref.label not in templates:
-                templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
-            templates[ref.label].render(dict.fromkeys(need.variables, "x"))
+    needs = [need for condition in conditions for need in condition.pipeline.templates()]
     if stories.equal_budget is not None:
-        ref = stories.equal_budget.revision_prompt
-        if ref.label not in templates:
-            templates[ref.label] = load_template(loaded.prompts_dir, ref.template, ref.version)
-        templates[ref.label].render(dict.fromkeys(REVISION_VARIABLES, "x"))
+        needs.append(TemplateNeed(stories.equal_budget.revision_prompt, REVISION_VARIABLES))
+    for need in needs:
+        require_template(
+            templates, loaded.prompts_dir, need.prompt, dict.fromkeys(need.variables, "x")
+        )
     checksums: dict[str, str] = {}
     for split in SPLITS:
         checksum = split_checksum(briefs_dir, split)
