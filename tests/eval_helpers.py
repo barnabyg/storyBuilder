@@ -108,3 +108,18 @@ def complete_form(
         form[f"tags-{side}"] = marks.tags
         form[f"free-tags-{side}"] = marks.free_tags
     return form
+
+
+def owner_reads_coherence(batch: Path, picks: list[str]) -> None:
+    """Score coherence 4 for the condition named in `picks` (2 for the other), or 3 and 3."""
+    key = json.loads((batch / "sealed" / "key.json").read_text(encoding="utf-8"))
+    client = reader(batch)
+    for number, (pair, pick) in enumerate(zip(key["pairs"], picks, strict=True), start=1):
+        scores = {}
+        for side in ("a", "b"):
+            condition = pair[side]["condition"]
+            scores[f"score-{side}-coherence"] = (
+                "3" if pick == "tie" else ("4" if condition == pick else "2")
+            )
+        client.post(f"/pairs/{number}", data={"preferred": "B", "strength": "1"} | scores)
+    client.post("/close")

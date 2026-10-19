@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 from nde.eval.judges import ORDERS, JudgeRecord
 from nde.eval.rubric import Rubric
+from nde.eval.sections import TIE, pick
 from nde.eval.stats import cohens_kappa
 
 INCONSISTENT = "inconsistent"
@@ -35,6 +36,8 @@ class PairLabels:
     a: str
     b: str
     owner: str
+    # The owner's pick on the batch's primary dimension (a condition, or TIE), if any.
+    owner_primary: str | None = None
 
     def condition(self, side: str) -> str:
         return self.a if side == "A" else self.b
@@ -113,11 +116,51 @@ def _rubric_rows(
     return rows
 
 
+def _primary_rows(
+    judges: Sequence[_Judge], pairs: Sequence[PairLabels], names: Sequence[str], primary: str
+) -> list[str]:
+    """Each judge's picks on the primary dimension, from rubric mode, against the owner's."""
+    lines = [
+        "### Judges on the primary measure",
+        "",
+        f"In each pair, the condition whose story the judge scored higher on {primary} in "
+        "rubric mode (equal scores are a tie), and how often that matches the owner's pick.",
+        "",
+        f"| Family | Judge | {' | '.join(f'{n} picks' for n in names)} | Ties "
+        "| Agreement with owner |",
+        f"| --- | --- |{' --- |' * len(names)} --- | --- |",
+    ]
+    for judge in judges:
+        scores: dict[tuple[int, str], int] = {}
+        for record in judge.records:
+            if record.mode == "rubric" and record.scores and record.story:
+                value = record.scores.get(primary)
+                if value is not None:
+                    scores[record.pair, record.story] = value
+        picks = [
+            pick(p.a, p.b, scores.get((n, "A")), scores.get((n, "B")))
+            for n, p in enumerate(pairs, start=1)
+        ]
+        compared = [
+            (j, p.owner_primary)
+            for j, p in zip(picks, pairs, strict=True)
+            if p.owner_primary is not None
+        ]
+        agreed = sum(j == o for j, o in compared)
+        cells = " | ".join(str(picks.count(name)) for name in names)
+        lines.append(
+            f"| {judge.family} | {judge.label} | {cells} | {picks.count(TIE)} "
+            f"| {_percent(agreed, len(compared))} |"
+        )
+    return [*lines, ""]
+
+
 def judges_section(
     records: Sequence[JudgeRecord],
     pairs: Sequence[PairLabels],
     names: Sequence[str],
     rubric: Rubric | None,
+    primary: str | None = None,
 ) -> list[str]:
     if not records:
         return []
@@ -151,6 +194,8 @@ def judges_section(
         lines.append("")
     if errors:
         lines += [f"{errors} judge verdicts were still invalid after their repairs.", ""]
+    if primary is not None and any(record.mode == "rubric" for record in latest):
+        lines += _primary_rows(judges, pairs, names, primary)
     if rubric is not None and any(record.mode == "rubric" for record in latest):
         lines += [
             "### Judge rubric scores",

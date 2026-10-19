@@ -36,6 +36,14 @@ uv run nde eval batch <name> --from <run dir> <condition> --from <run dir> <cond
   skim reading. Rubric scores, failure tags and the condition guess may then
   be left out or given in part; whatever is given is still checked. The
   report says so, and its secondary sections summarise only the marks given.
+- `--primary-score <dimension>` (for example `coherence`) makes that rubric
+  dimension the gate's primary measure. It is required for both stories in
+  every pair, even with `--optional-scores`, and the report leads with a
+  **Primary measure** section: in each pair, which condition's story scored
+  higher (equal scores are a tie), with an exact binomial test in which ties
+  count against the first condition. With a judge panel, **Judges on the
+  primary measure** compares each judge's rubric-mode picks with yours.
+  Structure-focused gates use `coherence` this way (plan §4).
 
 A batch lives in `batches/<name>/` (gitignored; change it with
 `--batches-dir` or `NDE_BATCHES`):

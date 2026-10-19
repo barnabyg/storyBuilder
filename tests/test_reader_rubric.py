@@ -16,6 +16,7 @@ from tests.eval_helpers import (
     Marks,
     build_batch,
     complete_form,
+    owner_reads_coherence,
     reader,
     seeded_story,
     two_runs,
@@ -356,3 +357,71 @@ def test_the_report_summarises_whatever_optional_marks_were_given(
     assert "| pacing | - | - |" in report
     assert "1 of 1 guesses right" in report
     assert "optional" in report.lower()
+
+
+def _primary_batch(tmp_path: Path, runs: tuple[Path, Path]) -> Path:
+    return build_batch(tmp_path, runs, "demo", "--optional-scores", "--primary-score", "coherence")
+
+
+def test_the_primary_score_is_required_and_the_rest_stays_optional(
+    runs: tuple[Path, Path], tmp_path: Path
+) -> None:
+    client = reader(_primary_batch(tmp_path, runs))
+    page = client.get("/pairs/1").text
+    assert 'name="score-a-coherence" value="1" required' in page
+    assert 'name="score-a-pacing" value="1" required' not in page
+
+    missing = client.post("/pairs/1", data={"preferred": "A", "strength": "1"})
+    assert missing.status_code == 422
+    problems = missing.text.split('<div class="problems">', 1)[1].split("</div>", 1)[0]
+    assert "score-a-coherence" in problems
+    assert "score-b-coherence" in problems
+    assert "score-a-pacing" not in problems
+
+    form = {"preferred": "A", "strength": "1", "score-a-coherence": "4", "score-b-coherence": "2"}
+    assert client.post("/pairs/1", data=form, follow_redirects=False).status_code == 303
+
+
+def test_an_unknown_primary_score_is_rejected(
+    runs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    first, second = runs
+    code = main(
+        [
+            "eval",
+            "batch",
+            "x",
+            "--from",
+            str(first),
+            "intact",
+            "--from",
+            str(second),
+            "control",
+            "--batches-dir",
+            str(tmp_path / "batches"),
+            "--rubric-dir",
+            str(RUBRIC_DIR),
+            "--primary-score",
+            "plot",
+        ]
+    )
+
+    assert code == 2
+    assert "primary score 'plot' is not a rubric dimension" in capsys.readouterr().err
+
+
+def test_the_report_leads_with_the_primary_score_picks(
+    runs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    batch = _primary_batch(tmp_path, runs)
+    owner_reads_coherence(batch, ["intact", "intact", "intact", "tie"])
+
+    report = _report(tmp_path, capsys)
+
+    section = report.split("## Primary measure: coherence", 1)[1].split("\n## ", 1)[0]
+    assert "| intact | 3 |" in section
+    assert "| control | 0 |" in section
+    assert "| tie | 1 |" in section
+    # 3 of 4 pairs for intact; ties count against it: 2 * P(X >= 3), X ~ Bin(4, 0.5).
+    assert "p = 0.625" in section
+    assert report.index("## Primary measure") < report.index("## Preferences")

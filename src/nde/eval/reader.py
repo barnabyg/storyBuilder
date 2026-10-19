@@ -11,6 +11,7 @@ never the sealed key, so no page or API response can reveal which condition,
 or which source, a story came from.
 """
 
+from collections.abc import Collection
 from html import escape
 from pathlib import Path
 
@@ -91,25 +92,30 @@ def _scoring(
     heading: str,
     scores: StoryScores | None,
     *,
-    required: bool = True,
+    required: Collection[str] | None = None,
 ) -> str:
-    """Rubric scores, failure tags and free-text tags for one story."""
+    """Rubric scores, failure tags and free-text tags for one story.
+
+    `required` names the dimensions that must be scored; None means all of them.
+    """
     parts = [f"<div><h3>{escape(heading)}</h3>"]
     for dimension in rubric.dimensions:
         chosen = scores.scores.get(dimension.id) if scores else None
+        needed = required is None or dimension.id in required
+        marker = " (required)" if required is not None and needed else ""
         radios = "".join(
             _radio(
                 f"score-{prefix}-{dimension.id}",
                 str(value),
                 str(value),
                 checked=chosen == value,
-                required=required,
+                required=needed,
             )
             for value in range(rubric.scale.min, rubric.scale.max + 1)
         )
         anchors = dimension.anchors
         parts.append(
-            f"<fieldset><legend>{escape(dimension.name)}</legend>{radios}"
+            f"<fieldset><legend>{escape(dimension.name)}{marker}</legend>{radios}"
             f"<details><summary>What the scale means</summary><p>{escape(dimension.definition)}"
             f"</p><p><b>{rubric.scale.min}:</b> {escape(anchors.low)}</p><p><b>Middle:</b> "
             f"{escape(anchors.middle)}</p><p><b>{rubric.scale.max}:</b> {escape(anchors.high)}"
@@ -133,6 +139,7 @@ def _scoring(
 
 def _pair_form(number: int, view: View, current: Judgement | None) -> str:
     rubric, required = view.rubric, not view.optional_scores
+    dimensions = view.required_dimensions()
     preferred = "".join(
         _radio(
             "preferred",
@@ -164,8 +171,8 @@ def _pair_form(number: int, view: View, current: Judgement | None) -> str:
             )
         current_a = current.a if current else None
         current_b = current.b if current else None
-        story_a = _scoring(rubric, "a", "Story A", current_a, required=required)
-        story_b = _scoring(rubric, "b", "Story B", current_b, required=required)
+        story_a = _scoring(rubric, "a", "Story A", current_a, required=dimensions)
+        story_b = _scoring(rubric, "b", "Story B", current_b, required=dimensions)
         sections.append(f'<div class="columns">{story_a}{story_b}</div>')
         options = "".join(
             _radio(

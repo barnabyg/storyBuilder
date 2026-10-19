@@ -53,6 +53,11 @@ def configure(evaluation: argparse.ArgumentParser) -> None:
         help="require only the preference and strength; rubric scores, tags and the guess "
         "may be partial (for skim reading)",
     )
+    build.add_argument(
+        "--primary-score",
+        metavar="DIMENSION",
+        help="a rubric dimension that is always required and leads the report, e.g. coherence",
+    )
     _batches_dir_option(build)
 
     serve = sub.add_parser("serve", help="open the blind reader on localhost")
@@ -102,7 +107,7 @@ def _build(args: argparse.Namespace) -> int:
         args.batches_dir,
         args.name,
         (first, second),
-        scoring=batches.Scoring(rubric, optional=args.optional_scores),
+        scoring=batches.Scoring(rubric, optional=args.optional_scores, primary=args.primary_score),
         seed=args.seed,
     )
     pairs = len(batches.read_view(path).pairs)
