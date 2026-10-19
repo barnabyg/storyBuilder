@@ -47,3 +47,6 @@ desktop.ini
 
 # Draft briefs awaiting curation (docs/briefs.md)
 /benchmark/drafts/
+
+# Blind evaluation batches: reader judgements and sealed keys (docs/evaluation.md)
+/batches/

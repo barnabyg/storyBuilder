@@ -3,11 +3,12 @@
 import argparse
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from nde import __version__, briefs
 from nde.env import load_dotenv
+from nde.eval import cli as eval_cli
 from nde.eval import rubric
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
@@ -70,6 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
     prompt_commands = prompt.add_subparsers(dest="prompts_command", required=True)
     lock = prompt_commands.add_parser("lock", help="record checksums of new template versions")
     lock.add_argument("--dir", type=Path, default=Path("prompts"), help="templates (./prompts)")
+
+    eval_cli.configure(
+        commands.add_parser("eval", help="blind evaluation: batches, reader, reports")
+    )
 
     rubric_parser = commands.add_parser("rubric", help="manage versions of the rubric")
     rubric_commands = rubric_parser.add_subparsers(dest="rubric_command", required=True)
@@ -177,20 +182,23 @@ def _briefs(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+_COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "run": _run,
+    "report": _report,
+    "eval": eval_cli.run,
+    "rubric": _rubric_lock,
+    "briefs": _briefs,
+    "prompts": _prompts_lock,
+}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     # Before parsing, so `.env` can also supply option defaults such as NDE_CACHE.
     load_dotenv(Path(".env"))
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command == "run":
-        return _run(args)
-    if args.command == "report":
-        return _report(args)
-    if args.command == "rubric":
-        return _rubric_lock(args)
-    if args.command == "briefs":
-        return _briefs(args)
-    if args.command == "prompts":
-        return _prompts_lock(args)
-    parser.print_help()
-    return EXIT_OK
+    handler = _COMMANDS.get(args.command)
+    if handler is None:
+        parser.print_help()
+        return EXIT_OK
+    return handler(args)

@@ -33,6 +33,8 @@ run directories.
 The G0 model benchmark is described in [docs/benchmark.md](docs/benchmark.md).
 Benchmark briefs (format, drafting, freezing) are described in
 [docs/briefs.md](docs/briefs.md), and the rubric in [docs/rubric.md](docs/rubric.md).
+Blind evaluation (batches, the reader and reports) is described in
+[docs/evaluation.md](docs/evaluation.md).
 
 ## Verification
 

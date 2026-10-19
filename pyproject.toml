@@ -6,9 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "barnabyg" }]
 dependencies = [
+    "fastapi>=0.146.0",
     "httpx>=0.28.1",
     "pydantic>=2.14.1",
+    "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
@@ -33,6 +36,8 @@ required-version = "==0.8.14"
 [dependency-groups]
 dev = [
     "detect-secrets==1.5.0",
+    # starlette.testclient (the reader tests) uses httpx2 and warns when given httpx.
+    "httpx2==2.14.0",
     "pip-audit==2.10.1",
     "pyright[nodejs]==1.1.414",
     "pytest==9.1.1",

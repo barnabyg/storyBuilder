@@ -1,0 +1,90 @@
+"""The `nde eval` commands: build a blind batch, read it, and report it."""
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+from nde.eval import batch as batches
+from nde.eval import report
+from nde.eval.reader import DEFAULT_PORT, HOST
+
+EXIT_OK = 0
+EXIT_USAGE = 2
+
+
+def _batches_dir_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--batches-dir",
+        type=Path,
+        default=Path(os.environ.get("NDE_BATCHES", batches.DEFAULT_BATCHES_DIR)),
+        help="where batches live (env NDE_BATCHES, default ./batches)",
+    )
+
+
+def configure(evaluation: argparse.ArgumentParser) -> None:
+    """Add the `nde eval` subcommands to its parser."""
+    sub = evaluation.add_subparsers(dest="eval_command", required=True)
+
+    build = sub.add_parser("batch", help="build a blind batch of story pairs from two runs")
+    build.add_argument("name", help="batch name, e.g. p1-instrument")
+    build.add_argument(
+        "--from",
+        dest="sources",
+        nargs=2,
+        action="append",
+        metavar=("RUN_DIR", "CONDITION"),
+        required=True,
+        help="a run directory and one of its conditions; give exactly two",
+    )
+    build.add_argument("--seed", type=int, help="shuffle seed (default: random, kept sealed)")
+    _batches_dir_option(build)
+
+    serve = sub.add_parser("serve", help="open the blind reader on localhost")
+    serve.add_argument("--batch", required=True, help="batch name")
+    serve.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"(default {DEFAULT_PORT})")
+    _batches_dir_option(serve)
+
+    reveal = sub.add_parser("report", help="reveal the key of a closed batch and report it")
+    reveal.add_argument("name", help="batch name")
+    _batches_dir_option(reveal)
+
+
+def _build(args: argparse.Namespace) -> int:
+    sources: list[list[str]] = args.sources
+    if len(sources) != 2:  # noqa: PLR2004 - a batch compares exactly two sources
+        print("nde eval batch: give --from exactly twice", file=sys.stderr)
+        return EXIT_USAGE
+    first, second = (batches.Source(Path(run), condition) for run, condition in sources)
+    path = batches.build_batch(args.batches_dir, args.name, first, second, seed=args.seed)
+    pairs = len(batches.read_view(path).pairs)
+    print(f"built batch {args.name!r}: {pairs} pairs in {path}")
+    print(f"read it with: uv run nde eval serve --batch {args.name}")
+    return EXIT_OK
+
+
+def _serve(args: argparse.Namespace) -> int:
+    # Imported here so other commands do not pay for loading the web stack.
+    import uvicorn  # noqa: PLC0415
+
+    from nde.eval.reader import create_app  # noqa: PLC0415
+
+    path = batches.batch_dir(args.batches_dir, args.batch)
+    print(f"blind reader for {args.batch!r}: http://{HOST}:{args.port}/  (Ctrl+C to stop)")
+    uvicorn.run(create_app(path), host=HOST, port=args.port, log_level="warning")
+    return EXIT_OK
+
+
+def _report(args: argparse.Namespace) -> int:
+    path = batches.batch_dir(args.batches_dir, args.name)
+    print(report.write_report(path), end="")
+    return EXIT_OK
+
+
+def run(args: argparse.Namespace) -> int:
+    handlers = {"batch": _build, "serve": _serve, "report": _report}
+    try:
+        return handlers[args.eval_command](args)
+    except batches.BatchError as error:
+        print(f"nde eval {args.eval_command}: {error}", file=sys.stderr)
+        return EXIT_USAGE
