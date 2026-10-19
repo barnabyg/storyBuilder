@@ -8,8 +8,20 @@ from typing import Any
 import pytest
 
 from nde.cli import main
-from tests.eval_helpers import DIMENSIONS, Marks, build_batch, complete_form, reader, two_runs
+from tests.eval_helpers import (
+    BRIEFS,
+    DIMENSIONS,
+    INTACT,
+    RUBRIC_DIR,
+    Marks,
+    build_batch,
+    complete_form,
+    reader,
+    seeded_story,
+    two_runs,
+)
 from tests.fake_openai import FakeOpenAI
+from tests.stories import run, story_config
 
 
 @pytest.fixture
@@ -247,3 +259,40 @@ def test_the_reader_does_not_warn_after_48_hours(
     assert "WARNING" not in capsys.readouterr().err
     _judge(batch, guess_right=[True, False, True, False])
     assert "## Warnings" not in _report(tmp_path, capsys)
+
+
+def test_same_named_conditions_are_offered_without_run_directory_names(
+    fake_llm: FakeOpenAI, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = seeded_story
+    runs = []
+    for seed in (100, 200):
+        config = story_config(fake_llm.base_url, [INTACT], briefs={"ids": BRIEFS[:2]})
+        config["seed"] = seed
+        runs.append(run(tmp_path, config))
+    code = main(
+        [
+            "eval",
+            "batch",
+            "same",
+            "--from",
+            str(runs[0]),
+            "intact",
+            "--from",
+            str(runs[1]),
+            "intact",
+            "--batches-dir",
+            str(tmp_path / "batches"),
+            "--rubric-dir",
+            str(RUBRIC_DIR),
+        ]
+    )
+    assert code == 0
+
+    options = _view(tmp_path / "batches" / "same")["guess_options"]
+
+    assert options == ["intact (source 1)", "intact (source 2)"]
+    page = reader(tmp_path / "batches" / "same").get("/pairs/1").text
+    assert runs[0].name not in page
+    assert runs[1].name not in page

@@ -172,10 +172,17 @@ class Source:
 
 
 def labels(sources: Sequence[StorySource]) -> dict[tuple[str, str], str]:
-    """A label per source: its condition, plus its run when both share a condition name."""
+    """A label per source: its condition, numbered when both share a condition name.
+
+    Labels are shown to the reader as the guess options, so they never name a run;
+    the report's Sources line maps each label to its run.
+    """
     if len({source.condition for source in sources}) == len(sources):
         return {(s.run, s.condition): s.condition for s in sources}
-    return {(s.run, s.condition): f"{s.condition} ({Path(s.run).name})" for s in sources}
+    return {
+        (s.run, s.condition): f"{s.condition} (source {number})"
+        for number, s in enumerate(sources, start=1)
+    }
 
 
 def _stories_by_pair(source: Source) -> dict[tuple[str, int], str]:
