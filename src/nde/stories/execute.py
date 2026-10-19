@@ -356,8 +356,7 @@ def run_stories(run: StoryRun) -> None:
     In equal-budget mode, each brief and repetition's two stories are then
     matched, and the matches are recorded in the manifest's stories summary.
     """
-    stories = run.loaded.config.stories
-    spec = None if stories is None else stories.equal_budget
+    spec = run.prepared.equal_budget
     for brief in run.prepared.briefs:
         for repetition in range(run.prepared.repeat):
             jobs: dict[str, StoryJob] = {}
