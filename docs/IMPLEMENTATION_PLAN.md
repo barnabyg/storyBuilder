@@ -116,6 +116,7 @@ tests/
 This protocol applies to every gate and is designed in Phase 1.
 
 - **Splits.** About 40 briefs are split into 10 **dev** briefs, used freely during development, and 30 **test** briefs. Outputs for test briefs are generated only for gate runs and read only blind.
+  - **The test split is frozen (20 October 2026):** `brief-11` to `brief-40`, checksums in `benchmark/frozen.json`. The briefs were LLM-drafted through `configs/draft-briefs.yaml` (run `20261020T195417Z-draft-briefs-7b48ae`, 40 drafts), given a first curation pass by Claude (10 rejected, light edits) and reviewed and accepted by the owner. Drafts 2, 7, 8, 11, 20, 22, 23, 26, 28 and 37 were rejected; the rest became `brief-11` to `brief-40` in draft order. The run directory and drafts are local only (`runs/` and `benchmark/drafts/` are gitignored).
 - **Statistical power.** Each gate uses paired forced-choice preferences with a two-sided exact binomial test:
   - 30 pairs detect a **≥75% win rate** with about 80% power at α = 0.05. This is enough for a pilot gate to catch a large effect, but a null result does not rule out a moderate one.
   - About 80 pairs are needed to detect a **65% win rate**. Use this for a final decision if a 30-pair pilot is promising but not significant.

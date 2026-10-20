@@ -1,0 +1,20 @@
+id: brief-12
+split: test
+genre: domestic suspense
+premise: >-
+  During a heatwave in a crowded apartment block, a building superintendent
+  finds a tenant's parrot loose in the stairwell and hears it repeating a
+  phrase that suggests someone is trapped behind a sealed basement door. The
+  landlord insists the basement is empty and threatens to call the police if
+  the superintendent keeps investigating.
+protagonist:
+  name: Ruth Delgado
+  description: a resourceful superintendent and single parent who has spent years keeping peace among tenants by fixing problems quietly
+central_conflict: >-
+  Ruth must uncover who is in the basement and get help before the building's
+  power fails, while weighing the danger to her own family against her habit
+  of shielding the landlord from scrutiny.
+themes: [silence and complicity, neighborly responsibility, fear of retaliation]
+ending_constraint:
+  kind: ambiguous
+  detail: The trapped person must be brought into the open, but the story must leave unresolved whether Ruth's evidence will be enough to stop the landlord from retaliating.

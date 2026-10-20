@@ -1,0 +1,19 @@
+id: brief-20
+split: test
+genre: survival drama
+premise: >-
+  A spring tide floods a remote Orkney island's only causeway while a small
+  group is gathered in the schoolhouse for a community supper. The island's
+  elderly baker has gone to check her kiln and is now stranded in a low shed
+  as the water rises.
+protagonist:
+  name: Mairi Sutherland
+  description: a practical schoolteacher who knows the island's tidal paths but freezes when a decision could put someone else's life in danger
+central_conflict: >-
+  Mairi must organize a rescue with limited rope, fading daylight, and
+  neighbors who disagree about the safest route, while confronting her fear
+  that one bad call will cost a life.
+themes: [mutual aid, fear and responsibility, living with the sea]
+ending_constraint:
+  kind: happy
+  detail: Mairi must lead a successful rescue, and the group must reach dawn together with a clearer plan for future high-water emergencies.

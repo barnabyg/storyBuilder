@@ -1,0 +1,20 @@
+id: brief-25
+split: test
+genre: rural comedy
+premise: >-
+  In a small Welsh village in the early 2000s, a council clerk discovers that
+  the annual sheep-counting contest has been entered as an official census
+  activity and is due for an audit. The contest's elderly organizer insists
+  the figures are accurate, though no two volunteers agree on what counts as a
+  sheep.
+protagonist:
+  name: Bethan Price
+  description: a conscientious clerk who has just returned to her village and is trying to prove she can do more than tidy other people's paperwork
+central_conflict: >-
+  Bethan must reconcile the contest's chaotic records before the auditor
+  arrives, while the organizer resists changes that could strip the event of
+  its history and the volunteers keep finding new exceptions.
+themes: [tradition and bureaucracy, belonging after return, precision and human judgment]
+ending_constraint:
+  kind: happy
+  detail: Bethan must devise a transparent counting method that satisfies the audit and preserves the village contest as a shared event rather than a mere official statistic.

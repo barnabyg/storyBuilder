@@ -1,0 +1,19 @@
+id: brief-26
+split: test
+genre: historical mystery
+premise: >-
+  In 1893, a junior mapmaker in a crowded Calcutta print shop notices that a
+  newly commissioned city map omits a narrow lane where several residents have
+  recently vanished. The printer must deliver the plates by dawn, and the
+  map's sponsor is a powerful municipal official.
+protagonist:
+  name: Mira Sen
+  description: a precise, self-taught mapmaker who trusts measurements more than the people who pay for them
+central_conflict: >-
+  Mira must establish why the lane was erased and decide whether to risk her
+  livelihood by correcting the map before it is printed, while the official's
+  clerk pressures her to leave it untouched.
+themes: [who gets recorded, professional courage, the politics of public space]
+ending_constraint:
+  kind: bittersweet
+  detail: Mira must get the lane restored to the printed map, but the correction must cost her the job and leave the missing residents' fate unresolved.

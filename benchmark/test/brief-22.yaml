@@ -1,0 +1,19 @@
+id: brief-22
+split: test
+genre: mystery
+premise: >-
+  In a 1960s New Mexico rail town, a stationmaster finds a string of fresh
+  handwritten messages tucked into the timetable cases after the last
+  passenger train is canceled. Each message points to a different local who
+  has been quietly helping keep the station alive.
+protagonist:
+  name: Lena Ortiz
+  description: a widowed stationmaster who is proud of her orderly records and uneasy about the informal favors that sustain her town
+central_conflict: >-
+  Lena must discover who is leaving the messages before the railroad inspector
+  arrives, while deciding whether to report the unauthorized use of station
+  space or protect the people who have made it a community hub.
+themes: [community and decline, secrecy as care, the limits of official records]
+ending_constraint:
+  kind: twist
+  detail: The reveal must show that the messages were created collaboratively by the people named in them, as a practical invitation to take over the station's unused waiting room, rather than by a single secret mastermind.

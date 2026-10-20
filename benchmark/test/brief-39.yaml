@@ -1,0 +1,20 @@
+id: brief-39
+split: test
+genre: heist caper
+premise: >-
+  In present-day Marseille, three night-shift cleaners at a municipal archive
+  realize that a planned power shutdown will leave a rare collection of
+  handwritten ship manifests vulnerable to disposal during a renovation. They
+  have one night to move the boxes to a safer room without triggering the
+  building's security alarms.
+protagonist:
+  name: Samira Benali
+  description: a resourceful archive cleaner who knows the building's routines better than its administrators and is tired of being treated as invisible
+central_conflict: >-
+  Samira must organize a covert transfer with coworkers who disagree about the
+  risks, while a security guard's unexpected return forces them to choose
+  between protecting the collection and protecting their jobs.
+themes: [invisible labor, cultural stewardship, solidarity and risk]
+ending_constraint:
+  kind: bittersweet
+  detail: The manifests must be saved, but the group must pay a real professional cost for acting without permission.

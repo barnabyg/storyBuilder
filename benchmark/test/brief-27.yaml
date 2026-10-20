@@ -1,0 +1,19 @@
+id: brief-27
+split: test
+genre: gothic suspense
+premise: >-
+  In 1930s rural Wales, a young housekeeper is asked to keep a shuttered
+  hilltop hotel ready for a storm-season reopening, though no guests have
+  booked. As she airs the rooms, she finds fresh footprints leading from the
+  locked ballroom to a wall that was bricked up decades earlier.
+protagonist:
+  name: Nia Pritchard
+  description: a practical former seamstress who takes the hotel job to earn passage money and refuses to be frightened into quitting
+central_conflict: >-
+  Nia must determine who is entering the sealed part of the hotel and why the
+  owner is desperate to keep the reopening on schedule, before the approaching
+  storm cuts off the road.
+themes: [inheritance and secrecy, fear as a tool, the cost of escape]
+ending_constraint:
+  kind: ambiguous
+  detail: The ending must reveal what the owner has been concealing while leaving it uncertain whether the final sound in the sealed ballroom is human or supernatural.

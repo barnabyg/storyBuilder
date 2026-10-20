@@ -1,0 +1,20 @@
+id: brief-30
+split: test
+genre: psychological thriller
+premise: >-
+  On the last shift before a regional radio station is automated, an overnight
+  host in coastal Maine receives a caller's precise description of a minor
+  accident that happened minutes earlier on a nearby road. The caller keeps
+  phoning with new details, and the station's producer insists the broadcast
+  is a prank that could jeopardize their final transmission.
+protagonist:
+  name: Caleb Rusk
+  description: a reserved radio host who has spent years filling silence with music and fears making a public mistake
+central_conflict: >-
+  Caleb must decide whether to use the station's remaining airtime to warn
+  listeners about the caller's next prediction or obey the producer and keep
+  the broadcast on script.
+themes: [trust and evidence, public responsibility, the fear of being heard]
+ending_constraint:
+  kind: twist
+  detail: The ending must show that the caller's warnings were produced by a credible, previously established mechanism rather than supernatural foresight, and force Caleb to reconsider whom he failed to believe.

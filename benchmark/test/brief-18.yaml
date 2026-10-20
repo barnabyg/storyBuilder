@@ -1,0 +1,20 @@
+id: brief-18
+split: test
+genre: comic caper
+premise: >-
+  At a 1978 seaside amusement pier, a retiring illusionist discovers that the
+  council has scheduled his last show for the same evening it plans to
+  demolish the old theater. He recruits the theater's wary stage crew to
+  smuggle its beloved mechanical sea monster out before the wrecking crew
+  arrives.
+protagonist:
+  name: Eddie Marlow
+  description: a once-famous escape artist whose nimble hands remain useful even as his pride makes it difficult to ask for help
+central_conflict: >-
+  Eddie must coordinate an improvised extraction without revealing the plan to
+  the council inspector, while his crew questions whether saving a prop is
+  worth risking their jobs.
+themes: [aging and reinvention, collective ingenuity, what makes a place worth saving]
+ending_constraint:
+  kind: happy
+  detail: The crew must get the sea monster safely out and turn the final performance into a joyful send-off that gives the theater's workers credit for the rescue.

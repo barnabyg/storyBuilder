@@ -1,0 +1,19 @@
+id: brief-19
+split: test
+genre: historical drama
+premise: >-
+  In 1911, a young typesetter at a small New York newspaper is assigned to
+  print a correction after the paper misidentifies a garment-factory worker
+  killed in a fire. The dead woman's sister arrives with a bundle of letters
+  and insists the correction is not enough.
+protagonist:
+  name: Isaac Bell
+  description: a careful typesetter who believes accuracy is a moral duty but has learned to keep his opinions out of the newsroom
+central_conflict: >-
+  Isaac must persuade his editor to publish the sister's account and name the
+  factory's unsafe practices, risking his position while deciding how much of
+  the letters he has the right to expose.
+themes: [truth and accountability, grief in public, the power of ordinary work]
+ending_constraint:
+  kind: open
+  detail: The story must end as the presses begin running with the sister's account included, leaving uncertain whether the newspaper's act will lead to meaningful change.

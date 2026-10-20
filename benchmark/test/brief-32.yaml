@@ -1,0 +1,19 @@
+id: brief-32
+split: test
+genre: historical drama
+premise: >-
+  In 1911, the last hand-operated ferry across a Welsh estuary is due to close
+  when its cable snaps just before the morning school crossing. The ferry
+  keeper must decide whether to risk a temporary repair or send the children
+  on a long road journey that will make them miss a crucial examination.
+protagonist:
+  name: Mair Evans
+  description: a widowed ferry keeper who knows the estuary's moods by sound but has never been trusted with the repair tools
+central_conflict: >-
+  Mair must persuade the skeptical schoolmaster and a visiting engineer to let
+  her attempt a dangerous repair before the tide turns, while confronting her
+  fear that one mistake will confirm everyone's doubts about her judgment.
+themes: [competence and recognition, risk and responsibility]
+ending_constraint:
+  kind: bittersweet
+  detail: Mair must get the children safely across, but the successful crossing cannot prevent the ferry's closure.

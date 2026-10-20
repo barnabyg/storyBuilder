@@ -38,9 +38,9 @@ Brief IDs are unique across both splits.
 
 - **dev** (`benchmark/dev/`): ten briefs, used freely during development.
   Dev briefs may be edited at any time; the dev split is not frozen.
-- **test** (`benchmark/test/`): the held-out briefs. Outputs for test briefs are
-  generated only for gate runs and read only blind. The test split is frozen
-  once curated.
+- **test** (`benchmark/test/`): thirty held-out briefs. Outputs for test briefs
+  are generated only for gate runs and read only blind. The test split is
+  frozen.
 
 ## Checking briefs
 
@@ -99,8 +99,16 @@ To curate:
 3. For each draft you keep, add `id: brief-NN` (the next free number) and
    `split: dev` or `split: test`, and move it to `benchmark/<split>/<id>.yaml`.
 4. Run `uv run nde briefs check`.
-5. For the test split, run `uv run nde briefs freeze test` once all 30 briefs
-   are in, and commit the briefs and `benchmark/frozen.json` together.
+5. For the test split, commit the briefs first so the owner can review them.
+   Once all 30 are in and accepted, run `uv run nde briefs freeze test` and
+   commit `benchmark/frozen.json` on its own. Freezing last keeps review edits
+   cheap, since a frozen split cannot be refrozen over changes.
+
+The thirty test briefs (`brief-11` to `brief-40`) were drafted with
+`configs/draft-briefs.yaml` (run `20261020T195417Z-draft-briefs-7b48ae`),
+given a first curation pass by Claude and accepted by the owner. The test
+split was frozen on 20 October 2026. The plan's §4 lists which drafts were
+kept.
 
 The ten committed dev briefs were drafted by an LLM (Claude, while
 implementing this ticket) rather than through the drafting config, and are

@@ -1,0 +1,19 @@
+id: brief-34
+split: test
+genre: science fiction
+premise: >-
+  On a research station beneath the Antarctic ice, a team discovers that a
+  crack is redirecting meltwater toward their only supply shaft. The station's
+  retired glaciologist, now there as a records archivist, recognizes the
+  pattern from an old model that she once dismissed.
+protagonist:
+  name: Sora Kim
+  description: a precise, self-effacing former glaciologist who has spent years cataloguing other researchers' work instead of defending her own
+central_conflict: >-
+  Sora must convince the station chief to evacuate through a less-tested route
+  before the shaft floods, while admitting that her earlier model may have
+  failed to account for the danger now unfolding.
+themes: [intellectual humility, trust under pressure, the cost of being overlooked]
+ending_constraint:
+  kind: happy
+  detail: The team must reach safety and Sora must take part in the decision-making that follows, not merely have her prediction validated.

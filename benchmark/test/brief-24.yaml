@@ -1,0 +1,20 @@
+id: brief-24
+split: test
+genre: psychological horror
+premise: >-
+  A museum conservator in Kyoto is asked to remove a water stain from a
+  folding screen before a major exhibition opens. As she works late in the
+  empty galleries, she notices that the stain's branching edge seems to match
+  the layout of a room that no longer exists in the museum.
+protagonist:
+  name: Emi Takeda
+  description: a gifted conservator who relies on patient observation and has been avoiding the grief of her father's recent death
+central_conflict: >-
+  Emi must determine whether the apparent pattern is a product of fatigue or a
+  clue to a concealed part of the museum's history, while her supervisor
+  presses her to finish the restoration without disturbing the screen's
+  provenance.
+themes: [grief and perception, preservation versus concealment, the stories objects carry]
+ending_constraint:
+  kind: tragic
+  detail: Emi must uncover a real, preventable harm hidden in the museum's history, but her attempt to expose it must cost her the exhibition and leave her unable to complete the restoration she once saw as her life's work.

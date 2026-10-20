@@ -1,0 +1,21 @@
+id: brief-21
+split: test
+genre: speculative fiction
+premise: >-
+  In a near-future apartment block where every resident's energy use is
+  displayed on a shared lobby screen, a night janitor notices that the
+  building's newest tenant is being publicly blamed for power spikes. The
+  tenant is an exhausted home-care worker whose elderly client depends on an
+  oxygen concentrator.
+protagonist:
+  name: Niko Reyes
+  description: a night janitor with a gift for noticing small patterns who has learned to stay invisible in the building where he works
+central_conflict: >-
+  Niko investigates the power readings and must challenge the residents'
+  committee, which is preparing to evict the tenant, while deciding whether to
+  reveal that he has been quietly bypassing the building's punitive monitoring
+  system.
+themes: [privacy and surveillance, care work, the difference between evidence and blame]
+ending_constraint:
+  kind: ambiguous
+  detail: The committee must suspend the eviction after Niko presents credible evidence, but the story must leave open whether the residents will dismantle the monitoring system or simply redirect their suspicion.
