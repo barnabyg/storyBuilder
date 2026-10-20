@@ -126,7 +126,7 @@ This protocol applies to every gate and is designed in Phase 1.
   - Headers and markup are stripped.
   - Reading happens at least 48 hours after the owner last worked on the generating code.
   - If the owner's condition guesses are right in more than about 70% of pairs, the gate is flagged as possibly unblinded.
-- **LLM judge panel.** At least two model families, each judging every pair in both orders to cancel position bias. Judges are used for screening and diagnosis. Their agreement with the owner (percentage agreement and Cohen's κ) is reported at every gate. **Judges never pass a gate on their own.**
+- **LLM judge panel.** At least two model families, each judging every pair in both orders to cancel position bias. Judges are used for screening and diagnosis. Their agreement with the owner (percentage agreement and Cohen's κ) is reported at every gate. **Judges never pass a gate on their own.** After G-instr (20 October 2026) the LLM judge is not validated for structural judgement, so it is not used for screening; it is reported for diagnosis only, until a judge is validated against the owner's verdicts.
 - **Structure as its own measure** (decided after G-instr attempt 1). The owner's
   natural "which is better" judgement weighs the quality of the writing, so it can
   miss structural differences when the prose is equally good. Gates that test
@@ -254,6 +254,38 @@ pair (required); the primary metric is the share of pairs in which intact B
 scores higher. The overall preference stays as a secondary signal. Stories are
 skimmed in full, and the pre-registration is amended before reading. The same
 approach applies to later structure-focused gates (see §4).
+
+**G-instr attempt 2 (20 October 2026): not passed (judge); gate closed by the
+pre-registered fail action.** Run `20261019T200559Z-p1-instrument-2-a640ad`
+(fresh stories, seed 2410, per-brief scramble), batch `p1-instrument-2`
+(coherence as the required primary score, skim reading), judge run
+`20261019T202110Z-p1-judges-2-5ce6c5`.
+
+| Criterion | Threshold | Result |
+| --- | --- | --- |
+| Intact B scores higher on coherence (owner) | ≥ 9 of 10 | **9 of 10**, no ties (two-sided exact binomial p = 0.021): passed |
+| Judge's coherence picks agree with the owner's | ≥ 80% | **70%**: failed. Rubric-mode picks: 8 B, 0 scrambled, 2 ties |
+| Pipelines within cost caps | — | yes: $0.15 for the stories, $0.40 for the judge |
+
+- Owner mean coherence: 3.6 for B and 1.8 for B-scrambled. The owner's overall
+  preference (secondary) went to B in 9 of 10. The judge's pairwise preference
+  (secondary) went to B in 10 of 10, 90% agreement with the owner, 100%
+  position-consistent.
+- The judge never scored a scrambled story higher on coherence. Its failure
+  came from two ties on the coarse 1–5 scale, plus the one pair (brief 03) in
+  which the owner preferred the scrambled story.
+- 4 of the 20 stories were short of the length range (1,599–1,713 words), split
+  evenly between the conditions.
+- Caveats: the reader warned that the generating code changed 19 hours before
+  reading (the agent's scramble fix, not the owner's work). The pre-registration's
+  "owner confirmed attempt 2" box was not ticked, but its terms were committed
+  before reading and were the owner's own decisions.
+
+**Decision (owner, 20 October 2026):** apply the pre-registered fail action.
+The owner's blind reading, judging structure explicitly through the coherence
+score, is the validated instrument. The LLM judge is **dropped from screening**:
+it is not validated for structural judgement, and later gates report it for
+diagnosis only. G-instr is closed, and so is Phase 1.
 
 **Fail action:** if the owner cannot reliably detect gross structural damage, the stories are too short or the prose dominates. Increase the target length or restrict reading to targeted excerpts before going further. If the judges fail where the owner succeeds, drop judges from screening and budget more owner reading time.
 
@@ -405,7 +437,7 @@ Proposal Stage 7 (novel length, graph diffusion, tooling for revision) is **out 
 | Gate | Phase | Question | Default pass (confirm in pre-registration) | If it fails |
 | --- | --- | --- | --- | --- |
 | G0 (passed, 18 Oct 2026) | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
-| G-instr | P1 | Does the instrument detect known damage? | Owner ≥9/10, judges ≥80% agreement | Longer stories or excerpts; adjust the judges' role |
+| G-instr (closed, 20 Oct 2026) | P1 | Does the instrument detect known damage? | Owner ≥9/10, judges ≥80% agreement | Longer stories or excerpts; adjust the judges' role. Result: owner 9/10 on coherence (attempt 2); judge 70%, so it was dropped from screening |
 | G-schema | P2 | Is the schema expressive and practical? | Mutation catch ≥95%; correction under about 2 hours per story | Cut channels |
 | **G1** | P3 | **Do multi-channel plans help?** | C ≥21/30 against B | One diagnostic retry, then stop the diffusion track |
 | G-D | P4 | Does refinement help? | D ≥ C, controllability targets met | C becomes the reference baseline |
