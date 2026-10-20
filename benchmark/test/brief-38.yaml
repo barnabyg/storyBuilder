@@ -1,0 +1,19 @@
+id: brief-38
+split: test
+genre: psychological drama
+premise: >-
+  A week before a public hearing on a proposed dam, a retired engineer in the
+  Scottish Highlands is asked to testify about a small village cemetery that
+  would be submerged. She has signed the original survey but no longer
+  remembers whether the disputed boundary was measured in spring or winter.
+protagonist:
+  name: Helen Fraser
+  description: a retired civil engineer whose lifelong faith in accurate records is shaken by the gaps in her memory
+central_conflict: >-
+  Helen must decide whether to testify from uncertain recollection, risk
+  undermining the villagers' case, or refuse and leave the hearing to people
+  who never saw the original site.
+themes: [memory and accountability, the limits of expertise, place and loss]
+ending_constraint:
+  kind: tragic
+  detail: Helen must speak honestly at the hearing, but the decision must still allow the cemetery to be flooded.

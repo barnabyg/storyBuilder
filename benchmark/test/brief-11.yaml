@@ -1,0 +1,20 @@
+id: brief-11
+split: test
+genre: contemporary literary fiction
+premise: >-
+  On the morning a century-old neighborhood bathhouse is due to close, its
+  longtime attendant discovers that the posted auction inventory lists a tiled
+  wall mural as removable, though it is built around the names of local
+  donors. She has one day to persuade the redevelopment board to preserve it
+  without pretending the bathhouse can remain open.
+protagonist:
+  name: Mina Okafor
+  description: a meticulous, recently widowed attendant who knows the bathhouse's regulars by their rituals but rarely asks what they need
+central_conflict: >-
+  Mina must decide whether to risk her severance and credibility by organizing
+  former patrons against a board that has already promised the site to a
+  housing nonprofit.
+themes: [community memory, practical compromise, grief and routine]
+ending_constraint:
+  kind: bittersweet
+  detail: The mural must be preserved in a new public passageway, while Mina accepts that the bathhouse itself will close and makes a final round of the empty rooms.

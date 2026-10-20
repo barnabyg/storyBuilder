@@ -1,0 +1,19 @@
+id: brief-29
+split: test
+genre: survival adventure
+premise: >-
+  In 1911, a young telegraph operator at an isolated Yukon weather station
+  receives a warning that a spring ice jam is about to flood the settlement
+  below. The station's only sled dog has injured a paw, and the signal line to
+  the settlement has already gone dead.
+protagonist:
+  name: Ada McLeod
+  description: a stubborn operator and competent sled driver who is more comfortable with instruments than asking for help
+central_conflict: >-
+  Ada must get the warning to the settlement before the river breaks, but she
+  has to decide whether to risk the injured dog on the journey or attempt a
+  slower route alone.
+themes: [responsibility under pressure, human-animal trust, the value of warning]
+ending_constraint:
+  kind: tragic
+  detail: Ada must deliver the warning in time to save the settlement, but the journey must cost the dog its life.

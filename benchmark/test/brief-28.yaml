@@ -1,0 +1,19 @@
+id: brief-28
+split: test
+genre: literary fiction
+premise: >-
+  At a 1970s roadside motel in New Mexico, a night clerk finds a roll of
+  undeveloped film left in a room by a guest who has checked out without
+  paying. The motel owner wants it thrown away before a state inspector
+  arrives, but the clerk recognizes the photographed landscape as the site of
+  a planned highway extension.
+protagonist:
+  name: Opal Harte
+  description: a sharp-eyed night clerk who has spent years postponing her own move west and has learned to notice what travelers leave behind
+central_conflict: >-
+  Opal must choose whether to develop and return the film or protect the motel
+  owner, who has been quietly letting displaced families stay in vacant rooms.
+themes: [displacement, small acts of care, the stories places keep]
+ending_constraint:
+  kind: bittersweet
+  detail: Opal must help the film's owner preserve evidence of the threatened landscape, while accepting that the motel and its hidden refuge cannot remain untouched.

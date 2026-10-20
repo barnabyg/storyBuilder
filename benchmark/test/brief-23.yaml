@@ -1,0 +1,20 @@
+id: brief-23
+split: test
+genre: romantic drama
+premise: >-
+  On a rainy week in 1994, two former bandmates are hired to clear out the
+  rehearsal rooms beneath a Glasgow dance hall before the building becomes a
+  supermarket. They uncover a box of unfinished demos that neither remembers
+  agreeing to abandon.
+protagonist:
+  name: Callum Fraser
+  description: a reserved guitar repairer who left the band years ago and still measures his choices against the music he never finished
+central_conflict: >-
+  Callum wants to restore the demos with his former bandmate, who now has a
+  family and a stable life, but they must decide whether finishing the songs
+  is an act of connection or an attempt to revive an old relationship that has
+  run its course.
+themes: [memory and change, creative collaboration, love beyond possession]
+ending_constraint:
+  kind: bittersweet
+  detail: The pair must complete one demo together and part on affectionate terms, with Callum accepting that their renewed closeness need not become a romance or a reunion.

@@ -1,0 +1,19 @@
+id: brief-35
+split: test
+genre: mystery
+premise: >-
+  In a small town in 1978, the brass bell that has rung each evening from the
+  shuttered textile mill sounds again on the night the mill's demolition
+  begins. A local radio host finds a fresh footprint in the dust inside the
+  locked bell tower.
+protagonist:
+  name: Elliot Shaw
+  description: a curious late-night broadcaster who knows the town's old mill stories but prefers evidence to folklore
+central_conflict: >-
+  Elliot investigates the bell's return before the demolition crew destroys
+  the tower, navigating the mill owner's desire for silence and the former
+  workers' conflicting memories of who had access.
+themes: [collective memory, the stories communities preserve, truth and loyalty]
+ending_constraint:
+  kind: twist
+  detail: The final revelation must emerge from clues about ordinary access and motive, reframing the bell's return without relying on a secret identity or a single concealed fact.

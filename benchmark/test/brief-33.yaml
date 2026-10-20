@@ -1,0 +1,19 @@
+id: brief-33
+split: test
+genre: contemporary literary fiction
+premise: >-
+  During a week of record heat in a high-rise apartment block in Singapore,
+  the lift fails and the residents begin carrying water upstairs for an
+  elderly neighbor. A teenage delivery rider arrives with a package addressed
+  to someone who moved out years ago.
+protagonist:
+  name: Nadia Lim
+  description: a meticulous building manager who keeps the block running by quietly solving problems before residents notice them
+central_conflict: >-
+  Nadia tries to coordinate the residents' improvised relief effort while the
+  unclaimed package draws her into a dispute about who is responsible for the
+  absent tenant's belongings and the neighbor's care.
+themes: [mutual aid, the limits of responsibility, urban loneliness]
+ending_constraint:
+  kind: open
+  detail: The residents must establish a workable plan for the neighbor, while the package's destination remains unresolved.

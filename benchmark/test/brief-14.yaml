@@ -1,0 +1,20 @@
+id: brief-14
+split: test
+genre: comic crime
+premise: >-
+  A retired pickpocket working as a tour guide in Lisbon recognizes an old
+  accomplice in a museum security video, apparently lifting a tiny brass
+  compass from a crowded exhibit. The museum's director offers a reward for
+  its return, but the guide suspects the theft was staged to conceal a more
+  embarrassing mistake.
+protagonist:
+  name: Nuno Vale
+  description: a gregarious former thief who has built a respectable life by turning his practiced eye for distractions into a career telling tourists stories
+central_conflict: >-
+  Nuno must recover the compass without exposing his former accomplice, or his
+  own past, while the director presses him to produce a simple culprit before
+  the museum's donor gala.
+themes: [reinvention, loyalty, the stories institutions tell]
+ending_constraint:
+  kind: twist
+  detail: The resolution must reveal that the compass was removed to prevent a larger, plainly established mishap, with the reveal arising from clues and choices rather than a previously unknown secret.

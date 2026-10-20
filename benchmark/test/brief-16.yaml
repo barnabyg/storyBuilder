@@ -1,0 +1,20 @@
+id: brief-16
+split: test
+genre: mythic fantasy
+premise: >-
+  In a mountain village where each household keeps a bell to warn of
+  avalanches, a bell-founder is asked to recast the cracked alarm bell before
+  the first spring thaw. The only available bronze comes from a statue of the
+  village's founding judge, whose legend says the judge once condemned an
+  innocent neighbor to save the settlement.
+protagonist:
+  name: Toma Rill
+  description: a young metalworker who inherited the foundry from an aunt and distrusts the village legends that give his craft its authority
+central_conflict: >-
+  Toma must persuade the council to sacrifice its revered statue and admit the
+  founding story may be false, while the thaw advances and the cracked bell
+  cannot be trusted.
+themes: [public memory, truth and belonging, craft as responsibility]
+ending_constraint:
+  kind: bittersweet
+  detail: The recast bell must warn the village in time, while the statue's removal forces the community to live with an unresolved account of its origins.

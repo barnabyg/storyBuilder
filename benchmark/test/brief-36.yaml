@@ -1,0 +1,19 @@
+id: brief-36
+split: test
+genre: romantic comedy
+premise: >-
+  At a county fair in rural New Mexico, a sign painter is hired to restore the
+  faded lettering on the dance pavilion before Saturday night. The fair
+  committee's treasurer insists on approving every brushstroke, though she
+  once painted signs herself and still carries a sketchbook.
+protagonist:
+  name: Rosa Valdez
+  description: a quick-witted sign painter who has built a career on bold color and avoids discussing why she left her hometown
+central_conflict: >-
+  Rosa and the treasurer clash over the restoration's design and the fair's
+  shrinking budget, while their shared love of the pavilion forces them to
+  decide whether preserving it means keeping it unchanged.
+themes: [homecoming, creative compromise, second chances]
+ending_constraint:
+  kind: happy
+  detail: The pavilion must reopen with a design the two women have genuinely shaped together, and their attraction must lead to a concrete next step.

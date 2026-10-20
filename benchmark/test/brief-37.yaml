@@ -1,0 +1,19 @@
+id: brief-37
+split: test
+genre: folk horror
+premise: >-
+  In a mountain village in northern Romania, a young surveyor arrives to mark
+  a new road through an orchard whose trees have been painted with white
+  bands. The villagers say the markings are a practical boundary, but each
+  night someone moves the stakes farther uphill.
+protagonist:
+  name: Ilinca Pop
+  description: a careful municipal surveyor who grew up nearby and is determined to finish her first independent project without leaning on family connections
+central_conflict: >-
+  Ilinca must resolve whether the shifting boundary is a deliberate act of
+  resistance, a surveying error, or something the villagers believe should not
+  be disturbed before roadwork begins.
+themes: [tradition and change, land and belonging, the fear of complicity]
+ending_constraint:
+  kind: ambiguous
+  detail: The road's fate must be decided, but the final evidence should leave open whether the orchard's warning came from human action or a force beyond explanation.

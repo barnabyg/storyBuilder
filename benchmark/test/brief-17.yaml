@@ -1,0 +1,20 @@
+id: brief-17
+split: test
+genre: near-future climate fiction
+premise: >-
+  In a flood-adapted Rotterdam district, a municipal engineer is assigned to
+  test a new movable footbridge before a forecast storm, but residents have
+  tied the bridge's supports into a makeshift market that keeps their block
+  supplied. The test window is the only chance to prove the bridge works
+  before funding for the whole district is cut.
+protagonist:
+  name: Saskia Vermeer
+  description: a careful civil engineer who believes sound measurements can keep people safe, though she has never had to choose between a clean test and a functioning neighborhood
+central_conflict: >-
+  Saskia must find a way to test the bridge without stripping the market of
+  its supports, negotiating with residents who distrust another official
+  promise as the storm closes in.
+themes: [resilience and bureaucracy, shared risk, knowledge from lived experience]
+ending_constraint:
+  kind: open
+  detail: The bridge must be tested through a negotiated adaptation that protects the market for the storm, while the district's future funding decision remains pending.

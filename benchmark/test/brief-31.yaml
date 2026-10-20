@@ -1,0 +1,21 @@
+id: brief-31
+split: test
+genre: literary historical fiction
+premise: >-
+  In 1860s Kyoto, a widowed paper-maker is ordered to supply ceremonial paper
+  for a shrine festival just as a new tax threatens to close her family
+  workshop. Her apprentice proposes replacing the costly imported pulp with
+  scraps collected from a nearby theater, whose troupe is being forced to
+  disband.
+protagonist:
+  name: Fumi Arai
+  description: a skilled craftswoman who guards her workshop's reputation but knows that tradition survives only when someone adapts it
+central_conflict: >-
+  Fumi must convince shrine officials that recycled theater paper can meet the
+  ritual standard, while her apprentice argues that refusing the scraps means
+  abandoning the performers who kept the workshop alive during her husband's
+  illness.
+themes: [tradition and change, mutual dependence, craft as memory]
+ending_constraint:
+  kind: open
+  detail: The story must end with Fumi presenting the altered paper at the shrine, leaving the officials' verdict and the workshop's future unknown.

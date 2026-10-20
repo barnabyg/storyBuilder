@@ -1,0 +1,20 @@
+id: brief-13
+split: test
+genre: science fiction
+premise: >-
+  At a lunar greenhouse maintained by a small crew, botanist Leena discovers
+  that a crop of dwarf beans is flowering weeks early after a minor radiation
+  storm. The station's food schedule depends on the plants maturing on time,
+  and the crew commander wants to destroy the anomalous crop before it risks
+  contaminating the seed bank.
+protagonist:
+  name: Leena Sato
+  description: a patient plant geneticist who came to the Moon after a career of being dismissed as too cautious
+central_conflict: >-
+  Leena must determine whether the early flowering is a threat or a useful
+  adaptation before the commander's deadline, while confronting her own
+  tendency to protect her work rather than share uncertainty.
+themes: [risk and evidence, adaptation, trust under pressure]
+ending_constraint:
+  kind: open
+  detail: The crew must preserve a small, carefully isolated sample and commit to a measured test, while the long-term consequences of the plants' change remain unknown.

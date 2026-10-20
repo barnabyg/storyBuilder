@@ -1,0 +1,21 @@
+id: brief-15
+split: test
+genre: rural drama
+premise: >-
+  A drought-strained irrigation cooperative in New Mexico draws lots to decide
+  which orchard gets the last night of canal water, and the winning lot
+  belongs to a newcomer whose young trees are already failing. The
+  cooperative's oldest grower asks the canal keeper to quietly switch the
+  result so the water goes to a family that has held land there for
+  generations.
+protagonist:
+  name: Inez Baca
+  description: a practical canal keeper whose father taught her the water rules and whose own small orchard has been sold to pay medical bills
+central_conflict: >-
+  Inez must enforce the lot she witnessed or bend the rules to protect a
+  familiar family, knowing either choice will deepen distrust and may cost her
+  the community's cooperation.
+themes: [fairness under scarcity, tradition and change, the cost of neutrality]
+ending_constraint:
+  kind: tragic
+  detail: The water must reach the lot's rightful winner, but the night's irreversible loss should make clear that a correct decision cannot restore what the drought has taken.

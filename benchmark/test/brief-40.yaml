@@ -1,0 +1,19 @@
+id: brief-40
+split: test
+genre: parable
+premise: >-
+  In a desert town in Morocco, the keeper of a public fountain is told that
+  the water allotment will be cut unless the neighborhood agrees on a new
+  schedule by sunset. The families who depend on the fountain each have a
+  different reason they cannot wait their turn.
+protagonist:
+  name: Youssef El Amrani
+  description: a patient fountain keeper who believes fairness means applying the same rule to everyone, even when circumstances differ
+central_conflict: >-
+  Youssef must mediate a schedule that will keep the community supplied while
+  confronting the possibility that his idea of impartiality has concealed his
+  own unwillingness to make difficult judgments.
+themes: [fairness and compassion, scarcity, community negotiation]
+ending_constraint:
+  kind: open
+  detail: The neighbors must agree to a temporary schedule, while the story leaves unresolved whether it will remain fair once the shortage deepens.
