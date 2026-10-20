@@ -40,7 +40,17 @@ calls:
       count: "10"
       # Steer the drafts here. To avoid near-duplicates of existing briefs,
       # list their premises: "Do not reuse these premises: ...".
-      guidance: Favour concrete, specific settings and people over generic ones.
+      guidance: >-
+        Favour concrete, specific settings and people over generic ones.
+        These briefs are for the held-out test split, so do not reuse or closely
+        echo these existing premises: a lighthouse keeper whose late husband's
+        boat is to be wrecked for insurance; a generation-ship technician who
+        finds the navigation log edited; a pharmacist filling prescriptions for
+        a dead man; a Victorian mudlark who finds a sewer surveyor's notebook; a
+        farmhouse whose stopped clocks restart; rival food trucks sharing a
+        festival permit; a city where debts are paid in years of life; swapped
+        wedding speeches; sisters crossing a frozen lake to scatter ashes; a
+        teacher with dementia writing apology letters to former pupils.
     response_model: brief_drafts
     repeat: 4
 
