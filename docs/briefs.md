@@ -38,9 +38,9 @@ Brief IDs are unique across both splits.
 
 - **dev** (`benchmark/dev/`): ten briefs, used freely during development.
   Dev briefs may be edited at any time; the dev split is not frozen.
-- **test** (`benchmark/test/`): the held-out briefs. Outputs for test briefs are
-  generated only for gate runs and read only blind. The test split is frozen
-  once curated.
+- **test** (`benchmark/test/`): thirty held-out briefs. Outputs for test briefs
+  are generated only for gate runs and read only blind. The test split is
+  frozen.
 
 ## Checking briefs
 
@@ -101,6 +101,10 @@ To curate:
 4. Run `uv run nde briefs check`.
 5. For the test split, run `uv run nde briefs freeze test` once all 30 briefs
    are in, and commit the briefs and `benchmark/frozen.json` together.
+
+The thirty test briefs (`brief-11` to `brief-40`) were drafted with
+`configs/draft-briefs.yaml`, given a first curation pass by Claude and
+accepted by the owner. The test split was frozen on 20 October 2026.
 
 The ten committed dev briefs were drafted by an LLM (Claude, while
 implementing this ticket) rather than through the drafting config, and are
