@@ -47,6 +47,17 @@ def configure(evaluation: argparse.ArgumentParser) -> None:
         "--rubric-dir", type=Path, default=DEFAULT_RUBRIC_DIR, help="(./benchmark/rubric)"
     )
     build.add_argument("--rubric-version", type=int, default=1, help="rubric version (1)")
+    build.add_argument(
+        "--optional-scores",
+        action="store_true",
+        help="require only the preference and strength; rubric scores, tags and the guess "
+        "may be partial (for skim reading)",
+    )
+    build.add_argument(
+        "--primary-score",
+        metavar="DIMENSION",
+        help="a rubric dimension that is always required and leads the report, e.g. coherence",
+    )
     _batches_dir_option(build)
 
     serve = sub.add_parser("serve", help="open the blind reader on localhost")
@@ -93,7 +104,11 @@ def _build(args: argparse.Namespace) -> int:
     first, second = (batches.Source(Path(run), condition) for run, condition in sources)
     rubric = load_rubric(args.rubric_dir, args.rubric_version)
     path = batches.build_batch(
-        args.batches_dir, args.name, (first, second), rubric=rubric, seed=args.seed
+        args.batches_dir,
+        args.name,
+        (first, second),
+        scoring=batches.Scoring(rubric, optional=args.optional_scores, primary=args.primary_score),
+        seed=args.seed,
     )
     pairs = len(batches.read_view(path).pairs)
     print(f"built batch {args.name!r}: {pairs} pairs in {path}")

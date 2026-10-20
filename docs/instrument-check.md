@@ -29,7 +29,7 @@ Copy-Item .env.example .env
 
 uv run nde run configs/p1-instrument.yaml
 $run = (Get-ChildItem runs -Directory -Filter '*-p1-instrument-*' | Sort-Object Name | Select-Object -Last 1).FullName
-uv run nde eval batch p1-instrument --from $run B --from $run B-scrambled
+uv run nde eval batch p1-instrument --from $run B --from $run B-scrambled --optional-scores
 uv run nde run configs/p1-judges.yaml
 uv run nde eval serve --batch p1-instrument
 ```
@@ -56,6 +56,24 @@ already made.
 calibrate first, confirm and commit the pre-registration, and wait at least
 48 hours after you last worked on the generating code. Stop the reader with
 Ctrl+C; it resumes where it left off.
+
+## Attempt 2
+
+Attempt 1 did not pass; the plan records why. Attempt 2 uses fresh stories and
+coherence as the primary measure (the pre-registration's Attempt 2 section):
+
+```powershell
+uv run nde run configs/p1-instrument-2.yaml
+$run = (Get-ChildItem runs -Directory -Filter '*-p1-instrument-2-*' | Sort-Object Name | Select-Object -Last 1).FullName
+uv run nde eval batch p1-instrument-2 --from $run B --from $run B-scrambled --optional-scores --primary-score coherence
+uv run nde run configs/p1-judges-2.yaml
+uv run nde eval serve --batch p1-instrument-2
+```
+
+In each pair, score coherence for both stories and give your preference; the
+rest is optional. Then close the batch and run
+`uv run nde eval report p1-instrument-2`. The report leads with the coherence
+picks.
 
 ## After reading
 

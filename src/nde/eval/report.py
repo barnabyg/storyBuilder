@@ -24,7 +24,7 @@ from nde.eval.calibration import render_calibration_report
 from nde.eval.judge_report import PairLabels, judges_section
 from nde.eval.judges import read_records
 from nde.eval.rubric import Rubric
-from nde.eval.sections import BOOTSTRAP_SEED, mean_ci, warnings_section
+from nde.eval.sections import BOOTSTRAP_SEED, TIE, mean_ci, pick, warnings_section
 from nde.eval.stats import binomial_two_sided
 from nde.files import write_text_lf
 
@@ -56,6 +56,36 @@ class _Revealed:
 
 def _table(names: list[str], first: str) -> list[str]:
     return [f"| {first} | {' | '.join(names)} |", f"| --- |{' --- |' * len(names)}"]
+
+
+def _owner_pick(judgement: Judgement, a: str, b: str, primary: str | None) -> str | None:
+    """The condition whose story the owner scored higher on the primary dimension."""
+    if primary is None or judgement.a is None or judgement.b is None:
+        return None
+    return pick(a, b, judgement.a.scores.get(primary), judgement.b.scores.get(primary))
+
+
+def _primary_section(revealed: _Revealed, primary: str) -> list[str]:
+    """The gate's primary measure: in each pair, which story scored higher on `primary`."""
+    picks = [_owner_pick(j, a, b, primary) for _, j, a, b in revealed.numbered()]
+    counts = {name: picks.count(name) for name in [*revealed.names, TIE]}
+    total = len(picks)
+    first = revealed.names[0]
+    p_value = binomial_two_sided(counts[first], total)
+    return [
+        f"## Primary measure: {primary}",
+        "",
+        f"For each pair, the condition whose story the owner scored higher on {primary}; "
+        "equal scores are a tie. This leads the report because the gate is decided on it.",
+        "",
+        "| Pick | Pairs |",
+        "| --- | --- |",
+        *(f"| {name} | {counts[name]} |" for name in [*revealed.names, TIE]),
+        "",
+        f"Two-sided exact binomial test against no difference (p = 0.5), ties counting "
+        f"against {first}: p = {p_value:.4g} ({counts[first]} of {total} pairs for {first}).",
+        "",
+    ]
 
 
 def _preferences(revealed: _Revealed) -> list[str]:
@@ -187,10 +217,17 @@ def render_report(batch: Path) -> str:
         f"- **Pairs:** {len(key.pairs)}",
         f"- **Sources:** {sources}",
         f"- **Rubric:** {f'v{key.rubric_version}' if key.rubric_version else 'none'}",
+        "- **Marks:** preference and strength required; rubric scores, tags and the guess "
+        "optional, so the secondary sections summarise only what was given"
+        if revealed.view.optional_scores
+        else "- **Marks:** all required",
         f"- **Closed:** {closed.closed_at if closed else '-'}",
         "",
     ]
     lines += warnings_section(batch)
+    primary = revealed.view.primary_dimension
+    if primary is not None:
+        lines += _primary_section(revealed, primary)
     lines += _preferences(revealed)
     rubric = revealed.view.rubric
     if rubric is not None:
@@ -199,10 +236,15 @@ def render_report(batch: Path) -> str:
     if any(judgement.guess is not None for judgement in revealed.judgements.values()):
         lines += _guess_section(revealed)
     pairs = [
-        PairLabels(a=a, b=b, owner=a if judgement.preferred == "A" else b)
+        PairLabels(
+            a=a,
+            b=b,
+            owner=a if judgement.preferred == "A" else b,
+            owner_primary=_owner_pick(judgement, a, b, primary),
+        )
         for _, judgement, a, b in revealed.numbered()
     ]
-    lines += judges_section(read_records(batch), pairs, revealed.names, rubric)
+    lines += judges_section(read_records(batch), pairs, revealed.names, rubric, primary)
     lines += _pairs_section(revealed)
     return "\n".join(lines)
 

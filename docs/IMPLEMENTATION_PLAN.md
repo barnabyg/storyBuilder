@@ -127,6 +127,11 @@ This protocol applies to every gate and is designed in Phase 1.
   - Reading happens at least 48 hours after the owner last worked on the generating code.
   - If the owner's condition guesses are right in more than about 70% of pairs, the gate is flagged as possibly unblinded.
 - **LLM judge panel.** At least two model families, each judging every pair in both orders to cancel position bias. Judges are used for screening and diagnosis. Their agreement with the owner (percentage agreement and Cohen's κ) is reported at every gate. **Judges never pass a gate on their own.**
+- **Structure as its own measure** (decided after G-instr attempt 1). The owner's
+  natural "which is better" judgement weighs the quality of the writing, so it can
+  miss structural differences when the prose is equally good. Gates that test
+  structure therefore make a required structural score (the rubric's coherence)
+  the primary metric, with the overall preference as a secondary signal.
 - **Pre-registration.** Before each gate run, `benchmark/prereg/<gate>.md` is committed with the hypothesis, primary metric, n, pass threshold and fail action. Thresholds suggested in this plan are defaults to confirm at that point.
 - **Scope of claims.** Gate results describe the owner's taste. That is acceptable for research-first internal decisions. A small external panel is a prerequisite for any public claim.
 
@@ -217,6 +222,38 @@ waived explicitly in the judge config (`judges.min_families: 1`,
 report flags the waiver. In G-instr both conditions share the planner and
 prose models, so self-preference cannot favour either one; revisit the
 panel before Phase 3, where conditions differ in their planners.
+
+**G-instr attempt 1 (19 October 2026): not passed.** Run
+`20261019T160211Z-p1-instrument-5222de` (10 B and 10 B-scrambled stories on the
+dev briefs), batch `p1-instrument`, read from a skim with optional rubric marks
+(pre-registered amendment).
+
+| Criterion | Threshold | Result |
+| --- | --- | --- |
+| Owner prefers intact B | ≥ 9 of 10 | 7 of 10 (two-sided exact binomial p = 0.34) |
+| Judge agrees with the owner | ≥ 80% | 70%; the judge (`gpt-6.1-sol`) preferred B in 10 of 10, 100% position-consistent |
+| Pipelines within cost caps | — | yes: $0.57 in total, every run within its cap |
+
+- Not flagged possibly unblinded: no condition guesses were given. The reader
+  warned that the generating code changed 7 hours before reading; the change
+  was the agent's, not the owner's.
+- 7 of the 20 stories were short of the ±10% length range (1,560–1,786 words),
+  split evenly between the conditions.
+- **Diagnosis:** the owner saw the strange sequences while skimming but judged
+  "which is better" by the quality of the writing, as they normally would: the
+  prose dominated, as the fail action anticipates. The judge's perfect detection
+  shows the damage is in the text. Because the prose model rewrites every scene
+  for the shuffled plan, a scrambled story reads as an odd but fluent story
+  rather than an obviously broken one.
+- **Flaw found:** every brief used the same scene permutation, because the
+  shuffle seed did not include the brief. Fixed before attempt 2.
+
+**Decision (owner, 19 October 2026):** rerun G-instr (attempt 2) with structure
+as its own measure. The owner scores **coherence** for both stories in every
+pair (required); the primary metric is the share of pairs in which intact B
+scores higher. The overall preference stays as a secondary signal. Stories are
+skimmed in full, and the pre-registration is amended before reading. The same
+approach applies to later structure-focused gates (see §4).
 
 **Fail action:** if the owner cannot reliably detect gross structural damage, the stories are too short or the prose dominates. Increase the target length or restrict reading to targeted excerpts before going further. If the judges fail where the owner succeeds, drop judges from screening and budget more owner reading time.
 

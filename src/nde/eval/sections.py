@@ -24,3 +24,15 @@ def warnings_section(batch: Path) -> list[str]:
     if not warnings:
         return []
     return ["## Warnings", "", *(f"- {w.at}: {w.warning}" for w in warnings), ""]
+
+
+TIE = "tie"
+
+
+def pick(a: str, b: str, score_a: int | None, score_b: int | None) -> str | None:
+    """The condition whose story scored higher, TIE when equal, None when a score is missing."""
+    if score_a is None or score_b is None:
+        return None
+    if score_a == score_b:
+        return TIE
+    return a if score_a > score_b else b

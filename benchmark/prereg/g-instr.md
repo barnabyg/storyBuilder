@@ -72,7 +72,8 @@ against no preference.
 3. Generate (`configs/p1-instrument.yaml`), build the batch, and run the judge
    panel (`configs/p1-judges.yaml`), as in `docs/instrument-check.md`.
 4. Wait at least 48 hours after last working on the generating code, then read
-   all 10 pairs blind in the reader and close the batch.
+   all 10 pairs blind in the reader (skimming is allowed; see Amendments) and
+   close the batch.
 5. Run `uv run nde eval report p1-instrument` and record the result in the
    plan.
 
@@ -90,3 +91,58 @@ in more than 70% of pairs), record that with the result.
   gates.
 - **If a pipeline exceeded its cost cap:** fix the cost estimate or the cap and
   rerun the generation; the cache makes completed calls free.
+
+## Amendments
+
+Made before any pair of `p1-instrument` was read.
+
+- **19 October 2026, reading mode.** The owner judges each pair from a skim.
+  Only the preference and its strength are required. Rubric scores, failure
+  tags and the condition guess are optional and may be partial: the batch is
+  built with `nde eval batch --optional-scores`. The pass thresholds are
+  unchanged, because they use only the preference and the judge. The secondary
+  metrics summarise only the marks given, so guess accuracy, and with it the
+  "possibly unblinded" flag, may rest on few pairs or none. The batch built
+  before this amendment had not been read; it was replaced, and the judge was
+  re-run on the new batch.
+
+## Attempt 2
+
+Attempt 1 did not pass (7 of 10; see the Phase 1 section of the plan). The
+owner saw the scrambled sequences but judged "which is better" by the quality
+of the writing. Per the owner's decision of 19 October 2026, attempt 2 measures
+structure on its own. Everything below was committed before any attempt 2 pair
+was read, and it overrides the sections above where they differ.
+
+- [ ] Owner confirmed attempt 2 (tick and commit before reading)
+
+**Stories.** Fresh B and B-scrambled stories on the same 10 dev briefs from
+`configs/p1-instrument-2.yaml` (seed 2410), with the B-scrambled permutation
+seeded per brief (attempt 1 used one order for every brief). The batch is
+`p1-instrument-2`, built with `--optional-scores --primary-score coherence`.
+The judge is `configs/p1-judges-2.yaml`: the same model and settings as
+attempt 1, on the new batch.
+
+**Reading.** The owner skims each story in full. In every pair the owner gives
+a coherence score (1–5) for both stories (required) and the overall
+preference with its strength (required). All other marks are optional.
+
+**Primary metric.** The pairs in which intact B has the higher coherence score.
+A tie counts as not detected.
+
+**Pass thresholds.** The gate passes only if all three hold:
+
+1. Intact B scores higher on coherence than B-scrambled in **at least 9 of
+   10** pairs (two-sided exact binomial p ≈ 0.021 at 9).
+2. The judge's coherence picks (from its rubric-mode scores, ties included)
+   agree with the owner's in **at least 80%** of the pairs.
+3. The pipelines ran within their cost caps.
+
+**Secondary.** The owner's overall preference, the judge's pairwise
+preference and position consistency, and any optional marks given.
+
+**Fail actions.** If the owner still cannot separate intact from scrambled
+stories on coherence (fewer than 9 of 10), restrict reading to targeted
+excerpts (the first paragraph of each scene and the ending) or increase the
+target length, then rerun. If the judge fails where the owner succeeds, drop
+the judge from screening.

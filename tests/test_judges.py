@@ -8,7 +8,15 @@ from nde.cli import main
 from nde.eval.judge_report import PairLabels, judges_section
 from nde.eval.judges import JudgeRecord
 from tests.conftest import base_config, write_config
-from tests.eval_helpers import Marks, build_batch, complete_form, reader, seeded_story, two_runs
+from tests.eval_helpers import (
+    Marks,
+    build_batch,
+    complete_form,
+    owner_reads_coherence,
+    reader,
+    seeded_story,
+    two_runs,
+)
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
 from tests.stories import last_user_message, run
 
@@ -20,7 +28,11 @@ def _judge_reply(body: Json) -> Reply:
     """A biased judge always prefers story 1; a fair judge always prefers the intact story."""
     prompt = last_user_message(body)
     if "Score this short story" in prompt:
-        return completion(json.dumps({**dict.fromkeys(_DIMENSIONS, 3), "failure_tags": []}))
+        scores = dict.fromkeys(_DIMENSIONS, 3)
+        if body["model"] == "fair-judge":
+            # The fair judge scores coherence by the story: 4 for intact, 2 for control.
+            scores["coherence"] = 4 if INTACT_MARKER in prompt else 2
+        return completion(json.dumps({**scores, "failure_tags": []}))
     if "Story 1:" in prompt:
         first = prompt.split("Story 1:", 1)[1].split("Story 2:", 1)[0]
         preferred = 1 if body["model"] == "biased-judge" or INTACT_MARKER in first else 2
@@ -352,3 +364,31 @@ def test_by_default_the_family_rules_hold(
     assert code == 2
     assert "judges must come from other families" in capsys.readouterr().err
     assert batch.exists()
+
+
+def test_the_report_compares_judges_with_the_owner_on_the_primary_score(
+    fake_llm: FakeOpenAI, batch: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    key = json.loads((batch / "sealed" / "key.json").read_text(encoding="utf-8"))
+    runs = {source["condition"]: source["run"] for source in key["sources"]}
+    primary = build_batch(
+        tmp_path,
+        (Path(runs["intact"]), Path(runs["control"])),
+        "prim",
+        "--optional-scores",
+        "--primary-score",
+        "coherence",
+    )
+    config = judge_config(fake_llm.base_url, tmp_path)
+    config["judges"]["batch"] = "prim"
+    run(tmp_path, config)
+    owner_reads_coherence(primary, ["intact", "intact", "intact", "control"])
+    capsys.readouterr()
+
+    assert main(["eval", "report", "prim", "--batches-dir", str(tmp_path / "batches")]) == 0
+
+    report = capsys.readouterr().out
+    section = report.split("### Judges on the primary measure", 1)[1].split("\n#", 1)[0]
+    # The fair judge picks intact every time (3 of 4 agree); the biased judge scores ties.
+    assert "| family-two | fake/fair-judge | 4 | 0 | 0 | 75% |" in section
+    assert "| family-one | fake/biased-judge | 0 | 0 | 4 | 0% |" in section

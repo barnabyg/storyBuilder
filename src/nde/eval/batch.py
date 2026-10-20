@@ -22,7 +22,7 @@ are read and reported with preferences only.
 import random
 import re
 import secrets
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -81,6 +81,20 @@ class View(_Record):
     rubric: Rubric | None = None
     # The conditions offered for "which condition was A?", sorted by name.
     guess_options: list[str] = Field(default_factory=list[str])
+    # When true, only the preference and strength are required: rubric scores, tags
+    # and the guess may be left out or given in part (for skim reading).
+    optional_scores: bool = False
+    # A rubric dimension that is always required and that the report leads with: the
+    # gate's primary measure (e.g. coherence for structure-focused gates).
+    primary_dimension: str | None = None
+
+    def required_dimensions(self) -> frozenset[str]:
+        """The rubric dimensions a judgement must score for both stories."""
+        if self.rubric is None:
+            return frozenset()
+        if not self.optional_scores:
+            return frozenset(self.rubric.dimension_ids)
+        return frozenset({self.primary_dimension} if self.primary_dimension else ())
 
     @property
     def size(self) -> int:
@@ -165,6 +179,17 @@ class Closed(_Record):
 
 
 @dataclass(frozen=True)
+class Scoring:
+    """What a pair batch asks for beyond the preference: the rubric, and whether it is optional."""
+
+    rubric: Rubric | None
+    # True: rubric scores, tags and the guess may be left out or partial (skim reading).
+    optional: bool = False
+    # A rubric dimension that stays required and leads the report (the primary measure).
+    primary: str | None = None
+
+
+@dataclass(frozen=True)
 class Source:
     run_dir: Path
     condition: str
@@ -220,13 +245,17 @@ def build_batch(
     name: str,
     sources: tuple[Source, Source],
     *,
-    rubric: Rubric | None,
+    scoring: Scoring,
     seed: int | None = None,
 ) -> Path:
     """Pair two conditions' stories by brief and repetition, shuffle, and seal the key."""
     batch_dir = batches_dir / name
     if batch_dir.exists():
         raise BatchError(f"batch {name!r} already exists at {batch_dir}")
+    if scoring.primary is not None and (
+        scoring.rubric is None or scoring.primary not in scoring.rubric.dimension_ids
+    ):
+        raise BatchError(f"primary score {scoring.primary!r} is not a rubric dimension")
     first, second = sources
     if (first.run_dir.resolve(), first.condition) == (second.run_dir.resolve(), second.condition):
         raise BatchError("a batch compares two different conditions")
@@ -253,15 +282,17 @@ def build_batch(
         shown.append(ShownPair(a=_text(sides[0]), b=_text(sides[1])))
     view = View(
         pairs=shown,
-        rubric=rubric,
-        guess_options=sorted(labels(origins).values()) if rubric is not None else [],
+        rubric=scoring.rubric,
+        guess_options=sorted(labels(origins).values()) if scoring.rubric is not None else [],
+        optional_scores=scoring.optional,
+        primary_dimension=scoring.primary,
     )
     key = Key(
         created_at=datetime.now(UTC).isoformat(),
         seed=seed,
         sources=origins,
         pairs=sealed,
-        rubric_version=None if rubric is None else rubric.version,
+        rubric_version=None if scoring.rubric is None else scoring.rubric.version,
         generators=_generators(sources),
     )
     write_batch(batch_dir, view, key)
@@ -335,13 +366,21 @@ def _one(fields: Mapping[str, Sequence[str]], name: str) -> str | None:
 
 
 def _scores(
-    fields: Mapping[str, Sequence[str]], rubric: Rubric, side: str, problems: list[str]
+    fields: Mapping[str, Sequence[str]],
+    rubric: Rubric,
+    side: str,
+    problems: list[str],
+    *,
+    required: Collection[str] | None = None,
 ) -> StoryScores:
+    """One story's marks; `required` names the dimensions that must be scored (all if None)."""
     scores: dict[str, int] = {}
     scale = rubric.scale
     for dimension in rubric.dimension_ids:
         name = f"score-{side}-{dimension}"
         value = _one(fields, name)
+        if value is None and required is not None and dimension not in required:
+            continue
         if value is None or not value.isdigit() or not scale.min <= int(value) <= scale.max:
             problems.append(f"{name}: give a score from {scale.min} to {scale.max}")
         else:
@@ -377,11 +416,15 @@ def parse_judgement(view: View, pair: int, fields: Mapping[str, Sequence[str]]) 
         at=datetime.now(UTC).isoformat(),
     )
     if view.rubric is not None:
+        required = view.required_dimensions()
         judgement.guess = _one(fields, "guess")
-        if judgement.guess not in view.guess_options:
+        guess_required = not view.optional_scores
+        if judgement.guess not in view.guess_options and (
+            guess_required or judgement.guess is not None
+        ):
             problems.append(f"guess: choose one of {', '.join(view.guess_options)}")
-        judgement.a = _scores(fields, view.rubric, "a", problems)
-        judgement.b = _scores(fields, view.rubric, "b", problems)
+        judgement.a = _scores(fields, view.rubric, "a", problems, required=required)
+        judgement.b = _scores(fields, view.rubric, "b", problems, required=required)
     if problems:
         raise InvalidJudgementError(problems)
     return judgement

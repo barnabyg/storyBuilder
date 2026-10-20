@@ -1,0 +1,52 @@
+# Gate G-instr attempt 2, LLM judge over the p1-instrument-2 batch (docs/evaluation.md).
+#
+#   uv run nde run configs/p1-judges-2.yaml
+#
+# The owner's choice (19 October 2026): one judge, OpenAI gpt-6.1-sol at medium
+# reasoning effort. Only OpenAI and DeepSeek APIs are available, and the batch's
+# stories come from both families (planner gpt-6-luna, prose deepseek-flash), so
+# the plan's family rules are waived explicitly below. Every report on the batch
+# flags that this judge shares the planner's family (self-preference is not
+# controlled).
+#
+# Needs OPENAI_API_KEY in the environment or in `.env`.
+# CHECK BEFORE RUNNING: the model ID and price against OpenAI's current lists.
+name: p1-judges-2
+seed: 2320
+prompts_dir: ../prompts
+
+providers:
+  openai:
+    base_url: https://api.openai.com/v1
+    base_url_env: NDE_OPENAI_BASE_URL
+    api_key_env: OPENAI_API_KEY  # pragma: allowlist secret - a variable name, not a key
+    json_schema: true           # response_format: json_schema
+    timeout_s: 300
+
+judges:
+  batch: p1-instrument-2
+  batches_dir: ../batches
+  modes: [pairwise, rubric]
+  min_families: 1                 # waived: a one-judge panel
+  allow_generator_families: true  # waived: shares the planner's family (openai)
+  panel:
+    - provider: openai
+      model: gpt-6.1-sol
+      family: openai
+      # A reasoning model: Chat Completions takes max_completion_tokens, which
+      # also bounds the reasoning tokens and so each call's cost reservation.
+      params: {reasoning_effort: medium, max_completion_tokens: 8000}
+
+structured:
+  max_repairs: 2
+
+prices:
+  # Secondary listings citing OpenAI's price page (checked 2026-10-19): $2 input,
+  # $10 output per million tokens; reasoning tokens bill as output.
+  openai/gpt-6.1-sol: {input_per_mtok: 2.00, output_per_mtok: 10.00}
+
+budget:
+  # 10 pairs x (2 orders + 2 stories) = 40 calls. Each reserves at most about
+  # $0.09 (8,000 output tokens plus the stories); actual spend is likely $1-2.
+  per_run_usd: 5.00
+  per_day_usd: 10.00
