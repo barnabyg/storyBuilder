@@ -103,8 +103,10 @@ To curate:
    are in, and commit the briefs and `benchmark/frozen.json` together.
 
 The thirty test briefs (`brief-11` to `brief-40`) were drafted with
-`configs/draft-briefs.yaml`, given a first curation pass by Claude and
-accepted by the owner. The test split was frozen on 20 October 2026.
+`configs/draft-briefs.yaml` (run `20261020T195417Z-draft-briefs-7b48ae`),
+given a first curation pass by Claude and accepted by the owner. The test
+split was frozen on 20 October 2026. The plan's §4 lists which drafts were
+kept.
 
 The ten committed dev briefs were drafted by an LLM (Claude, while
 implementing this ticket) rather than through the drafting config, and are
