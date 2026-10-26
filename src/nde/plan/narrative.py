@@ -38,7 +38,7 @@ def planning_templates(params: NarrativePlanningParams) -> list[TemplateNeed]:
     ]
 
 
-def _generated_errors(plan: NarrativePlan, ctx: StoryContext) -> list[str]:
+def generated_errors(plan: NarrativePlan, ctx: StoryContext) -> list[str]:
     errors = [
         f"{d.code} [{d.location}]: {d.message}"
         for d in validate_plan(plan).diagnostics
@@ -59,7 +59,7 @@ def _generated_errors(plan: NarrativePlan, ctx: StoryContext) -> list[str]:
     return errors
 
 
-def _request[T: BaseModel](
+def request_plan[T: BaseModel](
     ctx: StoryContext,
     step: Step,
     model: type[T],
@@ -67,7 +67,7 @@ def _request[T: BaseModel](
 ) -> T:
     template = ctx.templates[step.prompt.label]
     messages = template.render(step.variables)
-    binding = ctx.roles["planner"]
+    binding = ctx.roles[step.role]
     response_format = structured.response_format(model)
     if not ctx.gateway.supports_json_schema(binding):
         messages = structured.with_schema_instruction(messages, model)
@@ -114,11 +114,7 @@ def _request[T: BaseModel](
             metrics.record(attempts=attempts, valid=valid)
 
 
-# Shared bounded schema/semantic request boundary for masked revision operators.
-request_plan = _request
-
-
-def _stable_errors(previous: NarrativePlan, current: NarrativePlan, scene_id: str) -> list[str]:
+def stable_errors(previous: NarrativePlan, current: NarrativePlan, scene_id: str) -> list[str]:
     errors: list[str] = []
     for name in ("id", "tier", "title", "characters", "sources", "constraints", "arcs"):
         if getattr(previous, name) != getattr(current, name):
@@ -164,14 +160,14 @@ def generate_plan(ctx: StoryContext, params: NarrativePlanningParams) -> Narrati
     def check_skeleton(plan: NarrativePlan) -> list[str]:
         # Caller requirements are authoritative, including when the provider omits them.
         plan.constraints = constraints
-        errors = _generated_errors(plan, ctx)
+        errors = generated_errors(plan, ctx)
         if not plan.arcs:
             errors.append("skeleton_arc: include the whole-story character arc")
         # Natural-language ending requirements are literary checks, never inferred hard facts.
         return errors
 
     try:
-        selected = _request(
+        selected = request_plan(
             ctx,
             Step(
                 "skeleton",
@@ -188,7 +184,7 @@ def generate_plan(ctx: StoryContext, params: NarrativePlanningParams) -> Narrati
         ctx.keep("skeleton.json", selected.model_dump_json(indent=2) + "\n")
         for scene in selected.scenes:
             previous = selected
-            selected = _request(
+            selected = request_plan(
                 ctx,
                 Step(
                     f"channels-{scene.id}",
@@ -202,7 +198,7 @@ def generate_plan(ctx: StoryContext, params: NarrativePlanningParams) -> Narrati
                 ),
                 NarrativePlan,
                 lambda plan, previous=previous, scene_id=scene.id: (
-                    _generated_errors(plan, ctx) + _stable_errors(previous, plan, scene_id)
+                    generated_errors(plan, ctx) + stable_errors(previous, plan, scene_id)
                 ),
             )
         _keep_plan(ctx, selected)
