@@ -3,24 +3,23 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, cast
 from urllib.parse import urlparse
 
 from pydantic import Field, model_validator
 
 from nde import briefs, g1_report
 from nde.annotations.records import digest
+from nde.cd_comparison import selected_c_problems
 from nde.eval import g1
 from nde.eval.batch import BatchError, read_key
 from nde.eval.readiness import GateCohort, Record
 from nde.files import write_text_lf
 from nde.gitinfo import git
-from nde.llm.config import ModelBinding
 from nde.narrative.workflow import schema_json
 from nde.runs.config import ConfigError, LoadedConfig, load_config
 from nde.runs.prompts import PromptTemplate
 from nde.runs.records import read_manifest
-from nde.stories.baseline_c import BaselineC, BaselineCParams
 from nde.stories.execute import prepare_stories
 from nde.tiers import load_selection
 
@@ -125,7 +124,10 @@ def g1_evidence(protocol: GDProtocol, inputs: GDInputs) -> dict[str, Any]:
     """Recompute the closed gate; a supplied passed JSON blob is insufficient."""
     if g1.file_checksum(inputs.g1_decision) != protocol.g1_decision_sha256:
         raise ValueError("G1 decision identity differs from registration")
-    saved = json.loads(inputs.g1_decision.read_text(encoding="utf-8"))
+    raw = json.loads(inputs.g1_decision.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("G1 decision must be a structured result record")
+    saved = cast(dict[str, Any], raw)
     if saved.get("id") != digest(
         json.dumps({k: v for k, v in saved.items() if k != "id"}, sort_keys=True)
     ):
@@ -183,26 +185,9 @@ def _identities(protocol: GDProtocol, inputs: GDInputs, loaded: LoadedConfig) ->
     prepare_stories(loaded, templates)
     if {label: template.sha256 for label, template in templates.items()} != protocol.prompt_sha256:
         raise ValueError("prompt identities differ from registration")
-    stories = loaded.config.stories
-    if stories is None:
-        raise ValueError("G-D requires stories")
-    current = next(item for item in stories.conditions if item.name == "C")
-    old = selected.config["stories"]["conditions"]
-    original = next(item for item in old if item["pipeline"] == "baseline_c")
-    selected_params = BaselineCParams.model_validate(
-        original.get("params", {}) | {"tier": selected.tier}
-    )
-    if BaselineCParams.model_validate(current.params) != selected_params:
-        raise ValueError("selected C planner parameters changed")
-    for role in ("planner", "prose"):
-        if ModelBinding.model_validate(selected.config["roles"][role]) != loaded.config.roles[role]:
-            raise ValueError(f"selected C {role} model settings changed")
-    if any(
-        protocol.prompt_sha256.get(need.prompt.label)
-        != selected.prompt_sha256.get(need.prompt.label)
-        for need in BaselineC(selected_params).templates()
-    ):
-        raise ValueError("selected C prompt contents changed")
+    problems = selected_c_problems(selected, inputs.config)
+    if problems:
+        raise ValueError("selected C baseline is stale or incomplete: " + "; ".join(problems))
 
 
 def _configuration(protocol: GDProtocol, loaded: LoadedConfig) -> None:

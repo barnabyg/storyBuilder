@@ -141,7 +141,9 @@ def prepare_gd(
     ], config_path
 
 
-def gd_batch(common: list[str], tmp_path: Path) -> tuple[Path, Path, Path]:
+def gd_batch(
+    common: list[str], tmp_path: Path, target_kind: str = "unchanged"
+) -> tuple[Path, Path, Path]:
     runs, batches = tmp_path / "gd-runs", tmp_path / "gd-batches"
     assert (
         main(
@@ -172,7 +174,7 @@ def gd_batch(common: list[str], tmp_path: Path) -> tuple[Path, Path, Path]:
                     "locks": ["scenes/scene-0"],
                     "instruction": "Preserve the locked opening",
                 },
-                "targets": [{"id": "preserve", "kind": "unchanged", "selector": "scenes/scene-0"}],
+                "targets": [{"id": "preserve", "kind": target_kind, "selector": "scenes/scene-0"}],
             }
         )
     )

@@ -37,7 +37,7 @@ FOLLOW_UP = (
 )
 
 
-def _validate_scores(view: View, judgements: dict[int, Judgement]) -> list[str]:
+def validate_required_scores(view: View, judgements: dict[int, Judgement]) -> list[str]:
     problems: list[str] = []
     if set(judgements) != set(range(1, view.size + 1)):
         problems.append("required owner judgements are missing or include extra pair identities")
@@ -77,7 +77,7 @@ def _marks(key: Key, judgements: dict[int, Judgement]) -> list[tuple[StoryScores
     return rows
 
 
-def _caveats(
+def reading_caveats(
     batch: Path, judgements: dict[int, Judgement], owner_work: datetime | None
 ) -> list[str]:
     caveats = [warning.warning for warning in read_warnings(batch)]
@@ -180,7 +180,7 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
     view, key = read_view(batch), read_key(batch)
     judgements = read_judgements(batch)
     problems = binding_problems(batch, binding)
-    problems += _validate_scores(view, judgements)
+    problems += validate_required_scores(view, judgements)
     expected = {(brief, 0) for brief in protocol.cohort.brief_checksums}
     problems += _cohort_problems(expected, binding.readiness, view, key)
     closed = read_closed(batch)
@@ -264,7 +264,7 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
         "costs": costs,
         "realisation": _realisation_reports(binding, packets),
         "judges": "diagnostic only; see the ordinary closed-batch report for available agreement",
-        "reading_caveats": _caveats(batch, judgements, binding.owner_code_work_at),
+        "reading_caveats": reading_caveats(batch, judgements, binding.owner_code_work_at),
         "follow_up": FOLLOW_UP,
         "judgements_sha256": digest(
             json.dumps(

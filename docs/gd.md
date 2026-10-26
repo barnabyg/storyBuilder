@@ -45,3 +45,27 @@ plans, critics or ledgers. G-D condition-guess options use opaque labels.
 The 48-hour delay, prior benchmark exposure and blinding limitations must still
 be interpreted in the scientific report. Implementation fixtures are not owner
 evaluation and do not establish G1 or G-D scientific outcomes.
+
+## Closed decision
+
+`nde gd-report BATCH --out NEW_FOLDER [--realisation PACKET]` recomputes the
+registered prerequisites, sealed cohort, required scores and control reports.
+It writes deterministic `decision.json`, Markdown and HTML. The output folder
+must be new: previous scientific records are never overwritten. Open batches
+and missing or inconsistent evidence produce a pending result; the report
+does not open a sealed key before closure.
+
+Coherence, originality and every registered control predicate must pass.
+Overall preference is secondary. The report retains the exact final story and
+plan identities, experimental tokens, list-price cost, new spend, planning and
+revision provenance, owner realisation evidence where supplied, and diagnostic
+critic/judge separation. It records prior benchmark exposure, reading delay
+limitations, missing guesses and condition-guess accuracy as blinding caveats.
+
+Only a complete actual scientific pass creates `reference-baseline.json` naming
+D. A complete actual failure retains C. That record binds configuration, tier,
+schema, prompts, models and planning artifact provenance. Synthetic fixture
+outcomes can show that registered criteria passed or failed, but their
+scientific outcome remains pending and they never create a reference record.
+G-D failure alone does not block Phase 6 when its independent G1/G2 prerequisites
+hold; reporting never launches another experiment.

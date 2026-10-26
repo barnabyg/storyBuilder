@@ -5,6 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from pydantic import Field
+
 from nde.controllability import replay_report
 from nde.eval.batch import BatchError, Scoring, Source, is_closed, read_key, read_view
 from nde.eval.g1 import file_checksum
@@ -54,6 +56,9 @@ class GDBinding(Record):
     view_sha256: str
     key_sha256: str
     artifact_checksums: dict[str, str]
+    guess_conditions: dict[str, Literal["D", "C"]] = Field(
+        default_factory=lambda: {"condition 1": "D", "condition 2": "C"}
+    )
     owner_code_work_at: datetime | None = None
 
 
@@ -236,6 +241,8 @@ def binding_problems(batch: Path, binding: GDBinding) -> list[str]:
     for root, files in binding.readiness.source_checksums.items():
         expected.update({str(Path(root) / name): checksum for name, checksum in files.items()})
     problems: list[str] = []
+    if binding.guess_conditions != {"condition 1": "D", "condition 2": "C"}:
+        problems.append("sealed condition-guess mapping changed")
     for filename, checksum in expected.items():
         try:
             if file_checksum(Path(filename)) != checksum:

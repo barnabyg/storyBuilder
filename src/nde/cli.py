@@ -13,6 +13,7 @@ from nde import (
     controllability,
     diversity,
     g1_report,
+    gd_report,
     realisation,
     tiers,
 )
@@ -47,6 +48,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
+    gd_report.configure(
+        commands.add_parser("gd-report", help="report a closed registered G-D batch")
+    )
     gd_cli.configure(commands.add_parser("gd", help="registered D-versus-C gate workflow"))
     controllability.configure(
         commands.add_parser("control-report", help="report plan-only structural edit evidence")
@@ -258,6 +262,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "gd-report": gd_report.run,
     "gd": gd_cli.run,
     "control-report": controllability.run,
     "diversity-report": diversity.run,
