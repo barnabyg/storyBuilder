@@ -33,5 +33,11 @@ cross-record invariants additionally require the plan validator.
 The example is deterministic and requires no provider, keys or downloads.
 Existing outline and experiment commands keep their original contracts.
 
+Extended channels: [structure and knowledge](narrative-structure.md),
+[state and constraints](narrative-state.md),
+[interpretations and trajectories](narrative-interpretation.md).
+See [S/M/L projection](narrative-tiers.md) and the
+[draft–correct annotation workflow](annotations.md).
+
 See [character state and constraints](narrative-state.md) for the state,
 relationship, uncertainty and hard-fact channels.

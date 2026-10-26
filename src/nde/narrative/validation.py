@@ -8,6 +8,7 @@ from nde.narrative.diagnostics import Diagnostic, Validation
 from nde.narrative.interpretation import Annotation
 from nde.narrative.interpretation_validation import interpretation_diagnostics
 from nde.narrative.models import NarrativePlan, Span
+from nde.narrative.projection import tier_diagnostics
 from nde.narrative.state_validation import state_diagnostics
 from nde.narrative.structural_validation import validate_structure
 
@@ -117,4 +118,5 @@ def validate_plan(plan: NarrativePlan) -> Validation:
     diagnostics.extend(validate_structure(plan))
     diagnostics.extend(state_diagnostics(plan))
     diagnostics.extend(interpretation_diagnostics(plan))
+    diagnostics.extend(tier_diagnostics(plan))
     return Validation(diagnostics=diagnostics)

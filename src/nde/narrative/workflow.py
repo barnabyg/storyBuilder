@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from nde.files import write_text_lf
 from nde.narrative.interpretation_render import interpretation_lines
 from nde.narrative.models import NarrativePlan
+from nde.narrative.projection import serialized_plan
 from nde.narrative.state_render import state_card_lines
 from nde.narrative.structural_render import structural_lines
 from nde.narrative.validation import Validation, validate_plan
@@ -38,7 +39,7 @@ def load_plan(path: Path) -> NarrativePlan:
 
 
 def save_plan(plan: NarrativePlan, path: Path) -> None:
-    write_text_lf(path, plan.model_dump_json(indent=2) + "\n")
+    write_text_lf(path, json.dumps(serialized_plan(plan), indent=2, ensure_ascii=False) + "\n")
 
 
 def schema_json() -> str:
