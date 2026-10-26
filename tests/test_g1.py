@@ -17,6 +17,7 @@ from nde.eval.readiness import PairReadiness, ReadinessReport, cohort_checksum, 
 from nde.files import checksum_lf
 from nde.runs.config import load_config
 from tests.conftest import REPO, write_config
+from tests.eval_helpers import reader
 from tests.fake_openai import FakeOpenAI
 from tests.g1_fixtures import synthetic_schema_packet
 from tests.stories import story_config
@@ -271,6 +272,37 @@ def prepare_registered_workflow(
     return common, packet, config, raw
 
 
+def assert_bound_realisation_report(run: Path, batch: Path, tmp_path: Path) -> None:
+    packet = tmp_path / "realisation"
+    assert (
+        main(
+            [
+                "realisation",
+                "create",
+                str(run),
+                "--condition",
+                "C",
+                "--brief",
+                "brief-01",
+                "--out",
+                str(packet),
+            ]
+        )
+        == 0
+    )
+    client = reader(batch)
+    fields = {"preferred": "A", "strength": "1"}
+    for side in ("a", "b"):
+        fields.update({f"score-{side}-{name}": "4" for name in ("coherence", "originality")})
+    assert client.post("/pairs/1", data=fields).status_code == 200
+    assert client.post("/close").status_code == 200
+    output = tmp_path / "bound-report"
+    assert main(["g1-report", str(batch), "--out", str(output), "--realisation", str(packet)]) == 0
+    result = json.loads((output / "decision.json").read_text())
+    assert result["realisation"][0]["stale"] == []
+    assert result["realisation"][0]["source"]["brief"] == "brief-01"
+
+
 def test_registered_synthetic_workflow_generates_then_admits_a_sealed_exact_batch(
     registered_inputs: dict[str, Path],
     tmp_path: Path,
@@ -341,6 +373,7 @@ def test_registered_synthetic_workflow_generates_then_admits_a_sealed_exact_batc
     assert binding.readiness.status == "ready"
     assert len(binding.readiness.pairs) == 1
     assert binding_problems(batch, binding) == []
+    assert_bound_realisation_report(run_dir, batch, tmp_path)
     original = (run_dir / "stories/C/brief-01/r1/story.md").read_text(encoding="utf-8")
     (run_dir / "stories/C/brief-01/r1/story.md").write_text(original + " altered", encoding="utf-8")
     assert binding_problems(batch, binding)

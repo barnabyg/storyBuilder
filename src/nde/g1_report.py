@@ -23,10 +23,11 @@ from nde.eval.batch import (
     read_view,
     read_warnings,
 )
-from nde.eval.g1 import binding_problems, read_g1_binding
+from nde.eval.g1 import G1Binding, binding_problems, file_checksum, read_g1_binding
 from nde.eval.readiness import ReadinessReport
 from nde.eval.stats import binomial_two_sided
 from nde.files import write_text_lf
+from nde.runs.records import STORY_FILE
 
 FOLLOW_UP = (
     "At most one separate, pre-registered fixed-size follow-up on fresh held-out briefs: "
@@ -119,6 +120,60 @@ def _cohort_problems(
     return problems
 
 
+def _realisation_reports(binding: G1Binding, folders: list[Path]) -> list[dict[str, Any]]:
+    reports: list[dict[str, Any]] = []
+    for folder in folders:
+        packet = realisation.read_packet(folder)
+        row = realisation.report(folder)
+        matches = [
+            story
+            for pair in binding.readiness.pairs
+            for story in pair.stories
+            if (
+                Path(story.run).resolve(),
+                story.condition,
+                pair.brief,
+                pair.repetition,
+                Path(story.path),
+            )
+            == (
+                Path(packet.run).resolve(),
+                packet.story.condition,
+                packet.story.brief,
+                packet.story.repetition,
+                Path(packet.story.path) / STORY_FILE,
+            )
+            and story.sha256 == packet.story_sha256
+        ]
+        problem: str | None = None
+        if len(matches) != 1:
+            problem = "full run/story identity is not admitted to this batch"
+        else:
+            plan_kind = "narrative" if packet.story.condition == "C" else "beat_outline"
+            filename = "plan.json" if plan_kind == "narrative" else "outline.json"
+            plan = (Path(packet.run) / packet.story.path / filename).resolve()
+            expected = binding.artifact_checksums.get(str(plan))
+            if (
+                packet.plan_kind != plan_kind
+                or expected is None
+                or not plan.is_file()
+                or (file_checksum(plan) != expected)
+            ):
+                problem = "packet plan identity is not bound to the admitted story"
+        if problem is not None:
+            row["stale"] = [*row["stale"], problem]
+            row["owner_status"] = "pending"
+        row["source"] = {
+            "run": packet.run,
+            "condition": packet.story.condition,
+            "brief": packet.story.brief,
+            "repetition": packet.story.repetition,
+            "path": packet.story.path,
+        }
+        reports.append(row)
+    return reports or [{"owner_status": "pending", "note": "no packets supplied"}]
+
+
 def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
     binding = read_g1_binding(batch)
     protocol = binding.protocol
@@ -191,14 +246,6 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
             "generation_tokens": sum(s.budget.tokens for s in admitted),
             "new_spend_usd": sum(s.new_spend_usd for s in admitted),
         }
-    realisations: list[dict[str, Any]] = []
-    story_hashes = {s.sha256 for p in binding.readiness.pairs for s in p.stories}
-    for folder in packets:
-        row = realisation.report(folder)
-        if row["story_sha256"] not in story_hashes:
-            row["stale"] = [*row["stale"], "story is not admitted to this batch"]
-            row["owner_status"] = "pending"
-        realisations.append(row)
     result: dict[str, Any] = {
         "version": "1",
         "test_only": binding.test_only,
@@ -215,7 +262,7 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
         "secondary_preference": secondary,
         "failure_tags": tags,
         "costs": costs,
-        "realisation": realisations or [{"owner_status": "pending", "note": "no packets supplied"}],
+        "realisation": _realisation_reports(binding, packets),
         "judges": "diagnostic only; see the ordinary closed-batch report for available agreement",
         "reading_caveats": _caveats(batch, judgements, binding.owner_code_work_at),
         "follow_up": FOLLOW_UP,

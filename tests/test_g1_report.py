@@ -13,6 +13,7 @@ from nde.eval.rubric import load_rubric
 from nde.files import checksum_lf, write_text_lf
 from tests.conftest import REPO
 from tests.eval_helpers import reader
+from tests.test_realisation import create_packet, packet_source
 
 
 def synthetic_batch(tmp_path: Path, wins: int, *, ties: int = 0, originality: int = 3) -> Path:
@@ -20,7 +21,9 @@ def synthetic_batch(tmp_path: Path, wins: int, *, ties: int = 0, originality: in
     (batch / "sealed").mkdir(parents=True)
     rubric = load_rubric(REPO / "benchmark/rubric", 1)
     view = View(
-        pairs=[ShownPair(a=f"Candidate story {i}", b=f"Comparator story {i}") for i in range(30)],
+        pairs=[
+            ShownPair(a=f"Candidate story {i}\n", b=f"Comparator story {i}\n") for i in range(30)
+        ],
         rubric=rubric,
         optional_scores=True,
         primary_dimension="coherence",
@@ -215,3 +218,21 @@ def test_results_are_reproducible_and_completed_reports_are_preserved(tmp_path: 
     result = json.loads((first / "decision.json").read_text())
     assert any("timing absent" in caveat for caveat in result["reading_caveats"])
     assert any("guesses absent" in caveat for caveat in result["reading_caveats"])
+
+
+def test_identical_prose_from_another_run_cannot_supply_current_realisation(tmp_path: Path) -> None:
+    batch = synthetic_batch(tmp_path, 21)
+    source_root = tmp_path / "foreign"
+    source_root.mkdir()
+    run = packet_source(source_root)
+    folder = run / "stories/C/brief-01/r1"
+    for name in ("story.md", "story.raw.md", "attempts/1/scene-01.md"):
+        write_text_lf(folder / name, "Candidate story 0\n")
+    packet = tmp_path / "foreign-packet"
+    assert create_packet(run, packet) == 0
+    out = tmp_path / "decision"
+    assert main(["g1-report", str(batch), "--out", str(out), "--realisation", str(packet)]) == 0
+    result = json.loads((out / "decision.json").read_text())
+    [evidence] = result["realisation"]
+    assert evidence["stale"]
+    assert evidence["owner_status"] == "pending"
