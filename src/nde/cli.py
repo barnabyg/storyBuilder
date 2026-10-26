@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from nde import __version__, briefs
+from nde.annotations import cli as annotation_cli
 from nde.corpus import provenance
 from nde.env import load_dotenv
 from nde.eval import cli as eval_cli
@@ -129,6 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
             help="benchmark folder (./benchmark)",
         )
     narrative_cli.configure(commands.add_parser("plan", help="inspect versioned narrative plans"))
+    annotation_cli.configure(commands.add_parser("annotate", help="draft and correct annotations"))
     return parser
 
 
@@ -230,6 +232,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "annotate": annotation_cli.run,
     "plan": narrative_cli.run,
     "run": _run,
     "report": _report,

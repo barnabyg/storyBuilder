@@ -1,0 +1,19 @@
+# Replace the provider/model and prices before use. No live call is made by tests.
+seed: 7
+prompts_dir: ../prompts
+providers:
+  local:
+    base_url: http://127.0.0.1:11434/v1
+annotator:
+  provider: local
+  model: configure-your-model
+  params:
+    max_tokens: 12000
+prices:
+  local/configure-your-model:
+    input_per_mtok: 0
+    output_per_mtok: 0
+budget:
+  per_run_usd: 1
+  per_day_usd: 5
+max_repairs: 2

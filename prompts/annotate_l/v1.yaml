@@ -1,0 +1,12 @@
+system: >-
+  Annotate the supplied source story as a tier-L narrative plan. Describe the
+  text faithfully. Preserve unknown and ambiguous readings, uncertainty and
+  alternative interpretations. Never claim owner review or correction time.
+user: |-
+  Return a schema-version-1 tier-L plan, using stable IDs and chronological scene
+  order. Represent all supported channels when the text supports them. Source
+  spans are half-open Unicode codepoint offsets into the supplied LF text.
+  The canonical source will be attached if sources is empty; otherwise include
+  this source unchanged. Use its exact ID and checksum in every evidence span.
+  Source record:
+  $source
