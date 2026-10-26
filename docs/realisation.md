@@ -21,8 +21,10 @@ The review JSON contains `packet_sha256`, a nonempty `reviewer`, `test_only`
 `item_id`, `rating` (`realised`, `not_realised`, or `unknown`) and a nonempty
 `note`. Optional `start`, `end` and `quote` must exactly identify Unicode
 offsets in the final prose. Optional `diagnostic_provenance` records a model,
-prompt and other identities for diagnostic estimates; these never count as
+prompt and other identities for diagnostic estimates; nonempty `model` and
+`prompt` identifiers are required. These never count as
 owner assessments. Synthetic reviews likewise cannot complete actual review.
+Legacy estimates without those identifiers stay readable as unresolved diagnostics.
 
 Whole-story revisions make scene alignment unresolved. Assess the final prose
 directly; the workflow never transfers spans from superseded scene drafts.

@@ -177,10 +177,18 @@ def stale_reasons(packet: Packet) -> list[str]:
         return [f"source evidence unavailable: {error}"]
 
 
+def _identified_diagnostic(provenance: dict[str, str]) -> bool:
+    return all(provenance.get(name, "").strip() for name in ("model", "prompt"))
+
+
 def assess(folder: Path, review: Review) -> None:
     packet = read_packet(folder)
     if review.packet_sha256 != packet.packet_sha256 or stale_reasons(packet):
         raise ValueError("assessment identity is stale or does not match the selected prose/plan")
+    if review.diagnostic_provenance is not None and not _identified_diagnostic(
+        review.diagnostic_provenance
+    ):
+        raise ValueError("diagnostic estimates require nonempty model and prompt identities")
     known = {item.id for item in packet.items}
     ids = [item.item_id for item in review.assessments]
     if len(set(ids)) != len(ids) or set(ids) - known:
@@ -212,12 +220,17 @@ def report(folder: Path) -> dict[str, Any]:
     actual: dict[str, Assessment] = {}
     synthetic: dict[str, Assessment] = {}
     diagnostics = 0
+    unresolved_diagnostics = 0
     for path in sorted((folder / "history").glob("*.json")):
         review = Review.model_validate_json(path.read_text(encoding="utf-8"))
         if review.packet_sha256 != packet.packet_sha256 or stale:
             continue
         if review.diagnostic_provenance is not None:
-            diagnostics += len(review.assessments)
+            if _identified_diagnostic(review.diagnostic_provenance):
+                diagnostics += len(review.assessments)
+            else:
+                # Preserve readable legacy history without attributing unidentified estimates.
+                unresolved_diagnostics += len(review.assessments)
         else:
             target = synthetic if review.test_only else actual
             target.update({item.item_id: item for item in review.assessments})
@@ -241,6 +254,7 @@ def report(folder: Path) -> dict[str, Any]:
         "stale": stale,
         "synthetic_test_only_assessments": len(synthetic),
         "diagnostic_only_estimates": diagnostics,
+        "unresolved_diagnostic_estimates": unresolved_diagnostics,
     }
     write_text_lf(folder / "report.json", json.dumps(result, indent=2) + "\n")
     write_text_lf(

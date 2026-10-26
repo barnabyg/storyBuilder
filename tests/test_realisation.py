@@ -189,3 +189,68 @@ def test_packet_creation_refuses_prose_that_the_run_did_not_select(
     out = tmp_path / "packet"
     assert create_packet(run, out) == 2
     assert not out.exists()
+
+
+@pytest.mark.parametrize(
+    "provenance", [{}, {"model": "test-model"}, {"model": " ", "prompt": "diagnostic@1"}]
+)
+def test_diagnostic_estimates_require_model_and_prompt_identities(
+    tmp_path: Path, provenance: dict[str, str]
+) -> None:
+    run = packet_source(tmp_path)
+    out = tmp_path / "packet"
+    assert create_packet(run, out) == 0
+    packet = json.loads((out / "packet.json").read_text())
+    review = tmp_path / "diagnostic.json"
+    review.write_text(
+        json.dumps(
+            {
+                "packet_sha256": packet["packet_sha256"],
+                "reviewer": "synthetic model",
+                "test_only": True,
+                "diagnostic_provenance": provenance,
+                "assessments": [
+                    {
+                        "item_id": packet["items"][0]["id"],
+                        "rating": "unknown",
+                        "note": "Synthetic diagnostic only",
+                    }
+                ],
+            }
+        )
+    )
+    assert main(["realisation", "assess", str(out), str(review)]) == 2
+    assert not (out / "history").exists()
+
+
+def test_identified_diagnostics_stay_separate_and_legacy_estimates_remain_readable(
+    tmp_path: Path,
+) -> None:
+    run = packet_source(tmp_path)
+    out = tmp_path / "packet"
+    assert create_packet(run, out) == 0
+    packet = json.loads((out / "packet.json").read_text())
+    data = {
+        "packet_sha256": packet["packet_sha256"],
+        "reviewer": "synthetic model",
+        "test_only": True,
+        "diagnostic_provenance": {"model": "fake/model-v1", "prompt": "review@1"},
+        "assessments": [
+            {
+                "item_id": packet["items"][0]["id"],
+                "rating": "realised",
+                "note": "Synthetic diagnostic only",
+            }
+        ],
+    }
+    file = tmp_path / "diagnostic.json"
+    file.write_text(json.dumps(data))
+    assert main(["realisation", "assess", str(out), str(file)]) == 0
+    data["diagnostic_provenance"] = {}
+    (out / "history/000002-legacy.json").write_text(json.dumps(data))
+    assert main(["realisation", "report", str(out)]) == 0
+    result = json.loads((out / "report.json").read_text())
+    assert result["diagnostic_only_estimates"] == 1
+    assert result["unresolved_diagnostic_estimates"] == 1
+    assert result["assessed"] == 0
+    assert result["owner_status"] == "pending"
