@@ -55,3 +55,34 @@ experimental budget. Cached calls keep those tokens with zero new provider spend
 selected identity; `planning-provenance.json` includes the complete attributable
 initial-plus-refinement history. Critic preferences cannot override hard checks
 and provide no scientific or literary-quality score.
+
+## Selected C versus D development comparisons
+
+`uv run nde compare-cd run CONFIG.yaml --selection SELECTION.json --out NEW_FOLDER`
+validates the historical owner tier selection and its development evidence before
+any new provider call. The config must contain exactly C (`baseline_c`) and D
+(`baseline_d`), distinct dev briefs and shared C/D equal-budget matching. C's
+selected tier, normalized planning parameters, schema, planner/prose bindings and
+planning/shared-prose prompt identities must match the reviewed baseline. Adding
+D's critic role and prompts does not invalidate C's reviewed identity. Synthetic
+selections are visibly labelled test-only and cannot establish a scientific gate.
+
+This command uses the existing story run, bounded matching revisions, final prose
+selection and realisation tooling. Reports expose expected pairs even after an
+abort, all attributable generation tokens, list-price costs, new spend, final
+artifact identities, length validity and matching outcomes. `compare-cd report
+FOLDER` rechecks saved artifacts and selected-C evidence; changed or missing
+inputs make the report incomplete. The command never hides failed pairs by
+reporting only an intersection of successes. Output folders are immutable run
+registries; choose a new folder for another experiment.
+
+D can also import a completed saved plan/revision with `params.saved_plan` and
+`params.provenance` pointing at its final `plan.json` and complete
+`planning-provenance.json`. Brief, schema, prompt/model/parameter identities,
+seed, repair bounds, critic iteration history, final checksum and complete call
+sequences are validated before prose. Each historical planning, critic, rejected
+regeneration and repair call is attributed exactly once with its original token
+budget and list-price cost, zero new spend and `imported_from` source identity.
+Partial or standalone revision provenance lacking its upstream D planning calls
+cannot enter the comparison with an artificially free planner. Imports preserve
+readability of earlier D initial-planning provenance without critic histories.

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -179,7 +180,7 @@ def test_critic_family_rule_is_checked_before_any_generation(
     assert fake_llm.call_count == 0
 
 
-def critic_config(base_url: str, iterations: int = 1) -> dict[str, object]:
+def critic_config(base_url: str, iterations: int = 1) -> dict[str, Any]:
     value = story_config(
         base_url,
         [
@@ -355,3 +356,73 @@ def test_budget_stop_during_refinement_retains_selected_plan_and_costs(
     assert story["budget"]["calls"] == 8
     assert (folder / "plan.json").exists()
     assert not (folder / "story.md").exists()
+
+
+def test_saved_d_revision_import_preserves_every_planning_and_refinement_call_once(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = critic_provider
+    value = critic_config(fake_llm.base_url)
+    source = run(tmp_path, value)
+    [original] = stories(source)
+    folder = source / original["path"]
+    value["stories"]["conditions"][0]["params"].update(
+        {
+            "saved_plan": str(folder / "plan.json"),
+            "provenance": str(folder / "planning-provenance.json"),
+        }
+    )
+    imported = run(tmp_path, value)
+    [story] = stories(imported)
+    assert story["status"] == "ok"
+    assert story["budget"] == original["budget"]
+    calls = jsonl(imported / "calls.jsonl")
+    assert len(calls) == 14
+    assert all(c["imported_from"] and c["cost_usd"] == 0 for c in calls[:9])
+    assert fake_llm.call_count == 14
+    assert manifest(imported)["cost"]["usd"] == 0
+
+
+@pytest.mark.parametrize(
+    "tamper", ["calls", "seed", "model", "refinement", "nested", "usage", "plan"]
+)
+def test_saved_d_import_rejects_missing_or_stale_provenance_before_prose(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = critic_provider
+    value = critic_config(fake_llm.base_url)
+    source = run(tmp_path, value)
+    [original] = stories(source)
+    folder = source / original["path"]
+    provenance = folder / "planning-provenance.json"
+    raw = json.loads(provenance.read_text())
+    if tamper == "calls":
+        raw["calls"].pop()
+    elif tamper == "seed":
+        raw["calls"][-1]["seed"] += 1
+    elif tamper == "model":
+        raw["critic_model"]["family"] = "changed"
+    elif tamper == "refinement":
+        raw["refinement"]["iterations"][0]["revision_steps"] = []
+    elif tamper == "nested":
+        raw["refinement"]["iterations"][0] = "malformed record"
+    elif tamper == "usage":
+        raw["calls"][-1]["token_cost_usd"] = 0
+    else:
+        (folder / "plan.json").write_text((folder / "plan.json").read_text() + " ")
+    provenance.write_text(json.dumps(raw))
+    value["stories"]["conditions"][0]["params"].update(
+        {"saved_plan": str(folder / "plan.json"), "provenance": str(provenance)}
+    )
+    result = run(tmp_path, value)
+    [story] = stories(result)
+    assert story["status"] == "failed"
+    assert "saved-D-plan" in story["error"]
+    assert fake_llm.call_count == 14

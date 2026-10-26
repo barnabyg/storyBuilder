@@ -6,7 +6,16 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from nde import __version__, briefs, controllability, diversity, g1_report, realisation, tiers
+from nde import (
+    __version__,
+    briefs,
+    cd_comparison,
+    controllability,
+    diversity,
+    g1_report,
+    realisation,
+    tiers,
+)
 from nde.annotations import cli as annotation_cli
 from nde.corpus import provenance
 from nde.env import load_dotenv
@@ -44,6 +53,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     diversity.configure(
         commands.add_parser("diversity-report", help="compare structures across seeds")
+    )
+    cd_comparison.configure(
+        commands.add_parser("compare-cd", help="compare selected C and D on dev")
     )
     g1_report.configure(
         commands.add_parser("g1-report", help="report a closed registered G1 batch")
@@ -249,6 +261,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "gd": gd_cli.run,
     "control-report": controllability.run,
     "diversity-report": diversity.run,
+    "compare-cd": cd_comparison.run,
     "g1-report": g1_report.run,
     "tiers": tiers.run,
     "realisation": realisation.run,
