@@ -114,6 +114,10 @@ def _request[T: BaseModel](
             metrics.record(attempts=attempts, valid=valid)
 
 
+# Shared bounded schema/semantic request boundary for masked revision operators.
+request_plan = _request
+
+
 def _stable_errors(previous: NarrativePlan, current: NarrativePlan, scene_id: str) -> list[str]:
     errors: list[str] = []
     for name in ("id", "tier", "title", "characters", "sources", "constraints", "arcs"):

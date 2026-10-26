@@ -17,11 +17,12 @@ from nde.runs.runner import RunOptions, run_experiment
 
 def configure(parser: argparse.ArgumentParser) -> None:
     commands = parser.add_subparsers(dest="plan_command", required=True)
-    generate = commands.add_parser("generate", help="generate dev plans in a recorded experiment")
-    generate.add_argument("config", type=Path)
-    generate.add_argument("--runs-dir", type=Path, default=Path("runs"))
-    generate.add_argument("--cache", type=Path, default=Path(".nde/cache.sqlite"))
-    generate.add_argument("--ledger", type=Path, default=Path(".nde/ledger.sqlite"))
+    for name in ("generate", "revise"):
+        generate = commands.add_parser(name, help=f"{name} dev plans in a recorded experiment")
+        generate.add_argument("config", type=Path)
+        generate.add_argument("--runs-dir", type=Path, default=Path("runs"))
+        generate.add_argument("--cache", type=Path, default=Path(".nde/cache.sqlite"))
+        generate.add_argument("--ledger", type=Path, default=Path(".nde/ledger.sqlite"))
     schema = commands.add_parser("schema", help="export the deterministic JSON Schema")
     schema.add_argument("--out", type=Path, required=True)
     for name in ("inspect", "validate", "project", "replay"):
@@ -35,9 +36,12 @@ def configure(parser: argparse.ArgumentParser) -> None:
 
 def run(args: argparse.Namespace) -> int:
     try:
-        if args.plan_command == "generate":
-            if load_config(args.config).config.plans is None:
+        if args.plan_command in {"generate", "revise"}:
+            plans = load_config(args.config).config.plans
+            if plans is None:
                 raise ConfigError("plan generate requires a plans configuration")
+            if args.plan_command == "revise" and "revision" not in plans.params:
+                raise ConfigError("plan revise requires plans.params.revision and saved_plan")
             run_dir = run_experiment(
                 args.config,
                 RunOptions(

@@ -1,6 +1,7 @@
 """Plan-only runs share experiment preparation, gateway and final run accounting."""
 
 import json
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,7 +12,14 @@ from nde.files import write_text_lf
 from nde.llm.errors import ProviderError
 from nde.llm.gateway import Gateway
 from nde.llm.ledger import BudgetExceededError
+from nde.narrative.workflow import PlanError, load_plan
 from nde.plan.narrative import NarrativePlanningParams, generate_plan, planning_templates
+from nde.plan.revision import (
+    RevisionPlanningParams,
+    revise_plan,
+    revision_templates,
+    validate_selection,
+)
 from nde.runs.config import ConfigError, LoadedConfig
 from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.state import RunState
@@ -36,9 +44,17 @@ def prepare_plans(
     if "planner" not in loaded.config.roles:
         raise ConfigError("plan generation requires the planner role")
     try:
-        params = NarrativePlanningParams.model_validate(config.params)
+        params = (
+            RevisionPlanningParams.model_validate(config.params)
+            if "revision" in config.params
+            else NarrativePlanningParams.model_validate(config.params)
+        )
+        if isinstance(params, RevisionPlanningParams):
+            source = (loaded.directory / params.saved_plan).resolve()
+            params.saved_plan = str(source)
+            validate_selection(load_plan(source), params.revision)
         available = load_briefs((loaded.directory / config.briefs_dir).resolve())
-    except (BriefError, ValidationError) as error:
+    except (BriefError, PlanError, ValidationError) as error:
         raise ConfigError(str(error)) from error
     selection = config.briefs
     chosen = [
@@ -53,7 +69,12 @@ def prepare_plans(
         raise ConfigError("plan brief selection is empty or contains unknown IDs")
     if any(brief.split != "dev" for brief in chosen):
         raise ConfigError("plan generate is dev-only; held-out generation requires a gate workflow")
-    for need in planning_templates(params):
+    needs = (
+        revision_templates(params.revision)
+        if isinstance(params, RevisionPlanningParams)
+        else planning_templates(params)
+    )
+    for need in needs:
         require_template(
             templates,
             loaded.prompts_dir,
@@ -100,7 +121,12 @@ def run_plans(run: PlanRun) -> bool:
                 "error": None,
             }
             try:
-                generate_plan(ctx, prepared.params)
+                if isinstance(prepared.params, RevisionPlanningParams):
+                    revise_plan(
+                        ctx, load_plan(Path(prepared.params.saved_plan)), prepared.params.revision
+                    )
+                else:
+                    generate_plan(ctx, prepared.params)
                 record["status"] = "succeeded"
             except StepFailedError as error:
                 record["error"] = str(error)
@@ -109,10 +135,16 @@ def run_plans(run: PlanRun) -> bool:
                 record["error"] = str(error)
                 raise
             finally:
+                # Publish the complete artifact directory in one rename. No accepted
+                # plan becomes visible beside an incomplete diagnostic/card bundle.
+                destination_folder = run_dir / folder
+                destination_folder.parent.mkdir(parents=True, exist_ok=True)
+                staging = Path(tempfile.mkdtemp(prefix=".plan-", dir=destination_folder.parent))
                 for name, content in ctx.files.items():
-                    destination = run_dir / folder / name
+                    destination = staging / name
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     write_text_lf(destination, content)
+                staging.rename(destination_folder)
                 records.append(record)
                 write_text_lf(
                     run_dir / "plans.jsonl",
