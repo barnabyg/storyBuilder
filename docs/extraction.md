@@ -28,3 +28,34 @@ it remains `recovery_required`; rerunning never silently repeats the paid call.
 Cache hits retain experimental tokens and list-price costs. Nested ledger scopes
 enforce a shared cohort/day cap and a story cap without double-counting daily
 spend. Unresolved in-flight calls and durable accounting totals remain visible.
+
+## Independent model families
+
+`nde extract families WORK --segments SEGMENTS --config CONFIG --out OUTPUT`
+uses the same settings with `annotators` replacing `annotator`. Supply at least
+two different provider/model bindings with distinct, explicit `family` metadata.
+Aliases pointing at the same endpoint/model, missing families and case-insensitive
+duplicate families are rejected before any call. A declaration records the user's
+family provenance; it does not independently authenticate a provider's model.
+
+Each family receives only the verified source, segmentation and its own accepted
+passes/repairs. Separate directories retain each original and failure state.
+`families.json` records expected coverage; one failed or unstarted family leaves
+the story incomplete. Story caps cover all independent families together and
+remain enforced when a larger cohort cap is supplied by pilot orchestration.
+
+`nde extract families-report OUTPUT` revalidates source/config/schema identities
+and original responses, then recomputes agreement. Scenes align on exact source
+spans, entities on unique normalized names and reference claims on their normalized
+content. Generated record IDs are excluded. Duplicate names remain explicitly
+ambiguous. Exact normalized claims use multiset intersection/union: `agreed`
+is intersection size, `total` is union size, `compared` is the smaller inventory,
+and `unmatched` retains both inventories' missing or contradictory claims.
+Empty channels have no measured agreement, rather than a perfect score.
+
+Reports include core plot, causality, information, goal and belief channels,
+state/interpretive channels and a grouped interpretation row. They retain
+disagreements; they never produce merged consensus labels or claim owner approval.
+Three or more families produce all pairwise comparisons. Aggregate durable story
+spend and any new spend not attributable to a saved response remain visible after
+crash recovery. Actual literary correctness and gold review remain pending.
