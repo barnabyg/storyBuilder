@@ -95,6 +95,8 @@ def assess(protocol: Path) -> dict[str, Any]:
     registered = read_sealed(protocol)
     policy = G2Policy.model_validate(registered["policy"])
     pending: list[str] = []
+    review: dict[str, Any]
+    extraction: dict[str, Any]
     try:
         check_snapshot(registered["inputs"])
         _pilot_review_inputs(
