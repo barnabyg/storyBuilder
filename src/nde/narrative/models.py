@@ -2,8 +2,10 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
+from nde.narrative.base import Identified, Span, Strict
+from nde.narrative.state import Constraint, RelationshipTransition, StateTransition
 from nde.narrative.structure import (
     CausalLink,
     KnowledgeFact,
@@ -13,13 +15,7 @@ from nde.narrative.structure import (
     Setup,
 )
 
-
-class Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class Identified(Strict):
-    id: str = Field(min_length=1, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+__all__ = ["Identified", "Span", "Strict"]
 
 
 class Source(Identified):
@@ -28,13 +24,6 @@ class Source(Identified):
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     provenance: str
     span_basis: Literal["unicode-codepoints-lf"] = "unicode-codepoints-lf"
-
-
-class Span(Strict):
-    source_id: str
-    source_sha256: str
-    start: int = Field(ge=0)
-    end: int = Field(ge=0)
 
 
 class Character(Identified):
@@ -67,3 +56,8 @@ class NarrativePlan(Identified):
     knowledge_facts: list[KnowledgeFact] = Field(default_factory=list[KnowledgeFact])
     reveal_links: list[RevealLink] = Field(default_factory=list[RevealLink])
     knowledge_uses: list[KnowledgeUse] = Field(default_factory=list[KnowledgeUse])
+    states: list[StateTransition] = Field(default_factory=list[StateTransition])
+    relationships: list[RelationshipTransition] = Field(
+        default_factory=list[RelationshipTransition]
+    )
+    constraints: list[Constraint] = Field(default_factory=list[Constraint])

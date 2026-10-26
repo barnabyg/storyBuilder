@@ -1,0 +1,211 @@
+{
+  "schema_version": "1",
+  "control": "harbour-state.plan.json",
+  "mutations": [
+    {
+      "category": "unknown_state_character",
+      "path": [
+        "states",
+        0,
+        "character_id"
+      ],
+      "value": "ghost",
+      "expected_code": "state_character_reference",
+      "expected_severity": "error"
+    },
+    {
+      "category": "unknown_state_scene",
+      "path": [
+        "states",
+        0,
+        "scene_id"
+      ],
+      "value": "missing",
+      "expected_code": "state_scene_reference",
+      "expected_severity": "error"
+    },
+    {
+      "category": "state_before_contradiction",
+      "path": [
+        "states",
+        1,
+        "before"
+      ],
+      "value": {
+        "value": "abandon the boat"
+      },
+      "expected_code": "state_transition",
+      "expected_severity": "error"
+    },
+    {
+      "category": "relationship_unknown_participant",
+      "path": [
+        "relationships",
+        0,
+        "participant_ids"
+      ],
+      "value": [
+        "c1",
+        "ghost"
+      ],
+      "expected_code": "relationship_participant",
+      "expected_severity": "error"
+    },
+    {
+      "category": "relationship_duplicate_participant",
+      "path": [
+        "relationships",
+        0,
+        "participant_ids"
+      ],
+      "value": [
+        "c1",
+        "c1"
+      ],
+      "expected_code": "relationship_participant_duplicate",
+      "expected_severity": "error"
+    },
+    {
+      "category": "relationship_unknown_scene",
+      "path": [
+        "relationships",
+        0,
+        "scene_id"
+      ],
+      "value": "missing",
+      "expected_code": "relationship_scene_reference",
+      "expected_severity": "error"
+    },
+    {
+      "category": "relationship_before_contradiction",
+      "path": [
+        "relationships",
+        1,
+        "before"
+      ],
+      "value": {
+        "value": "enemies"
+      },
+      "expected_code": "relationship_transition",
+      "expected_severity": "error"
+    },
+    {
+      "category": "locked_value_changed",
+      "path": [
+        "states",
+        2,
+        "after"
+      ],
+      "value": {
+        "value": "protect property"
+      },
+      "expected_code": "locked_value",
+      "expected_severity": "error"
+    },
+    {
+      "category": "ending_fact_contradicted",
+      "path": [
+        "states",
+        1,
+        "after"
+      ],
+      "value": {
+        "value": "abandon the boat"
+      },
+      "expected_code": "required_ending",
+      "expected_severity": "error"
+    },
+    {
+      "category": "constraint_unknown_character",
+      "path": [
+        "constraints",
+        0,
+        "character_id"
+      ],
+      "value": "ghost",
+      "expected_code": "constraint_character_reference",
+      "expected_severity": "error"
+    },
+    {
+      "category": "constraint_expected_missing",
+      "path": [
+        "constraints",
+        0,
+        "expected"
+      ],
+      "value": null,
+      "expected_code": "constraint_expected",
+      "expected_severity": "error"
+    },
+    {
+      "category": "state_character_required",
+      "path": [
+        "states",
+        0,
+        "character_id"
+      ],
+      "value": null,
+      "expected_code": "state_character_required",
+      "expected_severity": "error"
+    },
+    {
+      "category": "duplicate_state_transition",
+      "path": [
+        "states",
+        1,
+        "scene_id"
+      ],
+      "value": "s1",
+      "expected_code": "state_duplicate",
+      "expected_severity": "error"
+    },
+    {
+      "category": "duplicate_relationship_transition",
+      "path": [
+        "relationships",
+        1,
+        "scene_id"
+      ],
+      "value": "s1",
+      "expected_code": "relationship_duplicate",
+      "expected_severity": "error"
+    },
+    {
+      "category": "absent_state_character",
+      "path": [
+        "scenes",
+        0,
+        "character_ids"
+      ],
+      "value": [
+        "c2"
+      ],
+      "expected_code": "state_presence",
+      "expected_severity": "error"
+    },
+    {
+      "category": "absent_relationship_participant",
+      "path": [
+        "scenes",
+        0,
+        "character_ids"
+      ],
+      "value": [
+        "c1"
+      ],
+      "expected_code": "relationship_presence",
+      "expected_severity": "error"
+    },
+    {
+      "category": "constraint_character_required",
+      "path": [
+        "constraints",
+        0,
+        "character_id"
+      ],
+      "value": null,
+      "expected_code": "constraint_character_required",
+      "expected_severity": "error"
+    }
+  ]
+}

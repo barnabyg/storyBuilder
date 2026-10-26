@@ -1,0 +1,38 @@
+{
+  "schema_version": "1",
+  "id": "harbour-state",
+  "title": "The keeper's choice",
+  "characters": [{"id": "c1", "name": "Mara"}, {"id": "c2", "name": "Ivo"}],
+  "scenes": [
+    {"id": "s1", "title": "The dark lamp", "character_ids": ["c1", "c2"]},
+    {"id": "s2", "title": "The signal", "character_ids": ["c1", "c2"]}
+  ],
+  "states": [
+    {"id": "st1", "scene_id": "s1", "character_id": "c1", "kind": "goal", "key": "priority",
+     "before": {"value": "protect the lamp", "confidence": 0.8},
+     "after": {"value": "save the boat", "confidence": 0.9}},
+    {"id": "st2", "scene_id": "s2", "character_id": "c1", "kind": "goal", "key": "priority",
+     "before": {"value": "save the boat", "confidence": 0.9},
+     "after": {"value": "guide the boat home", "confidence": 0.8}},
+    {"id": "st3", "scene_id": "s1", "character_id": "c1", "kind": "value", "key": "oath",
+     "before": {"value": "protect lives"}, "after": {"value": "protect lives"}},
+    {"id": "st4", "scene_id": "s2", "character_id": "c1", "kind": "belief", "key": "Ivo's motive",
+     "before": {"status": "unknown"},
+     "after": {"status": "ambiguous", "value": "trust", "confidence": 0.5,
+               "alternatives": ["duty", "friendship"]}}
+  ],
+  "relationships": [
+    {"id": "r1", "scene_id": "s1", "participant_ids": ["c1", "c2"], "key": "trust",
+     "before": {"value": "suspicious"}, "after": {"value": "cooperating"}},
+    {"id": "r2", "scene_id": "s2", "participant_ids": ["c1", "c2"], "key": "trust",
+     "before": {"value": "cooperating"}, "after": {"value": "allies"}}
+  ],
+  "constraints": [
+    {"id": "hc1", "kind": "locked", "character_id": "c1", "state_kind": "value",
+     "key": "oath", "expected": "protect lives"},
+    {"id": "hc2", "kind": "required_ending", "character_id": "c1", "state_kind": "goal",
+     "key": "priority", "expected": "guide the boat home"},
+    {"id": "hc3", "kind": "literary", "key": "earned ending",
+     "note": "Does the ending earn Mara's change of priority?"}
+  ]
+}

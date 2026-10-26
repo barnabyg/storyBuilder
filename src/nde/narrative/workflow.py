@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from nde.files import write_text_lf
 from nde.narrative.models import NarrativePlan
+from nde.narrative.state_render import state_card_lines
 from nde.narrative.structural_render import structural_lines
 from nde.narrative.validation import Validation, validate_plan
 
@@ -62,6 +63,7 @@ def card_lines(plan: NarrativePlan, result: Validation) -> list[str]:
             for beat in scene.beats
             for span in beat.evidence
         )
+    lines.extend(state_card_lines(plan))
     lines.extend(
         f"{item.severity} {item.code} [{item.location}]: {item.message}"
         for item in result.diagnostics

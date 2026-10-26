@@ -5,7 +5,10 @@ from collections.abc import Iterable
 from nde.files import checksum_lf
 from nde.narrative.diagnostics import Diagnostic, Validation
 from nde.narrative.models import Identified, NarrativePlan, Span
+from nde.narrative.state_validation import state_diagnostics
 from nde.narrative.structural_validation import validate_structure
+
+__all__ = ["Diagnostic", "Validation"]
 
 
 def check_ids(records: Iterable[Identified]) -> list[Diagnostic]:
@@ -46,6 +49,7 @@ def check_spans(plan: NarrativePlan, spans: Iterable[tuple[str, Span]]) -> list[
 def validate_plan(plan: NarrativePlan) -> Validation:
     records: list[Identified] = [plan, *plan.characters, *plan.sources, *plan.scenes]
     records.extend(beat for scene in plan.scenes for beat in scene.beats)
+    records.extend([*plan.states, *plan.relationships, *plan.constraints])
     diagnostics = check_ids(records)
     characters = {character.id for character in plan.characters}
     spans: list[tuple[str, Span]] = []
@@ -80,4 +84,5 @@ def validate_plan(plan: NarrativePlan) -> Validation:
         spans.extend((beat.id, span) for beat in scene.beats for span in beat.evidence)
     diagnostics.extend(check_spans(plan, spans))
     diagnostics.extend(validate_structure(plan))
+    diagnostics.extend(state_diagnostics(plan))
     return Validation(diagnostics=diagnostics)
