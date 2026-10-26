@@ -14,6 +14,7 @@ from nde.eval.judges import (
     run_judges,
     write_records,
 )
+from nde.files import write_text_lf
 from nde.gitinfo import git
 from nde.llm.cache import DEFAULT_CACHE_PATH, CacheMode, ResponseCache
 from nde.llm.config import ModelBinding
@@ -21,6 +22,7 @@ from nde.llm.errors import ProviderError
 from nde.llm.gateway import Gateway, Prompt
 from nde.llm.ledger import DEFAULT_LEDGER_PATH, BudgetExceededError, CostLedger, Pricing
 from nde.llm.structured import StructuredOutputError
+from nde.plan.execute import PlanRun, PreparedPlans, prepare_plans, run_plans
 from nde.runs.benchmark import benchmark_rows
 from nde.runs.config import (
     CallSpec,
@@ -80,6 +82,7 @@ class PreparedRun:
     bindings: list[tuple[RoleName, ModelBinding]]
     stories: PreparedStories | None = None
     judges: PreparedJudges | None = None
+    plans: PreparedPlans | None = None
 
 
 def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
@@ -90,7 +93,11 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
     for call in config.calls:
         require_template(templates, loaded.prompts_dir, call.prompt, call.variables)
     stories = prepare_stories(loaded, templates)
-    bindings = config.role_bindings([] if stories is None else stories.roles)
+    plans = prepare_plans(loaded, templates)
+    extra: list[RoleName] = [] if stories is None else list(stories.roles)
+    if plans is not None:
+        extra.append("planner")
+    bindings = config.role_bindings(extra)
     unpriced = config.unpriced_warnings(binding for _, binding in bindings)
     if unpriced and not config.budget.allow_unpriced_models:
         raise ConfigError("; ".join(unpriced))
@@ -103,7 +110,12 @@ def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
             )
     judges = prepare_judges(loaded, templates)
     return PreparedRun(
-        loaded=loaded, templates=templates, bindings=bindings, stories=stories, judges=judges
+        loaded=loaded,
+        templates=templates,
+        bindings=bindings,
+        stories=stories,
+        judges=judges,
+        plans=plans,
     )
 
 
@@ -148,6 +160,8 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
     )
     if prepared.stories is not None:
         manifest.files["stories"] = STORIES
+    if prepared.plans is not None:
+        manifest.files["plans"] = "plans.jsonl"
     if prepared.judges is not None:
         judges = prepared.judges
         manifest.judges = JudgesSummary(
@@ -324,6 +338,8 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
     started = options.clock()
     run_dir = _new_run_dir(options.runs_dir, config.name, started)
     manifest = _manifest(prepared, options, started)
+    manifest.files["configuration"] = "config.json"
+    write_text_lf(run_dir / "config.json", config.model_dump_json(indent=2) + "\n")
     write_manifest(run_dir, manifest)
     state = RunState()
     gateway = _gateway(config, options)
@@ -343,7 +359,10 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
             )
         if judge_run is not None:
             run_judges(judge_run)
-        manifest.status = "succeeded"
+        plans_passed = prepared.plans is None or run_plans(
+            PlanRun(prepared.loaded, prepared.plans, prepared.templates, gateway, state, run_dir)
+        )
+        manifest.status = "succeeded" if plans_passed else "failed"
     except BudgetExceededError as error:
         manifest.status = "aborted"
         manifest.abort_reason = "budget"

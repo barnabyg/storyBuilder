@@ -106,6 +106,15 @@ class ConditionSpec(Strict):
     params: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
 
 
+class PlansConfig(Strict):
+    """Plan-only development runs, recorded without manufacturing a story."""
+
+    briefs_dir: str = "../benchmark"
+    briefs: BriefSelection
+    repeat: int = Field(default=1, ge=1)
+    params: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
+
+
 class LengthConfig(Strict):
     """Length control: stories must be within `tolerance` of their brief's target length."""
 
@@ -211,12 +220,15 @@ class ExperimentConfig(Strict):
     structured: StructuredConfig = Field(default_factory=StructuredConfig)
     benchmark: BenchmarkConfig | None = None
     stories: StoriesConfig | None = None
+    plans: PlansConfig | None = None
     judges: JudgesConfig | None = None
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:
-        if not self.calls and self.stories is None and self.judges is None:
-            raise ValueError("a config needs `calls`, `stories` or `judges`")
+        if not self.calls and self.stories is None and self.judges is None and self.plans is None:
+            raise ValueError("a config needs `calls`, `stories`, `plans` or `judges`")
+        if self.plans is not None and (self.stories is not None or self.judges is not None):
+            raise ValueError("plan-only runs cannot also generate stories or judge batches")
         bindings = [(f"role {role!r}", binding) for role, binding in self.roles.items()]
         if self.judges is not None:
             bindings += [("judge", judge) for judge in self.judges.panel]

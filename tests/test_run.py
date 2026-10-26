@@ -192,7 +192,7 @@ def test_committed_configs_are_valid(config: Path) -> None:
 
     prepared = prepare(config, keys)
 
-    assert prepared.loaded.config.calls or prepared.stories
+    assert prepared.loaded.config.calls or prepared.stories or prepared.plans
 
 
 def test_prompts_lock_check_reports_without_writing(

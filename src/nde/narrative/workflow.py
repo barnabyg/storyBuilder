@@ -74,17 +74,23 @@ def card_lines(plan: NarrativePlan, result: Validation) -> list[str]:
     return lines
 
 
-def render(plan: NarrativePlan, out: Path) -> Validation:
+def rendered_files(plan: NarrativePlan) -> tuple[Validation, dict[str, str]]:
+    """The inspection artifacts, also used by generation before a run is saved."""
     result = validate_plan(plan)
     lines = card_lines(plan, result)
-    out.mkdir(parents=True, exist_ok=True)
-    save_plan(plan, out / "plan.json")
-    write_text_lf(out / "validation.json", result.model_dump_json(indent=2) + "\n")
-    write_text_lf(out / "cards.md", "\n\n".join(lines) + "\n")
     body = "\n".join(f"<p>{html.escape(line)}</p>" for line in lines)
-    write_text_lf(
-        out / "cards.html",
-        '<!doctype html><html lang="en"><meta charset="utf-8">'
+    return result, {
+        "plan.json": json.dumps(serialized_plan(plan), indent=2, ensure_ascii=False) + "\n",
+        "validation.json": result.model_dump_json(indent=2) + "\n",
+        "cards.md": "\n\n".join(lines) + "\n",
+        "cards.html": '<!doctype html><html lang="en"><meta charset="utf-8">'
         f"<title>{html.escape(plan.title)}</title><body>{body}</body></html>\n",
-    )
+    }
+
+
+def render(plan: NarrativePlan, out: Path) -> Validation:
+    result, files = rendered_files(plan)
+    out.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        write_text_lf(out / name, content)
     return result
