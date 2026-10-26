@@ -6,6 +6,21 @@ import pytest
 
 from nde.corpus.records_io import create_record, read_sealed
 from nde.reconstruction.overlap import audit_overlap
+from tests.fake_openai import FakeOpenAI
+from tests.reconstruction_support import paired_datasets
+
+
+def test_audit_accepts_public_encoding_and_rechecks_transitive_sources(
+    tmp_path: Path, fake_llm: FakeOpenAI
+) -> None:
+    train, held = paired_datasets(tmp_path, fake_llm)
+    result = audit_overlap(tmp_path / "encoded", held, tmp_path / "audit")
+    assert result["unresolved_overlap"] is False
+    assert len(result["index_members"]) == 2
+    annotation = Path(read_sealed(train)["examples"][0]["record"]["provenance"]["annotation_path"])
+    annotation.write_text("{}")
+    with pytest.raises(ValueError, match="changed"):
+        audit_overlap(train, held, tmp_path / "stale")
 
 
 def dataset(path: Path, *, query: bool = False, renamed: bool = False) -> Path:

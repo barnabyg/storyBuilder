@@ -8,13 +8,26 @@ from pathlib import Path
 from typing import Any, cast
 
 from nde.corpus.records_io import check_snapshot, create_record, read_sealed, report_files, snapshot
+from nde.reconstruction.codec import load_encoding
+from nde.reconstruction.dataset import load_dataset
 
 METRIC = "canonical-typed-record-multiset-jaccard-v1"
 
 
+def view_path(path: Path) -> Path:
+    if path.is_dir():
+        return path / ("dataset.json" if (path / "dataset.json").is_file() else "encoding.json")
+    return path
+
+
 def load_view(path: Path) -> dict[str, Any]:
     """Read an identified view without fitting or changing either dataset."""
-    value = read_sealed(path / "dataset.json" if path.is_dir() else path)
+    path = view_path(path)
+    value = read_sealed(path)
+    if value.get("kind") == "reconstruction-dataset":
+        return load_dataset(path)
+    if "specification" in value and "records" in value:
+        return load_encoding(path)
     check_snapshot(value.get("inputs", {}))
     return value
 
@@ -97,7 +110,11 @@ def audit_overlap(training: Path, query: Path, out: Path, *, neighbours: int = 5
     if neighbours < 1:
         raise ValueError("neighbours must be positive")
     train, queries = load_view(training), load_view(query)
-    if train.get("split") != "train" or train.get("role", "optimizer") != "optimizer":
+    split = train.get("split")
+    if split is None and train.get("records"):
+        assignments = {record.get("provenance", {}).get("split") for record in train["records"]}
+        split = "train" if assignments == {"train"} else None
+    if split != "train" or train.get("role", "optimizer") != "optimizer":
         raise ValueError("nearest-neighbour index requires optimizer training records")
     if train.get("codec_id") != queries.get("codec_id"):
         raise ValueError("incompatible codec identities")
@@ -134,8 +151,8 @@ def audit_overlap(training: Path, query: Path, out: Path, *, neighbours: int = 5
         rows.append(
             {"query_id": item["id"], "provenance": provenance, "matches": matches[:neighbours]}
         )
-    training_file = training / "dataset.json" if training.is_dir() else training
-    query_file = query / "dataset.json" if query.is_dir() else query
+    training_file = view_path(training)
+    query_file = view_path(query)
     report = create_record(
         out / "overlap.json",
         {
