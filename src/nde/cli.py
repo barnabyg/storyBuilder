@@ -48,25 +48,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
-    gd_report.configure(
-        commands.add_parser("gd-report", help="report a closed registered G-D batch")
-    )
-    gd_cli.configure(commands.add_parser("gd", help="registered D-versus-C gate workflow"))
-    controllability.configure(
-        commands.add_parser("control-report", help="report plan-only structural edit evidence")
-    )
-    diversity.configure(
-        commands.add_parser("diversity-report", help="compare structures across seeds")
-    )
-    cd_comparison.configure(
-        commands.add_parser("compare-cd", help="compare selected C and D on dev")
-    )
-    g1_report.configure(
-        commands.add_parser("g1-report", help="report a closed registered G1 batch")
-    )
-    tiers.configure(commands.add_parser("tiers", help="compare dev tiers and freeze a selection"))
-    realisation.configure(commands.add_parser("realisation", help="review final prose intentions"))
-    evidence_cli.configure(commands.add_parser("schema-evidence", help="G-schema review packet"))
+    for name, configure, description in (
+        ("gd-report", gd_report.configure, "report a closed registered G-D batch"),
+        ("gd", gd_cli.configure, "registered D-versus-C gate workflow"),
+        ("control-report", controllability.configure, "report plan-only structural edit evidence"),
+        ("diversity-report", diversity.configure, "compare structures across seeds"),
+        ("compare-cd", cd_comparison.configure, "compare selected C and D on dev"),
+        ("g1-report", g1_report.configure, "report a closed registered G1 batch"),
+        ("tiers", tiers.configure, "compare dev tiers and freeze a selection"),
+        ("realisation", realisation.configure, "review final prose intentions"),
+        ("schema-evidence", evidence_cli.configure, "G-schema review packet"),
+    ):
+        configure(commands.add_parser(name, help=description))
 
     run = commands.add_parser("run", help="run an experiment config and record a run directory")
     run.add_argument("config", type=Path, help="experiment config (YAML)")
