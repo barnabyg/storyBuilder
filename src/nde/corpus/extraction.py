@@ -111,6 +111,9 @@ def _prepare(
     )
     identities = {
         "source_sha256": source.sha256,
+        "work_record_sha256": digest(record.model_dump_json()),
+        "provenance": record.model_dump(mode="json"),
+        "resolved_providers": config.provider_endpoints(os.environ),
         "segmentation_sha256": digest(segments.model_dump_json()),
         "config_sha256": digest(config.model_dump_json()),
         "schema_sha256": digest(schema_json()),
@@ -366,6 +369,9 @@ def verify_extraction(directory: Path) -> ExtractionSession:
         or digest(segments.model_dump_json()) != session.segmentation_sha256
         or digest(current.model_dump_json()) != session.config_sha256
         or session.config != current
+        or session.provenance != record.model_dump(mode="json")
+        or session.work_record_sha256 != digest(record.model_dump_json())
+        or session.resolved_providers != current.provider_endpoints(os.environ)
         or digest(INSTRUCTION) != session.prompt_sha256
         or digest(schema_json()) != session.schema_sha256
     ):

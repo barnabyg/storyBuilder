@@ -227,3 +227,30 @@ def test_exhausted_or_changed_inputs_cannot_reset_attempts(
     config.write_text(yaml.safe_dump(changed), encoding="utf-8")
     assert extract_command(args) == 2
     assert fake_llm.call_count == 2
+
+
+@pytest.mark.parametrize("changed_input", ["provenance", "endpoint"])
+def test_same_text_cannot_hide_changed_provenance_or_provider_endpoint(
+    tmp_path: Path,
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    changed_input: str,
+) -> None:
+    work, segments, config = extraction_inputs(tmp_path, fake_llm)
+    settings = yaml.safe_load(config.read_text())
+    settings["providers"]["fake"]["base_url_env"] = "FIXTURE_EXTRACTION_ENDPOINT"
+    config.write_text(yaml.safe_dump(settings), encoding="utf-8")
+    monkeypatch.setenv("FIXTURE_EXTRACTION_ENDPOINT", fake_llm.base_url)
+    good = plan_fixture(work, segments)
+    fake_llm.queue(*(completion(json.dumps(good)) for _ in range(3)))
+    out = tmp_path / "extraction"
+    args = command_args(work, segments, config, out)
+    assert extract_command(args) == 0
+    if changed_input == "provenance":
+        record = json.loads((work / "work.json").read_text())
+        record["author_id"] = "different-author"
+        (work / "work.json").write_text(json.dumps(record), encoding="utf-8")
+    else:
+        monkeypatch.setenv("FIXTURE_EXTRACTION_ENDPOINT", fake_llm.base_url + "/other")
+    assert extract_command(args) == 2
+    assert fake_llm.call_count == 3

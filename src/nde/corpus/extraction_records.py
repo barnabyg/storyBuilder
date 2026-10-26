@@ -1,8 +1,9 @@
 """Versioned extraction checkpoints; Phase 2 annotation sessions remain unchanged."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
@@ -33,6 +34,11 @@ class ExtractionSettings(Strict):
     prices: dict[str, Price]
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     max_repairs: int = Field(default=1, ge=0, le=10)
+
+    def provider_endpoints(self, environ: Mapping[str, str]) -> dict[str, str]:
+        return {
+            name: provider.resolved_base_url(environ) for name, provider in self.providers.items()
+        }
 
 
 class ExtractionConfig(ExtractionSettings):
@@ -71,6 +77,9 @@ class ExtractionSession(Strict):
     work_id: str
     source: Source
     source_sha256: str
+    work_record_sha256: str | None = None
+    provenance: dict[str, Any] = Field(default_factory=dict[str, Any])
+    resolved_providers: dict[str, str] = Field(default_factory=dict[str, str])
     segmentation_sha256: str
     work_dir: str
     segmentation_file: str

@@ -69,6 +69,9 @@ class FamilySession(Strict):
     work_dir: str
     segmentation_file: str
     source_sha256: str
+    work_record_sha256: str | None = None
+    provenance: dict[str, Any] = Field(default_factory=dict[str, Any])
+    resolved_providers: dict[str, str] = Field(default_factory=dict[str, str])
     segmentation_sha256: str
     config_file: str
     config: FamilyConfig
@@ -106,6 +109,9 @@ def _prepare(
     identity = {
         "config_sha256": digest(config.model_dump_json()),
         "source_sha256": record.text_sha256,
+        "work_record_sha256": digest(record.model_dump_json()),
+        "provenance": record.model_dump(mode="json"),
+        "resolved_providers": config.provider_endpoints(os.environ),
         "segmentation_sha256": digest(segments.model_dump_json()),
         "prompt_sha256": digest(INSTRUCTION),
         "schema_sha256": digest(schema_json()),
@@ -295,6 +301,9 @@ def family_report(directory: Path) -> dict[str, Any]:
     if (
         digest(current.model_dump_json()) != session.config_sha256
         or current != session.config
+        or session.provenance != record.model_dump(mode="json")
+        or session.work_record_sha256 != digest(record.model_dump_json())
+        or session.resolved_providers != current.provider_endpoints(os.environ)
         or record.text_sha256 != session.source_sha256
         or digest(segments.model_dump_json()) != session.segmentation_sha256
         or digest(INSTRUCTION) != session.prompt_sha256

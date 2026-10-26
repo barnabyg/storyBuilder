@@ -14,6 +14,11 @@ Configuration contains `providers`, `annotator`, explicit `prices`, `budget`,
 gateway provider/model/price/budget schemas. Instructions and narrative schema
 are versioned by checkpoint checksums. Changed source, segmentation, prompts,
 schema, configuration, cache or accounting paths require a new output version.
+Checkpoints also retain the complete acquired work provenance and the resolved
+provider endpoints, including environment overrides. Same-text author/licence
+metadata changes or endpoint changes cannot silently reuse old evidence. Earlier
+checkpoint JSON remains readable; checkpoints lacking these bindings cannot be
+resumed or admitted as current evidence and require a new output version.
 
 `extraction.json` checkpoints every expected pass, original response, diagnostic,
 request attribution, token count, retries and list-price/new-spend cost. Original
