@@ -8,6 +8,12 @@ Inspect saved narrative plans with the [plan workflow](docs/narrative-plans.md).
 Replay [planned scene state](docs/state-ledger.md) before writing prose.
 Generate a reproducible [G-schema evidence packet](docs/schema-evidence.md) from saved inputs.
 Compare [development tiers and freeze an owner selection](docs/tier-selection.md).
+Generate [validated C plans](docs/generated-plans.md) and write them through
+the [shared prose pipeline](docs/baseline-c.md). Inspect
+[equal-budget comparisons](docs/bc-comparisons.md) and
+[final-prose realisation evidence](docs/realisation.md).
+Require [strict gate readiness](docs/gate-readiness.md) before blind admission,
+then produce a [protocol-bound G1 decision](docs/g1-decision.md) after closure.
 
 ## Setup
 
