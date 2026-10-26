@@ -240,6 +240,9 @@ def test_tier_comparison_keeps_failed_pairs_and_does_not_select_them(
     assert report["status"] == "incomplete"
     assert any("incomplete" in item for item in report["problems"])
     assert report["tiers"]["S"]["stories"][0]["status"] == "failed"
+    missing = report["tiers"]["S"]["stories"]
+    assert {row["condition"] for row in missing} == {"B", "C"}
+    assert all(row["missing"] for row in missing)
     assert (
         main(
             [

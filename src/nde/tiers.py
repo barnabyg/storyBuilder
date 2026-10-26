@@ -299,6 +299,29 @@ def _run_rows(run: Path, packet: Comparison) -> tuple[list[dict[str, Any]], list
             if not row["plan_valid"]:
                 problems.append(f"{story.brief}: plan invalid or missing")
         rows.append(row)
+    for condition, brief, repetition in sorted(expected - set(identities)):
+        budget = story_budget(calls, condition, brief, repetition)
+        rows.append(
+            {
+                "condition": condition,
+                "brief": brief,
+                "repetition": repetition,
+                "status": "failed",
+                "missing": True,
+                "error": "story generation did not complete",
+                "attributed_budget": budget.model_dump(mode="json"),
+                "new_spend_usd": sum(
+                    call.cost_usd
+                    for call in calls
+                    if (call.condition, call.brief, call.repetition)
+                    == (condition, brief, repetition)
+                ),
+                "final_story_sha256": None,
+                "final_words": 0,
+                "length_valid": False,
+                "plan_valid": False,
+            }
+        )
     matching = summary.equal_budget
     if matching is None or len(matching.matches) != len(packet.briefs) * summary.repeat:
         problems.append("incomplete budget comparisons")
