@@ -28,6 +28,7 @@ from nde.runs.config import ConfigError, PromptRef, RoleName
 from nde.stories.pipeline import Step, StepFailedError, StoryContext, TemplateNeed
 
 CRITIC = PromptRef(template="plan_critic", version=1)
+CONSECUTIVE_FAILURE_LIMIT = 2
 
 
 class RefinementParams(CoarseParams):
@@ -197,6 +198,7 @@ def refine_plan(
             if record["status"] == "noop":
                 stopping = "noop"
                 break
+            stopping = "iteration_limit"
         status = "succeeded"
         return selected
     finally:
@@ -204,6 +206,7 @@ def refine_plan(
             "status": status,
             "stopping_reason": stopping if status == "succeeded" else "interrupted",
             "iterations": iterations,
+            "initial_plan_sha256": identity(initial),
             "selected_plan_sha256": identity(selected),
             "allow_critic_generator_family": params.allow_critic_generator_family,
         }
@@ -232,6 +235,7 @@ def _save_refinement(
         else ctx.roles["critic"].model_dump(mode="json"),
     )
     provenance["calls"].extend(call.model_dump(mode="json") for call in ctx.state.calls[first:])
+    provenance["calls_sha256"] = identity(provenance["calls"])
     provenance["prompts"].update(
         {
             need.prompt.label: ctx.templates[need.prompt.label].sha256

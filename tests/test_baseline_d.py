@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from nde.cli import main
+from nde.plan.revision import identity
 from tests.conftest import write_config
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion, error
 from tests.stories import (
@@ -420,7 +421,8 @@ def test_saved_d_revision_import_preserves_every_planning_and_refinement_call_on
 
 
 @pytest.mark.parametrize(
-    "tamper", ["calls", "seed", "model", "refinement", "nested", "usage", "plan"]
+    "tamper",
+    ["calls", "seed", "model", "refinement", "nested", "usage", "plan", "truncated", "chain"],
 )
 def test_saved_d_import_rejects_missing_or_stale_provenance_before_prose(
     fake_llm: FakeOpenAI,
@@ -430,7 +432,17 @@ def test_saved_d_import_rejects_missing_or_stale_provenance_before_prose(
 ) -> None:
     monkeypatch.setenv("FAKE_API_KEY", "test-key")
     fake_llm.default = critic_provider
-    value = critic_config(fake_llm.base_url)
+    value = critic_config(fake_llm.base_url, iterations=2 if tamper == "truncated" else 1)
+    if tamper == "truncated":
+
+        def terminal_review(body: Json) -> Reply:
+            if "structural revision critic" in str(
+                body["messages"][0]["content"]
+            ) and "Mara decides to relight" in str(body["messages"][1]["content"]):
+                return completion('{"issues": []}')
+            return critic_provider(body)
+
+        fake_llm.default = terminal_review
     source = run(tmp_path, value)
     [original] = stories(source)
     folder = source / original["path"]
@@ -448,6 +460,12 @@ def test_saved_d_import_rejects_missing_or_stale_provenance_before_prose(
         raw["refinement"]["iterations"][0] = "malformed record"
     elif tamper == "usage":
         raw["calls"][-1]["token_cost_usd"] = 0
+    elif tamper == "truncated":
+        raw["refinement"]["iterations"].pop()
+        raw["calls"] = [call for call in raw["calls"] if call["step"] != "critic-2"]
+        raw["calls_sha256"] = identity(raw["calls"])
+    elif tamper == "chain":
+        raw["refinement"]["iterations"][0]["before_sha256"] = "0" * 64
     else:
         (folder / "plan.json").write_text((folder / "plan.json").read_text() + " ")
     provenance.write_text(json.dumps(raw))
@@ -458,4 +476,4 @@ def test_saved_d_import_rejects_missing_or_stale_provenance_before_prose(
     [story] = stories(result)
     assert story["status"] == "failed"
     assert "saved-D-plan" in story["error"]
-    assert fake_llm.call_count == 14
+    assert fake_llm.call_count == (15 if tamper == "truncated" else 14)
