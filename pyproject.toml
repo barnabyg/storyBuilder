@@ -39,6 +39,7 @@ dev = [
     # starlette.testclient (the reader tests) uses httpx2 and warns when given httpx.
     "httpx2==2.14.0",
     "pip-audit==2.10.1",
+    "playwright==1.64.1",
     "pyright[nodejs]==1.1.414",
     "pytest==9.1.1",
     "ruff==0.17.1",

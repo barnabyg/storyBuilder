@@ -2,13 +2,13 @@
 
 import os
 import socket
-import subprocess
 import threading
 import time
 from pathlib import Path
 
 import pytest
 import uvicorn
+from playwright.sync_api import sync_playwright
 
 from nde.eval.batch import (
     Key,
@@ -25,8 +25,8 @@ from tests.conftest import REPO
 
 
 @pytest.mark.skipif(
-    not os.environ.get("NDE_BROWSER_NODE"),
-    reason="set NDE_BROWSER_NODE and NODE_PATH to installed Node/Playwright for browser acceptance",
+    os.environ.get("NDE_BROWSER") != "1",
+    reason="set NDE_BROWSER=1 to run acceptance with installed Chrome (or NDE_BROWSER_CHANNEL)",
 )
 def test_synthetic_g1_browser_controls_api_storage_and_blinding(tmp_path: Path) -> None:
     batch = tmp_path / "synthetic-test-only"
@@ -59,20 +59,49 @@ def test_synthetic_g1_browser_controls_api_storage_and_blinding(tmp_path: Path) 
             while not server.started and time.monotonic() < deadline:
                 time.sleep(0.01)
             assert server.started
-            # S603: fixed test script; installed Node path is an explicit test prerequisite.
-            subprocess.run(  # noqa: S603
-                [
-                    os.environ["NDE_BROWSER_NODE"],
-                    str(REPO / "tests/browser/g1-reader.cjs"),
-                    f"http://127.0.0.1:{port}",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=45,
-            )
+            _read_in_browser(f"http://127.0.0.1:{port}")
             assert read_judgements(batch)[1].a is not None
         finally:
             server.should_exit = True
             thread.join(timeout=10)
             assert not thread.is_alive()
+
+
+def _read_in_browser(base: str) -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            headless=True, channel=os.environ.get("NDE_BROWSER_CHANNEL", "chrome")
+        )
+        try:
+            page = browser.new_page()
+            page.goto(f"{base}/pairs/1")
+            assert "SECRET-" not in page.content()
+            for side in ("a", "b"):
+                for dimension in ("coherence", "originality"):
+                    control = page.locator(f'input[name="score-{side}-{dimension}"][value="1"]')
+                    assert control.get_attribute("required") == ""
+            assert (
+                page.request.post(
+                    f"{base}/pairs/1", form={"preferred": "A", "strength": "2"}
+                ).status
+                == 422
+            )
+            assert page.request.post(f"{base}/close").status == 409
+            assert page.request.get(f"{base}/sealed/key.json").status == 404
+            assert page.request.get(f"{base}/sealed/g1.json").status == 404
+            assert page.request.get(f"{base}/api/progress").status == 200
+            for side in ("a", "b"):
+                page.locator(f'input[name="score-{side}-coherence"][value="4"]').check()
+                page.locator(f'input[name="score-{side}-originality"][value="3"]').check()
+            page.locator('input[name="preferred"][value="A"]').check()
+            page.locator('input[name="strength"][value="2"]').check()
+            page.get_by_role("button", name="Save and continue").click()
+            saved = page.request.get(f"{base}/api/pairs/1").json()
+            assert saved["judgement"]["a"]["scores"] == {"coherence": 4, "originality": 3}
+            assert not any(word in str(saved) for word in ("sealed", "condition", "SECRET-"))
+            page.get_by_role("button", name="Close the batch").click()
+            page.reload()
+            progress = page.request.get(f"{base}/api/progress").json()
+            assert progress == {"pairs": 1, "judged": 1, "closed": True}
+        finally:
+            browser.close()

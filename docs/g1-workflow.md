@@ -75,12 +75,24 @@ prevent submission and closure, including incomplete scores already on disk.
 ## Browser acceptance
 
 Default tests use synthetic offline fixtures and download no browser. The browser
-test uses an already installed Node.js, Playwright package and Chromium/Chrome:
-set `NDE_BROWSER_NODE` to the Node executable, `NODE_PATH` to its installed
-`node_modules`, and optionally `NDE_BROWSER_CHANNEL=chrome`, then run
-`uv run pytest tests/test_g1_browser.py`. It exercises rendered required controls,
-HTTP validation, persisted scores, closure and sealed condition-map exclusion.
-Without `NDE_BROWSER_NODE`, this one test reports its prerequisite as skipped.
+test uses the exact Python Playwright version pinned in the dev dependencies and
+lockfile. `uv sync --locked` installs that package and its bundled driver; it does
+not download browsers. With Chrome already installed, run:
+
+```powershell
+$env:NDE_BROWSER = "1"
+uv run pytest tests/test_g1_browser.py
+uv run nde-verify
+```
+
+`NDE_BROWSER_CHANNEL` selects another installed browser channel (default `chrome`).
+For a separately provisioned Playwright Chromium, set that variable to `chromium`;
+provision it explicitly with `uv run playwright install chromium` before tests.
+Tests never install or download browsers. Without `NDE_BROWSER=1`, this one test
+reports its prerequisite as skipped. With it enabled, both focused tests and the
+canonical verification run exercise rendered required controls, HTTP validation,
+persisted scores, closure and sealed condition-map exclusion. Browser test code
+is Python, so the existing format, lint and strict type gates check it too.
 
 Manual regression: with a synthetic batch, submit only preference/strength and
 expect an error naming both required dimensions; complete coherence/originality
