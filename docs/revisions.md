@@ -61,3 +61,26 @@ runs retain diagnostics and `last-accepted` cards/plan, and do not expose a fail
 candidate as `plan.json`. A complete artifact directory is published by atomic
 rename; no existing destination is replaced. Cached replay retains experimental
 tokens and list-price cost while adding zero new provider spend.
+
+## Contiguous scene spans
+
+The same command/operator accepts `mask.scene_ids`, an explicit nonempty list in
+story order, for example `[s2, s3]`. First, middle, last and whole-story spans
+share one contract. Empty masks, unknown/duplicate/reversed/non-contiguous spans
+and whole-scene lock conflicts fail before calls. Scene and beat IDs, order and
+counts remain fixed; adding/removing/reordering scenes or beats is unsupported.
+A span grants content authority over those scene records only. Other channels
+and related edges require explicit `channels` or `units` entries in the mask;
+this includes any necessary incoming/outgoing causal, setup/payoff or knowledge
+edge correction. Selecting a span does not authorise editing linked context.
+Channel-level and nested locks continue to apply to separately selected records.
+
+Every candidate passes complete-plan validation (incoming/outgoing causal and
+setup/payoff timing, knowledge holders/acquisition/use, character presence,
+state continuity and hard constraints), plus the scope/lock boundary check.
+`revisions/<name>/boundary.json` binds the last accepted plan identities and
+records selected scene IDs, crossing causal/payoff links, knowledge events,
+constraints and validation diagnostics. Rejected candidates retain their own
+specific diagnostics and raw text under `planning/revision-<name>/`; they never
+replace the source or selected plan. Literary boundary consistency remains a
+human assessment, separate from these explicit symbolic checks.

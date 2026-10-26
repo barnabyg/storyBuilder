@@ -87,6 +87,17 @@ def selected_units(spec: RevisionSpec) -> list[str]:
     return [*spec.mask.channels, *spec.mask.units, *(f"scenes/{s}" for s in spec.mask.scene_ids)]
 
 
+def _validate_span(plan: NarrativePlan, scene_ids: list[str]) -> None:
+    if not scene_ids:
+        return
+    positions = {scene.id: index for index, scene in enumerate(plan.scenes)}
+    if any(scene_id not in positions for scene_id in scene_ids):
+        raise PlanError("scene span contains unknown scene IDs")
+    indices = [positions[scene_id] for scene_id in scene_ids]
+    if indices != list(range(indices[0], indices[0] + len(indices))):
+        raise PlanError("scene span must be contiguous, distinct and in story order")
+
+
 def validate_selection(plan: NarrativePlan, spec: RevisionSpec) -> None:
     result = validate_plan(plan)
     if not result.valid:
@@ -94,8 +105,7 @@ def validate_selection(plan: NarrativePlan, spec: RevisionSpec) -> None:
     selections = selected_units(spec)
     if not selections:
         raise PlanError("revision mask is empty")
-    if spec.mask.scene_ids:
-        raise PlanError("scene spans are not supported by this operator version")
+    _validate_span(plan, spec.mask.scene_ids)
     if len(set(selections)) != len(selections) or len(set(spec.locks)) != len(spec.locks):
         raise PlanError("duplicate revision selectors")
     if any(channel not in EDITABLE for channel in spec.mask.channels):
@@ -173,6 +183,43 @@ def revision_templates(spec: RevisionSpec) -> list[TemplateNeed]:
     return [TemplateNeed(spec.prompt, frozenset({"brief", "plan", "revision"}))]
 
 
+def boundary_evidence(
+    before: NarrativePlan, after: NarrativePlan, spec: RevisionSpec
+) -> dict[str, Any]:
+    """Expose explicit cross-span structure; validation always checks the entire plan."""
+    selected = set(spec.mask.scene_ids)
+    setups = {setup.id: setup.scene_id for setup in after.setups}
+    result = validate_plan(after)
+    errors = boundary_errors(before, after, spec)
+    return {
+        "scene_ids": spec.mask.scene_ids,
+        "before_sha256": identity(before),
+        "after_sha256": identity(after),
+        "valid": result.valid and not errors,
+        "scope_diagnostics": errors,
+        "validation": result.model_dump(mode="json"),
+        "incoming_causal_links": [
+            link.id
+            for link in after.causal_links
+            if link.effect_scene_id in selected and link.cause_scene_id not in selected
+        ],
+        "outgoing_causal_links": [
+            link.id
+            for link in after.causal_links
+            if link.cause_scene_id in selected and link.effect_scene_id not in selected
+        ],
+        "crossing_payoff_links": [
+            link.id
+            for link in after.payoff_links
+            if (setups.get(link.setup_id) in selected) != (link.payoff_scene_id in selected)
+        ],
+        "knowledge_events": [
+            event.model_dump(mode="json") for event in [*after.reveal_links, *after.knowledge_uses]
+        ],
+        "constraints": [constraint.model_dump(mode="json") for constraint in after.constraints],
+    }
+
+
 def revise_plan(
     ctx: StoryContext, before: NarrativePlan, spec: RevisionSpec, *, name: str = "revision"
 ) -> NarrativePlan:
@@ -220,6 +267,10 @@ def revise_plan(
         error = str(failure)
         raise
     finally:
+        ctx.keep(
+            f"{folder}/boundary.json",
+            json.dumps(boundary_evidence(before, selected, spec), indent=2) + "\n",
+        )
         _, last = rendered_files(before if status == "failed" else selected)
         for filename, content in last.items():
             ctx.keep(f"{folder}/last-accepted/{filename}", content)

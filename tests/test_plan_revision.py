@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from nde.cli import main
-from tests.conftest import write_config
+from tests.conftest import REPO, write_config
 from tests.fake_openai import FakeOpenAI, completion, error
 from tests.stories import jsonl, manifest
 from tests.test_plan_generation import config, skeleton
@@ -248,3 +248,174 @@ def test_provider_failure_retains_revision_provenance_and_source(
     assert (folder / "revisions/revision/last-accepted/plan.json").exists()
     assert not (folder / "plan.json").exists()
     assert manifest(run)["error"]["type"] == "authentication"
+
+
+@pytest.mark.parametrize(
+    "span",
+    [
+        ["scene-0"],
+        ["scene-1", "scene-2"],
+        ["scene-4"],
+        [f"scene-{i}" for i in range(5)],
+    ],
+)
+def test_scene_spans_save_changed_content_with_unchanged_surroundings(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    span: list[str],
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    changed = skeleton()
+    for scene in changed["scenes"]:
+        if scene["id"] in span:
+            scene["summary"] = "A revised scene function"
+    fake_llm.default = lambda _body: completion(json.dumps(changed))
+    value = revision_config(
+        tmp_path,
+        fake_llm.base_url,
+        {
+            "mask": {"scene_ids": span},
+            "instruction": "Revise these scene functions",
+        },
+    )
+    run = revise(tmp_path, value)
+    [record] = jsonl(run / "plans.jsonl")
+    folder = run / record["path"]
+    plan = json.loads((folder / "plan.json").read_text())
+    for scene in plan["scenes"]:
+        assert scene["summary"] == (
+            "A revised scene function"
+            if scene["id"] in span
+            else f"Function {scene['id'].split('-')[-1]}"
+        )
+    boundary = json.loads((folder / "revisions/revision/boundary.json").read_text())
+    assert boundary["scene_ids"] == span
+    assert boundary["valid"]
+
+
+@pytest.mark.parametrize(
+    ("span", "locks"),
+    [
+        ([], []),
+        (["scene-0", "scene-2"], []),
+        (["scene-2", "scene-1"], []),
+        (["missing"], []),
+        (["scene-1", "scene-1"], []),
+        (["scene-1"], ["scenes/scene-1"]),
+        (["scene-1"], ["scenes"]),
+    ],
+)
+def test_invalid_spans_and_lock_conflicts_fail_before_spend(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    span: list[str],
+    locks: list[str],
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    value = revision_config(
+        tmp_path,
+        fake_llm.base_url,
+        {
+            "mask": {"scene_ids": span},
+            "locks": locks,
+            "instruction": "Revise span",
+        },
+    )
+    assert main(["plan", "revise", str(write_config(tmp_path, value))]) == 2
+    assert fake_llm.call_count == 0
+
+
+@pytest.mark.parametrize(
+    ("attack", "diagnostic"),
+    [
+        ("dangling", "causal_endpoint"),
+        ("timing", "causal_order"),
+        ("knowledge", "knowledge_before_acquisition"),
+        ("presence", "knowledge_presence"),
+        ("locked_edge", "revision_lock"),
+        ("scope_edge", "revision_scope"),
+        ("nested_lock", "revision_lock"),
+        ("scene_identity", "revision_identity"),
+        ("scene_count", "revision_identity"),
+    ],
+)
+def test_boundary_mutations_and_lock_attacks_are_rejected(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    attack: str,
+    diagnostic: str,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    value = revision_config(
+        tmp_path,
+        fake_llm.base_url,
+        {
+            "mask": {"scene_ids": ["s2"], "channels": ["causal_links", "knowledge_uses"]},
+            "locks": ["causal_links/cause1", "scenes/s2/title"],
+            "instruction": "Revise span",
+        },
+    )
+    fixture = json.loads((REPO / "tests/fixtures/narrative-structure.json").read_text())
+    (tmp_path / "source.json").write_text(json.dumps(fixture))
+    changed = json.loads(json.dumps(fixture))
+    if attack == "dangling":
+        changed["causal_links"][0]["cause_scene_id"] = "missing"
+    elif attack == "timing":
+        changed["causal_links"][0]["cause_scene_id"] = "s3"
+        changed["causal_links"][0]["effect_scene_id"] = "s2"
+    elif attack == "knowledge":
+        changed["knowledge_uses"][1]["scene_id"] = "s1"
+    elif attack == "presence":
+        changed["scenes"][1]["character_ids"] = []
+    elif attack in {"locked_edge", "scope_edge"}:
+        changed["causal_links"][0]["effect_scene_id"] = "s2"
+        if attack == "scope_edge":
+            value["plans"]["params"]["revision"]["mask"]["channels"] = []
+    elif attack == "nested_lock":
+        changed["scenes"][1]["title"] = "Locked title attack"
+    elif attack == "scene_identity":
+        changed["scenes"][1]["id"] = "replacement"
+    elif attack == "scene_count":
+        changed["scenes"].pop()
+    fake_llm.default = lambda _body: completion(json.dumps(changed))
+    value["structured"] = {"max_repairs": 0}
+    run = revise(tmp_path, value, expected=1)
+    [record] = jsonl(run / "plans.jsonl")
+    folder = run / record["path"]
+    diagnostics = (folder / "planning/revision-revision/1.diagnostics.json").read_text()
+    assert diagnostic in diagnostics
+    assert (folder / "revisions/revision/last-accepted/plan.json").exists()
+    assert not (folder / "plan.json").exists()
+
+
+def test_valid_boundary_preserving_span_retains_causal_payoff_and_knowledge_context(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    value = revision_config(
+        tmp_path,
+        fake_llm.base_url,
+        {
+            "mask": {"scene_ids": ["s2", "s3"]},
+            "locks": ["causal_links", "constraints"],
+            "instruction": "Add concrete scene summaries without changing structural context",
+        },
+    )
+    fixture = json.loads((REPO / "tests/fixtures/narrative-structure.json").read_text())
+    (tmp_path / "source.json").write_text(json.dumps(fixture))
+    changed = json.loads(json.dumps(fixture))
+    changed["scenes"][1]["summary"] = "The warning transmits knowledge of the spare flare"
+    changed["scenes"][2]["summary"] = "Ivo uses the acquired knowledge to save the boat"
+    fake_llm.default = lambda _body: completion(json.dumps(changed))
+    run = revise(tmp_path, value)
+    [record] = jsonl(run / "plans.jsonl")
+    boundary = json.loads((run / record["path"] / "revisions/revision/boundary.json").read_text())
+    assert boundary["incoming_causal_links"] == ["cause1"]
+    assert boundary["crossing_payoff_links"] == ["payoff1"]
+    assert [event["id"] for event in boundary["knowledge_events"]] == ["reveal1", "use1", "use2"]
+    assert boundary["valid"]
