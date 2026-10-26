@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from nde import __version__, briefs, g1_report, realisation, tiers
+from nde import __version__, briefs, controllability, diversity, g1_report, realisation, tiers
 from nde.annotations import cli as annotation_cli
 from nde.corpus import provenance
 from nde.env import load_dotenv
@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
+    controllability.configure(
+        commands.add_parser("control-report", help="report plan-only structural edit evidence")
+    )
+    diversity.configure(
+        commands.add_parser("diversity-report", help="compare structures across seeds")
+    )
     g1_report.configure(
         commands.add_parser("g1-report", help="report a closed registered G1 batch")
     )
@@ -239,6 +245,8 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "control-report": controllability.run,
+    "diversity-report": diversity.run,
     "g1-report": g1_report.run,
     "tiers": tiers.run,
     "realisation": realisation.run,
