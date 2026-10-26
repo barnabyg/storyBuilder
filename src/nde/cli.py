@@ -31,6 +31,11 @@ from nde.evidence import cli as evidence_cli
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
 from nde.narrative import cli as narrative_cli
+from nde.reconstruction import codec as reconstruction_codec
+from nde.reconstruction import dataset as reconstruction_data
+from nde.reconstruction import overlap as reconstruction_overlap
+from nde.reconstruction import scoring as reconstruction_score
+from nde.reconstruction import tasks as reconstruction_tasks
 from nde.runs import prompts
 from nde.runs.config import ConfigError
 from nde.runs.records import read_manifest
@@ -65,6 +70,31 @@ def build_parser() -> argparse.ArgumentParser:
         ("corpus-pilot", corpus_pilot.configure, "run a frozen budget-capped extraction pilot"),
         ("corpus-g2", corpus_g2.configure, "assess registered corpus gate evidence"),
         ("corpus-export", corpus_export.configure, "export eligible approved training channels"),
+        (
+            "reconstruction-codec",
+            reconstruction_codec.configure,
+            "encode filtered structural plans",
+        ),
+        (
+            "reconstruction-data",
+            reconstruction_data.configure,
+            "prepare protected reconstruction data",
+        ),
+        (
+            "reconstruction-overlap",
+            reconstruction_overlap.configure_overlap,
+            "audit source overlap and structural neighbours",
+        ),
+        (
+            "reconstruction-score",
+            reconstruction_score.configure_score,
+            "score paired masked reconstruction predictions",
+        ),
+        (
+            "reconstruction-tasks",
+            reconstruction_tasks.configure,
+            "save reproducible corruption tasks",
+        ),
         ("gd-report", gd_report.configure, "report a closed registered G-D batch"),
         ("gd", gd_cli.configure, "registered D-versus-C gate workflow"),
         ("control-report", controllability.configure, "report plan-only structural edit evidence"),
@@ -277,6 +307,11 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "corpus-pilot": corpus_pilot.run,
     "corpus-g2": corpus_g2.run,
     "corpus-export": corpus_export.run,
+    "reconstruction-codec": reconstruction_codec.run,
+    "reconstruction-data": reconstruction_data.run,
+    "reconstruction-overlap": reconstruction_overlap.run_overlap,
+    "reconstruction-score": reconstruction_score.run_score,
+    "reconstruction-tasks": reconstruction_tasks.run,
     "corpus": corpus_cli.run,
     "gd-report": gd_report.run,
     "gd": gd_cli.run,
