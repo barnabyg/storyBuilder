@@ -9,6 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from nde.corpus.acquisition import CorpusError, acquire, load_work
+from nde.corpus.features import extract_features, load_features
 from nde.corpus.segmentation import compare_segmentation, load_segmentation, segment_work
 from nde.corpus.splits import freeze_cohort, load_cohort
 
@@ -37,11 +38,23 @@ def configure(parser: argparse.ArgumentParser) -> None:
         command.add_argument("segmentation", type=Path)
     compare.add_argument("--gold", type=Path)
     compare.add_argument("--out", type=Path, required=True)
+    features = commands.add_parser("features")
+    feature_check = commands.add_parser("features-check")
+    for command in (features, feature_check):
+        command.add_argument("work", type=Path)
+        command.add_argument("segmentation", type=Path)
+    features.add_argument("--out", type=Path, required=True)
+    features.add_argument("--aliases", type=Path)
+    feature_check.add_argument("features", type=Path)
 
 
 def run(args: argparse.Namespace) -> int:
     try:
-        if args.corpus_command == "segment":
+        if args.corpus_command == "features":
+            record = extract_features(args.work, args.segmentation, args.out, args.aliases)
+        elif args.corpus_command == "features-check":
+            record = load_features(args.features, args.work, args.segmentation)
+        elif args.corpus_command == "segment":
             record = segment_work(args.work, args.out)
         elif args.corpus_command == "segment-check":
             record = load_segmentation(args.segmentation, args.work)
