@@ -9,6 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from nde.corpus.acquisition import CorpusError, acquire, load_work
+from nde.corpus.splits import freeze_cohort, load_cohort
 
 
 def configure(parser: argparse.ArgumentParser) -> None:
@@ -20,11 +21,22 @@ def configure(parser: argparse.ArgumentParser) -> None:
             command.add_argument("file", type=Path)
         command.add_argument("--out", type=Path, required=True)
     commands.add_parser("inspect").add_argument("work", type=Path)
+    split = commands.add_parser("split").add_subparsers(dest="split_command", required=True)
+    freeze = split.add_parser("freeze")
+    freeze.add_argument("config", type=Path)
+    freeze.add_argument("--out", type=Path, required=True)
+    split.add_parser("inspect").add_argument("cohort", type=Path)
 
 
 def run(args: argparse.Namespace) -> int:
     try:
-        if args.corpus_command == "inspect":
+        if args.corpus_command == "split":
+            record = (
+                freeze_cohort(args.config, args.out)
+                if args.split_command == "freeze"
+                else load_cohort(args.cohort)
+            )
+        elif args.corpus_command == "inspect":
             record, _ = load_work(args.work)
         else:
             record = acquire(
