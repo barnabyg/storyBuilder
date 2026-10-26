@@ -25,6 +25,10 @@ _SECRET_SCAN_EXCLUDES: dict[str, str] = {
     # SHA-256 checksums recorded for each calibration source; YAML written by
     # `nde calibration fetch`, which cannot place inline pragmas.
     "data/manifest.calibration.yaml": "calibration source checksums",
+    # HexHighEntropyString: exact SHA-256 of the synthetic embedded source and
+    # evidence spans. JSON cannot carry an inline pragma. Revisit if this fixture
+    # gains non-checksum high-entropy fields; source identity is verified in tests.
+    "src/nde/evidence/controls/evidence.json": "synthetic source/span checksum fixture",
 }
 
 

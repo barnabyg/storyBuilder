@@ -71,7 +71,9 @@ The only broader exceptions are the per-file ignores for `tests/**` in
 there, and the secret-scan exclusions for checksum files (`prompts/checksums.json`,
 `benchmark/frozen.json`, `tests/fixtures/frozen-split/frozen.json`,
 `benchmark/rubric/checksums.json`,
-`data/manifest.calibration.yaml`), justified in `src/nde/verify/steps.py`. The code has no type-checker suppressions.
+`data/manifest.calibration.yaml`, and the synthetic source/span checksum fixture
+`src/nde/evidence/controls/evidence.json`), justified in `src/nde/verify/steps.py`.
+The code has no type-checker suppressions.
 
 CI (`.github/workflows/verify.yml`) runs the same command headless on every
 push and pull request.
