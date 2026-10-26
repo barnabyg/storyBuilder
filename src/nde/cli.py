@@ -19,8 +19,8 @@ from nde import (
 )
 from nde.annotations import cli as annotation_cli
 from nde.corpus import cli as corpus_cli
+from nde.corpus import exemplars, extraction_cli, provenance
 from nde.corpus import export as corpus_export
-from nde.corpus import extraction_cli, provenance
 from nde.corpus import g2 as corpus_g2
 from nde.corpus import pilot as corpus_pilot
 from nde.corpus import reliability as corpus_review
@@ -55,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command")
     corpus_cli.configure(commands.add_parser("corpus", help="acquire and inspect corpus works"))
     for name, configure, description in (
+        ("exemplars", exemplars.configure, "compare approved plan exemplars on dev briefs"),
         (
             "extract",
             extraction_cli.configure,
@@ -270,6 +271,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "exemplars": exemplars.run,
     "extract": extraction_cli.run,
     "corpus-review": corpus_review.run,
     "corpus-pilot": corpus_pilot.run,
