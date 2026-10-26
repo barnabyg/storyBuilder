@@ -19,7 +19,9 @@ from nde import (
 )
 from nde.annotations import cli as annotation_cli
 from nde.corpus import cli as corpus_cli
+from nde.corpus import export as corpus_export
 from nde.corpus import extraction_cli, provenance
+from nde.corpus import g2 as corpus_g2
 from nde.corpus import pilot as corpus_pilot
 from nde.corpus import reliability as corpus_review
 from nde.env import load_dotenv
@@ -60,6 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         ("corpus-review", corpus_review.configure, "freeze and assess corpus channel reviews"),
         ("corpus-pilot", corpus_pilot.configure, "run a frozen budget-capped extraction pilot"),
+        ("corpus-g2", corpus_g2.configure, "assess registered corpus gate evidence"),
+        ("corpus-export", corpus_export.configure, "export eligible approved training channels"),
         ("gd-report", gd_report.configure, "report a closed registered G-D batch"),
         ("gd", gd_cli.configure, "registered D-versus-C gate workflow"),
         ("control-report", controllability.configure, "report plan-only structural edit evidence"),
@@ -269,6 +273,8 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "extract": extraction_cli.run,
     "corpus-review": corpus_review.run,
     "corpus-pilot": corpus_pilot.run,
+    "corpus-g2": corpus_g2.run,
+    "corpus-export": corpus_export.run,
     "corpus": corpus_cli.run,
     "gd-report": gd_report.run,
     "gd": gd_cli.run,
