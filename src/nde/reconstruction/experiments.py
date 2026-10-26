@@ -3,6 +3,7 @@
 import argparse
 import importlib
 import json
+import math
 import os
 import sys
 import time
@@ -81,6 +82,7 @@ def register_experiment(config_path: Path, out: Path) -> dict[str, Any]:
         config.base_model / "model.json",
         config.base_model / "weights.json",
     ]
+    phase_seconds = math.nextafter(config.max_total_seconds / (cardinality * 2), 0.0)
     out.mkdir(parents=True, exist_ok=True)
     for dataset_index, training_path in enumerate(config.train_datasets):
         original = load_training_dataset(training_path)
@@ -99,6 +101,12 @@ def register_experiment(config_path: Path, out: Path) -> dict[str, Any]:
                         "seed": seed,
                         "test_only": config.test_only,
                         **config.training,
+                        "max_seconds": min(
+                            float(config.training.get("max_seconds", 3600)), phase_seconds
+                        ),
+                        "inference_max_seconds": min(
+                            float(config.training.get("inference_max_seconds", 3600)), phase_seconds
+                        ),
                     }
                 )
                 pair = {
@@ -123,7 +131,10 @@ def register_experiment(config_path: Path, out: Path) -> dict[str, Any]:
                             "learning_rate",
                         )
                     },
-                    "inference_budget": {"max_tokens": template.inference_max_tokens},
+                    "inference_budget": {
+                        "max_tokens": template.inference_max_tokens,
+                        "max_seconds": template.inference_max_seconds,
+                    },
                     "source_dataset_id": original["id"],
                     "generation_costs": original.get("generation_costs", {}),
                     "source_groups": original.get("source_groups", subset["groups"]),
@@ -151,6 +162,8 @@ def register_experiment(config_path: Path, out: Path) -> dict[str, Any]:
                             "seed": seed,
                             "subset_percent": percent,
                             "granularity": original["granularity"],
+                            "time_reservation_seconds": template.max_seconds
+                            + template.inference_max_seconds,
                         }
                     )
     return create_record(
@@ -208,6 +221,7 @@ def _job_result(job: dict[str, Any], protocol: dict[str, Any], steps: int | None
         "objective": job["objective"],
     }
     result["reserved_tokens"] = _reservation(job)
+    result["reserved_seconds"] = job["time_reservation_seconds"]
     if training["status"] != "complete":
         return result
     checkpoint = directory / "training/checkpoints" / f"step-{training['step']:08d}.json"
@@ -294,6 +308,7 @@ def _failed_job(job: dict[str, Any], protocol: dict[str, Any], error: Exception)
         "error": str(error),
         "evaluation_task_set_id": protocol["evaluation_task_set_id"],
         "reserved_tokens": _reservation(job),
+        "reserved_seconds": job["time_reservation_seconds"],
         "accounting": "full reservation retained for failed/unknown work",
     }
     try:
@@ -347,13 +362,21 @@ def _run_locked(
             continue
         reserved = sum(row.get("reserved_tokens", 0) for row in progress["jobs"])
         additional = 0 if progress["jobs"][index].get("reserved_tokens") else _reservation(job)
+        seconds = math.fsum(float(row.get("reserved_seconds", 0.0)) for row in progress["jobs"])
+        new_seconds = (
+            0.0
+            if progress["jobs"][index].get("reserved_seconds")
+            else job["time_reservation_seconds"]
+        )
         if (
             (job_limit is not None and attempted >= job_limit)
             or progress["elapsed_seconds"] >= config.max_total_seconds
             or reserved + additional > config.max_total_tokens
+            or seconds + new_seconds > config.max_total_seconds
         ):
             break
         progress["jobs"][index]["reserved_tokens"] = _reservation(job)
+        progress["jobs"][index]["reserved_seconds"] = job["time_reservation_seconds"]
         progress["jobs"][index]["status"] = "running"
         save_json(progress_path, seal(progress))
         started = time.monotonic()
@@ -372,6 +395,9 @@ def _run_locked(
         "complete_jobs": sum(row["status"] == "complete" for row in progress["jobs"]),
         "expected_jobs": len(protocol["jobs"]),
         "reserved_tokens": sum(row.get("reserved_tokens", 0) for row in progress["jobs"]),
+        "reserved_seconds": math.fsum(
+            float(row.get("reserved_seconds", 0.0)) for row in progress["jobs"]
+        ),
         "actual_training_tokens": sum(row.get("training_tokens", 0) for row in progress["jobs"]),
         "actual_inference_tokens": sum(
             row.get("work", {}).get("inference_tokens", 0) for row in progress["jobs"]

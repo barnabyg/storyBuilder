@@ -351,6 +351,7 @@ def _matching_problems(registered: dict[str, Any], score: dict[str, Any], path: 
         pending.append("unequal model/data/budget configuration")
     frozen = registered["readiness"]
     pair = frozen["pairs"][str(path.resolve())]
+    inference_budget = pair.get("inference_budget", frozen["inference_budget"])
     expected = {
         "base_id": frozen["base_id"],
         "initial_parameter_sha256": frozen["initial_parameter_sha256"],
@@ -359,7 +360,7 @@ def _matching_problems(registered: dict[str, Any], score: dict[str, Any], path: 
         "task_set_id": pair["training_task_set_id"],
         "seed": pair["seed"],
         "training_budget": pair["training_budget"],
-        "inference_budget": frozen["inference_budget"],
+        "inference_budget": inference_budget,
     }
     if any(score["matching"].get(key) != value for key, value in expected.items()):
         pending.append("score configuration differs from frozen paired job")
@@ -375,8 +376,13 @@ def _matching_problems(registered: dict[str, Any], score: dict[str, Any], path: 
         ):
             if work[field] > budget[cap]:
                 pending.append(f"{side}: recorded {field} exceeds registered budget")
-        if work["inference_tokens"] > frozen["inference_budget"]["max_tokens"]:
+        if work["inference_tokens"] > inference_budget["max_tokens"]:
             pending.append(f"{side}: inference budget exceeded")
+        if "max_seconds" in inference_budget and (
+            "inference_elapsed_seconds" not in work
+            or work["inference_elapsed_seconds"] > inference_budget["max_seconds"]
+        ):
+            pending.append(f"{side}: inference time budget exceeded or unavailable")
     return pending
 
 

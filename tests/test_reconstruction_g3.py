@@ -301,3 +301,28 @@ def test_g3_rejects_matrix_populations_outside_its_registered_overlap_audit(
     create_record(experiment, matrix)
     with pytest.raises(ValueError, match="one audited training population"):
         readiness(config)
+
+
+@pytest.mark.parametrize("problem", [None, "matching", "elapsed"])
+def test_g3_uses_each_pairs_allocated_inference_seconds(
+    tmp_path: Path, problem: str | None
+) -> None:
+    config, fixture = g3_inputs(tmp_path)
+    experiment = tmp_path / "experiment.json"
+    matrix = read_sealed(experiment)
+    allocated = {"max_tokens": 128, "max_seconds": 0.25}
+    matrix["pairs"][0]["inference_budget"] = allocated
+    experiment.unlink()
+    create_record(experiment, matrix)
+    fixture["score"]["matching"]["inference_budget"] = dict(allocated)
+    for side in ("candidate", "comparator"):
+        fixture["score"]["work"][side]["inference_elapsed_seconds"] = 0.1
+    protocol = tmp_path / "protocol.json"
+    register(config, protocol)
+    if problem == "matching":
+        fixture["score"]["matching"]["inference_budget"]["max_seconds"] = 0.5
+    if problem == "elapsed":
+        fixture["score"]["work"]["candidate"]["inference_elapsed_seconds"] = 0.3
+    complete(tmp_path, fixture)
+    decision = assess(protocol)
+    assert decision["criteria_outcome"] == ("passed" if problem is None else "pending")

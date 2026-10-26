@@ -128,3 +128,53 @@ def test_failed_sweep_jobs_keep_their_resource_reservation_after_training(
     assert result["jobs"][0]["training_steps"] == 1
     assert result["reserved_tokens"] == 15000
     assert run_experiment(tmp_path / "sweep") == result
+
+
+@pytest.mark.ml
+@pytest.mark.skipif(
+    importlib.util.find_spec("torch") is None and os.environ.get("NDE_REQUIRE_ML") != "1",
+    reason="optional CPU ML runtime",
+)
+def test_registered_sweep_time_caps_stop_cpu_work_and_survive_resume(
+    tmp_path: Path, fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    training, evaluation = paired_datasets(tmp_path / "data", fake_llm)
+    initialize_model(tmp_path / "base", width=8, max_positions=8192)
+    config = tmp_path / "timed.json"
+    config.write_text(
+        json.dumps(
+            {
+                "base_model": str(tmp_path / "base"),
+                "train_datasets": [str(training)],
+                "evaluation_dataset": str(evaluation),
+                "subsets": [100],
+                "max_jobs": 2,
+                "max_total_seconds": 1,
+                "test_only": True,
+                "training": {
+                    "max_steps": 100,
+                    "max_seconds": 3600,
+                    "max_output_tokens": 2048,
+                    "inference_max_tokens": 5000,
+                },
+            }
+        )
+    )
+    protocol = register_experiment(config, tmp_path / "sweep")
+    budgets = [job["binding"]["config"] for job in protocol["jobs"]]
+    assert sum(budget["max_seconds"] + budget["inference_max_seconds"] for budget in budgets) <= 1
+    ticks = 0.0
+
+    def monotonic() -> float:
+        nonlocal ticks
+        ticks += 0.05
+        return ticks
+
+    monkeypatch.setattr("time.monotonic", monotonic)
+    stopped = run_experiment(tmp_path / "sweep")
+    assert any(job["status"] == "resource-stop" for job in stopped["jobs"])
+    assert all(job.get("training_steps", 0) < 100 for job in stopped["jobs"])
+    assert stopped["reserved_seconds"] <= 1
+    resumed = run_experiment(tmp_path / "sweep")
+    assert resumed["reserved_seconds"] == stopped["reserved_seconds"]
+    assert resumed["jobs"] == stopped["jobs"]

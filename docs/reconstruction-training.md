@@ -66,3 +66,12 @@ budget comparison, not a claim that unequal realized inference costs are equal.
 The public `inspect_attention` API allows controlled verification of causal future
 invariance. CPU integration tests perform real AR updates, checkpoint resume and
 reconstruction on exactly the saved denoiser tasks.
+
+
+`inference_max_seconds` defaults to 3600 for standalone reconstruction. Training and
+inference write bound phase-timer journals; their elapsed allowances persist across
+resume. Inference checks before every forward pass, reports resource-stopped tasks
+and records `inference_elapsed_seconds`. If result publication is interrupted, the
+unknown remaining inference allowance is conservatively charged rather than granted
+again. A registered sweep freezes smaller matched per-phase caps when necessary to
+fit its aggregate time budget.

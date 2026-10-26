@@ -38,6 +38,7 @@ from nde.reconstruction.codec import (
 )
 from nde.reconstruction.dataset import load_dataset
 from nde.reconstruction.model import build, pack, runtime, unpack
+from nde.reconstruction.resources import TimeAllowance
 from nde.reconstruction.tasks import model_input
 from nde.reconstruction.training_data import dataset_file, load_training_dataset
 
@@ -57,6 +58,7 @@ class TrainingConfig(Strict):
     max_seconds: float = Field(default=3600, gt=0, allow_inf_nan=False)
     max_output_tokens: int = Field(default=256, ge=4)
     inference_max_tokens: int = Field(default=1000000, ge=1)
+    inference_max_seconds: float = Field(default=3600, gt=0, allow_inf_nan=False)
     budget_policy: Literal["padded-token-attention-caps-v1"] = "padded-token-attention-caps-v1"
     test_only: bool = False
     g1_batch: Path | None = None
@@ -388,6 +390,7 @@ def train(
     config_path: Path, out: Path, *, resume: bool = False, max_steps_this_call: int | None = None
 ) -> dict[str, Any]:
     """Train one optimizer on approved tasks, preserving budgets across resumptions."""
+    call_started = time.monotonic()
     if max_steps_this_call is not None and max_steps_this_call < 1:
         raise ValueError("steps-this-call must be positive")
     binding = preflight(config_path)
@@ -396,7 +399,17 @@ def train(
     torch = runtime()
     torch.set_num_threads(1)
     model, state, optimizer = _training_state(binding, config, out, resume=resume)
-    started = time.monotonic()
+    timer = TimeAllowance(
+        out / "training-time.json",
+        identity(binding),
+        config.max_seconds,
+        call_started,
+        elapsed_floor=state["elapsed_seconds"],
+        charge_interruption=False,
+    )
+    state["elapsed_seconds"] = timer.elapsed()
+    if timer.expired():
+        state["status"] = "resource-stop"
     stop_step = min(config.max_steps, state["step"] + (max_steps_this_call or config.max_steps))
     while state["step"] < stop_step:
         task = tasks[(int(state["sampler_position"]) + config.seed) % len(tasks)]
@@ -404,6 +417,7 @@ def train(
         target, weights = _target_tokens(task)
         width = config.max_output_tokens
         length = len(context) + width
+        state["elapsed_seconds"] = timer.elapsed()
         if (
             state["elapsed_seconds"] >= config.max_seconds
             or state["tokens"] + length > config.max_tokens
@@ -424,6 +438,7 @@ def train(
                 }
             ),
         )
+        timer.save(tokens=state["tokens"], cells=state["attention_cells"])
         loss = _optimizer_step(model, optimizer, context, (target, weights), config)
         state["step"] += 1
         state["sampler_position"] += 1
@@ -434,10 +449,18 @@ def train(
         state["parameter_sha256"] = identity(state["model_state"])
         state["optimizer_state"] = pack(optimizer.state_dict())
         state["rng_state"] = torch.get_rng_state().tolist()
-        state["elapsed_seconds"] += time.monotonic() - started
-        started = time.monotonic()
-        state["status"] = "complete" if state["step"] == config.max_steps else "partial"
+        state["elapsed_seconds"] = timer.elapsed()
+        state["status"] = (
+            "resource-stop"
+            if timer.expired()
+            else "complete"
+            if state["step"] == config.max_steps
+            else "partial"
+        )
         _save_checkpoint(out, state)
+        if state["status"] == "resource-stop":
+            break
+    timer.save(tokens=state["tokens"], cells=state["attention_cells"], status="complete")
     if state["status"] == "resource-stop":
         # Progress checkpoints remain immutable; a separate status retains the stop reason.
         save_json(out / "status.json", {"status": "resource-stop", "step": state["step"]})
@@ -449,6 +472,7 @@ def train(
         "losses": state["losses"],
         "reserved_failed_tokens": state.get("reserved_failed_tokens", 0),
         "work_accounting": "completed work plus durable interrupted-step reservations",
+        "elapsed_seconds": timer.elapsed(),
         "parameter_sha256": state["parameter_sha256"],
         "binding": binding,
     }
@@ -481,7 +505,9 @@ def _decode_prediction(tokens: list[int], task: dict[str, Any]) -> list[dict[str
     return replacements
 
 
-def _generate(model: Any, context: list[int], config: TrainingConfig) -> tuple[list[int], int]:
+def _generate(
+    model: Any, context: list[int], config: TrainingConfig, *, deadline: float
+) -> tuple[list[int], int]:
     torch = runtime()
     width = config.max_output_tokens
     generated: list[int] = []
@@ -489,13 +515,15 @@ def _generate(model: Any, context: list[int], config: TrainingConfig) -> tuple[l
     with torch.no_grad():
         if config.objective == "ar":
             for _ in range(width):
+                if time.monotonic() >= deadline:
+                    break
                 output = [BOS, *generated] + [PAD] * (width - len(generated) - 1)
                 logits = model.forward(context + output, causal=True, context_length=len(context))
                 generated.append(int(logits[len(generated)].argmax().item()))
                 passes += 1
                 if generated[-1] == EOS:
                     break
-        else:
+        elif time.monotonic() < deadline:
             logits = model.forward(
                 context + [MASK] * width, causal=False, context_length=len(context)
             )
@@ -504,9 +532,50 @@ def _generate(model: Any, context: list[int], config: TrainingConfig) -> tuple[l
     return generated, passes
 
 
+def _prediction_row(
+    task: dict[str, Any], model: Any, config: TrainingConfig, timer: TimeAllowance, tokens_used: int
+) -> tuple[dict[str, Any], int, int]:
+    context = model_input(task)
+    width = config.max_output_tokens
+    length = len(context) + width
+    passes = width if config.objective == "ar" else 1
+    row: dict[str, Any] = {
+        "task_id": task["id"],
+        "status": "invalid",
+        "replacements": [],
+        "diagnostics": [],
+    }
+    if timer.expired() or tokens_used + length * passes > config.inference_max_tokens:
+        row["status"] = "resource-stop"
+        row["diagnostics"] = ["registered inference time/token allowance exhausted"]
+        return row, 0, 0
+    if length > model.max_positions:
+        row["diagnostics"] = ["evaluation task exceeds position capacity"]
+        return row, 0, 0
+    generated, actual_passes = _generate(model, context, config, deadline=timer.deadline)
+    if timer.expired():
+        row["status"] = "resource-stop"
+        row["diagnostics"] = ["registered inference time allowance exhausted during forward passes"]
+    else:
+        try:
+            row["replacements"] = _decode_prediction(generated, task)
+            row["status"] = "complete"
+        except (ValueError, UnicodeDecodeError, TypeError) as error:
+            row["diagnostics"] = [str(error)]
+    row["generated_tokens"] = generated
+    return row, length * actual_passes, width * length * actual_passes
+
+
 def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[str, Any]:
+    call_started = time.monotonic()
     checkpoint = inspect_checkpoint(checkpoint_path)
     config = TrainingConfig.model_validate(checkpoint["binding"]["config"])
+    timer = TimeAllowance(
+        out / "inference-time.json",
+        identity({"checkpoint_id": checkpoint["id"], "dataset": str(dataset_path.resolve())}),
+        config.inference_max_seconds,
+        call_started,
+    )
     dataset = _dataset(dataset_path)
     if dataset["codec_id"] != checkpoint["binding"]["codec_id"] or (
         dataset["vocabulary_id"] != checkpoint["binding"]["vocabulary_id"]
@@ -517,39 +586,14 @@ def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[st
     model = build(base["width"], base["max_positions"], config.seed, checkpoint["model_state"])
     torch = runtime()
     torch.set_num_threads(1)
-    tokens_used = cells_used = 0
+    tokens_used, cells_used = timer.tokens_before, timer.cells_before
     predictions: list[dict[str, Any]] = []
     for task in tasks:
-        # The only task function called inside inference is model_input; it excludes targets.
-        context = model_input(task)
-        width = config.max_output_tokens
-        length = len(context) + width
-        passes = width if config.objective == "ar" else 1
-        row: dict[str, Any] = {
-            "task_id": task["id"],
-            "status": "invalid",
-            "replacements": [],
-            "diagnostics": [],
-        }
-        if tokens_used + length * passes > config.inference_max_tokens:
-            row["status"] = "resource-stop"
-            row["diagnostics"] = ["registered inference token cap exhausted"]
-            predictions.append(row)
-            continue
-        if length > model.max_positions:
-            row["diagnostics"] = ["evaluation task exceeds position capacity"]
-            predictions.append(row)
-            continue
-        generated, actual_passes = _generate(model, context, config)
-        tokens_used += length * actual_passes
-        cells_used += width * length * actual_passes
-        try:
-            row["replacements"] = _decode_prediction(generated, task)
-            row["status"] = "complete"
-        except (ValueError, UnicodeDecodeError, TypeError) as error:
-            row["diagnostics"] = [str(error)]
-        row["generated_tokens"] = generated
+        row, used_tokens, used_cells = _prediction_row(task, model, config, timer, tokens_used)
+        tokens_used += used_tokens
+        cells_used += used_cells
         predictions.append(row)
+        timer.save(tokens=tokens_used, cells=cells_used)
     matching = {
         key: checkpoint["binding"][key]
         for key in (
@@ -574,7 +618,10 @@ def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[st
             "learning_rate",
         )
     }
-    matching["inference_budget"] = {"max_tokens": config.inference_max_tokens}
+    matching["inference_budget"] = {
+        "max_tokens": config.inference_max_tokens,
+        "max_seconds": config.inference_max_seconds,
+    }
     result = create_record(
         out / "predictions.json",
         {
@@ -598,11 +645,14 @@ def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[st
                 "training_elapsed_seconds": checkpoint["elapsed_seconds"],
                 "inference_tokens": tokens_used,
                 "inference_attention_cells": cells_used,
+                "inference_elapsed_seconds": timer.elapsed(),
+                "inference_interrupted_allowance_retained": timer.interrupted,
             },
             "predictions": predictions,
             "inputs": snapshot([checkpoint_path, dataset_file(dataset_path)]),
         },
     )
+    timer.save(tokens=tokens_used, cells=cells_used, status="complete")
     report_files(out, "Reconstruction predictions", result)
     return result
 

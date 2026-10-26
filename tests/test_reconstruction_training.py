@@ -2,9 +2,11 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
+from nde.corpus.records_io import read_sealed
 from nde.reconstruction.dataset import load_dataset
 from nde.reconstruction.tasks import model_input
 from nde.reconstruction.training import (
@@ -269,3 +271,56 @@ def test_interrupted_optimizer_work_remains_charged_to_the_resumed_budget(
     assert resumed["parameter_sha256"] == continuous["parameter_sha256"]
     assert resumed["tokens"] > continuous["tokens"]
     assert resumed["reserved_failed_tokens"] == resumed["tokens"] - continuous["tokens"]
+
+
+def test_cpu_inference_deadline_and_interrupted_allowance_are_preserved(
+    tmp_path: Path, fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset = training_dataset(
+        tmp_path / "data", fake_llm, schedules=[{"kind": "fields", "channel": "goal", "rate": 0.1}]
+    )
+    initialize_model(tmp_path / "base", width=8, max_positions=4096)
+    config = tmp_path / "timed-ar.json"
+    config.write_text(
+        json.dumps(
+            {
+                "dataset": str(dataset),
+                "base_model": str(tmp_path / "base"),
+                "objective": "ar",
+                "max_steps": 1,
+                "max_output_tokens": 128,
+                "inference_max_seconds": 0.5,
+                "test_only": True,
+            }
+        )
+    )
+    train(config, tmp_path / "run")
+    checkpoint = tmp_path / "run/checkpoints/step-00000001.json"
+    ticks = 0.0
+
+    def monotonic() -> float:
+        nonlocal ticks
+        ticks += 0.02
+        return ticks
+
+    monkeypatch.setattr("time.monotonic", monotonic)
+    stopped = reconstruct(checkpoint, dataset, tmp_path / "stopped")
+    assert stopped["work"]["inference_tokens"] > 0
+    assert all(row["status"] == "resource-stop" for row in stopped["predictions"])
+    assert stopped["work"]["inference_elapsed_seconds"] >= 0.5
+    original_open = Path.open
+
+    def interrupted_open(path: Path, *args: Any, **kwargs: Any) -> Any:
+        if path.name == "predictions.json":
+            raise OSError("interrupted inference publication")
+        return cast(Any, original_open)(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", interrupted_open)
+    with pytest.raises(OSError, match="interrupted inference"):
+        reconstruct(checkpoint, dataset, tmp_path / "interrupted")
+    monkeypatch.setattr(Path, "open", original_open)
+    journal = read_sealed(tmp_path / "interrupted/inference-time.json")
+    resumed = reconstruct(checkpoint, dataset, tmp_path / "interrupted")
+    assert resumed["work"]["inference_tokens"] == journal["tokens"]
+    assert resumed["work"]["inference_interrupted_allowance_retained"] is True
+    assert all(row["status"] == "resource-stop" for row in resumed["predictions"])

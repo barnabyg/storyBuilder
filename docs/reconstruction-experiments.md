@@ -47,3 +47,26 @@ source groups, generator costs and human-control linkage remain in reports.
 Recipe/model selection is validation-only; fixed test results never select the
 configuration later described as registered. Software fixtures remain test-only,
 and no sweep result automatically passes G3 or launches Phase 7.
+
+
+## Time allowance and interrupted work
+
+Registration divides `max_total_seconds` into frozen per-job training and inference
+portions. Their sum over the matrix fits the total allowance; a requested phase cap
+can reduce its portion further. Candidate and comparator receive identical portions.
+Each started job durably reserves both portions before executing, and that seconds
+charge remains on completed, failed, partial and interrupted entries.
+
+Training checks its saved phase timer before every optimizer step, includes setup,
+and records a resource stop when a step crosses the cap. Inference checks a deadline
+before each forward pass, records elapsed seconds and preserves every stopped task.
+Checks occur between indivisible operations, so one kernel or file-validation
+operation may overrun the deadline; that overrun is reported and cannot pass G3.
+No timer can preempt a tensor kernel already executing.
+
+Phase timer journals survive incomplete result publication. Unknown interrupted
+inference consumes its remaining time portion conservatively, retaining known token
+work and producing explicit resource stops on resume. Training combines its timer
+with the existing durable optimizer-attempt journal. G3 checks each pair's allocated
+inference token/time caps rather than the original unallocated request. Older saved
+score fixtures without a time field keep their registered token-only interpretation.
