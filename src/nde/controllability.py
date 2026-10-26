@@ -2,9 +2,10 @@
 
 import argparse
 import html
+import json
 import sys
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self, cast
 
 from pydantic import Field, model_validator
 
@@ -57,6 +58,7 @@ class ControlInputs(Strict):
     before: str
     after: str
     revision: RevisionSpec
+    revision_provenance: str | None = None
     targets: list[ControlTarget] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -75,6 +77,8 @@ class ControlReport(Strict):
     after_sha256: str
     inputs: dict[str, str]
     request_path: str
+    revision_provenance_path: str | None = None
+    accepted_revision: bool = False
     revision: RevisionSpec
     targets: list[TargetResult]
     lock_stable: bool
@@ -135,6 +139,26 @@ def _target(before: NarrativePlan, after: NarrativePlan, target: ControlTarget) 
     )
 
 
+def _revision_evidence(
+    path: Path | None, before: NarrativePlan, after: NarrativePlan, spec: RevisionSpec
+) -> tuple[Status, str]:
+    if path is None:
+        return "unknown", "No accepted operator revision provenance supplied"
+    data: Any = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("revision provenance must be an object")
+    record = cast(dict[str, Any], data)
+    if (
+        record.get("status") not in {"accepted", "noop"}
+        or (record.get("status") == "noop") != (plan_identity(before) == plan_identity(after))
+        or record.get("before_sha256") != plan_identity(before)
+        or record.get("after_sha256") != plan_identity(after)
+        or RevisionSpec.model_validate(record.get("revision")) != spec
+    ):
+        return "failure", "Operator provenance does not bind this source, mask and accepted output"
+    return "success", "Accepted operator source, mask and output identities match"
+
+
 def control_report(path: Path) -> ControlReport:
     inputs = ControlInputs.model_validate_json(path.read_text(encoding="utf-8"))
     before_path, after_path = path.parent / inputs.before, path.parent / inputs.after
@@ -152,10 +176,20 @@ def control_report(path: Path) -> ControlReport:
         except ValueError:
             locks = False
     targets = [_target(before, after, target) for target in inputs.targets]
+    provenance = (
+        None if inputs.revision_provenance is None else path.parent / inputs.revision_provenance
+    )
+    evidence, evidence_reason = _revision_evidence(provenance, before, after, inputs.revision)
     status: Status = "success"
-    if not locks or errors or not valid or any(t.status == "failure" for t in targets):
+    if (
+        not locks
+        or errors
+        or not valid
+        or evidence == "failure"
+        or any(t.status == "failure" for t in targets)
+    ):
         status = "failure"
-    elif any(t.status == "unknown" for t in targets):
+    elif evidence == "unknown" or any(t.status == "unknown" for t in targets):
         status = "unknown"
     return ControlReport(
         status=status,
@@ -163,16 +197,27 @@ def control_report(path: Path) -> ControlReport:
         after_sha256=plan_identity(after),
         inputs={
             str(file.resolve()): checksum_lf(file.read_bytes())
-            for file in (path, before_path, after_path)
+            for file in (
+                path,
+                before_path,
+                after_path,
+                *([] if provenance is None else [provenance]),
+            )
         },
         request_path=str(path.resolve()),
+        revision_provenance_path=None if provenance is None else str(provenance.resolve()),
+        accepted_revision=evidence == "success",
         revision=inputs.revision,
         targets=targets,
         lock_stable=locks,
         authorised_scope=not errors,
         validator_passed=valid,
         actual_changes=changed_units(before, after),
-        diagnostics=[*errors, *[d.model_dump_json() for d in validation.diagnostics]],
+        diagnostics=[
+            evidence_reason,
+            *errors,
+            *[d.model_dump_json() for d in validation.diagnostics],
+        ],
     )
 
 

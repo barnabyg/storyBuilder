@@ -12,6 +12,7 @@ The reports are deterministic and use the revision operator's canonical JSON.
 {
   "before": "source/plan.json",
   "after": "revision/plan.json",
+  "revision_provenance": "revision/provenance.json",
   "revision": {
     "mask": {"units": ["scenes/s3/summary"]},
     "locks": ["scenes/s1"],
@@ -48,6 +49,15 @@ remain stable, an authorised edit scope, and complete hard validation. A failed
 hard check yields failure; otherwise any pending target yields unknown.
 Each target includes its full request and canonical request checksum so a
 registered target cannot be replaced with an easier predicate under the same ID.
+
+An accepted-revision claim also requires `revision_provenance` from the
+operator: its accepted/no-op status, source identity, exact mask/locks and
+output identity must match the request. Without it the difference can still
+be inspected, but overall success remains unknown and `accepted_revision`
+is false. G-D admission additionally requires that record and its source/output
+artifacts to belong to the actual D story and match an accepted refinement
+iteration and its attributable calls. An invented before-plan cannot establish
+gate controllability merely by differing from the final D plan.
 
 All outcomes are **plan-only**. Structural compliance is separate from final
 prose realisation, literary improvement, originality and scientific gate

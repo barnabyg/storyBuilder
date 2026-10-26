@@ -10,6 +10,9 @@ from nde import g1_report
 from nde.cli import main
 from nde.eval.gd import GDInputs, check_gd, write_check
 from nde.files import checksum_lf
+from nde.narrative.workflow import load_plan
+from nde.plan.revision import identity
+from tests.conftest import REPO
 from tests.eval_helpers import reader
 from tests.fake_openai import FakeOpenAI
 from tests.gd_fixtures import gd_batch, prepare_gd
@@ -138,6 +141,60 @@ def test_registered_fake_workflow_seals_controls_and_requires_persisted_scores(
         secret not in str(saved) for secret in ("baseline_d", "critic", "condition", str(run))
     )
     assert client.post("/close").status_code == 200
+
+
+def test_unrelated_before_plan_cannot_fabricate_gate_controllability(
+    registered_inputs: dict[str, Path],
+    tmp_path: Path,
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    common, _ = prepare_gd(registered_inputs, tmp_path, fake_llm, monkeypatch)
+    _, run, _ = gd_batch(common, tmp_path)
+    request = json.loads((tmp_path / "controls.json").read_text())
+    before = json.loads(Path(request["before"]).read_text())
+    before["scenes"][2]["summary"] = "An unrelated invented starting intention"
+    fabricated = tmp_path / "fabricated-before.json"
+    fabricated.write_text(json.dumps(before))
+    proof = json.loads(Path(request["revision_provenance"]).read_text())
+    proof["before_sha256"] = identity(load_plan(fabricated))
+    invented_proof = tmp_path / "invented-provenance.json"
+    invented_proof.write_text(json.dumps(proof))
+    request.update(before=str(fabricated), revision_provenance=str(invented_proof))
+    forged = tmp_path / "fabricated-request.json"
+    forged.write_text(json.dumps(request))
+    out = tmp_path / "fabricated-control"
+    assert main(["control-report", str(forged), "--out", str(out)]) == 0
+    saved = out / "control-report.json"
+    assert json.loads(saved.read_text())["status"] == "success"
+    assert (
+        main(
+            [
+                "gd",
+                "batch",
+                *common,
+                "--name",
+                "forged",
+                "--batches-dir",
+                str(tmp_path / "gd-batches"),
+                "--from",
+                str(run),
+                "D",
+                "--from",
+                str(run),
+                "C",
+                "--control",
+                "brief-01",
+                str(saved),
+                "--rubric-dir",
+                str(REPO / "benchmark/rubric"),
+            ]
+        )
+        == 2
+    )
+    assert "saved D operator revision" in capsys.readouterr().err
+    assert not (tmp_path / "gd-batches/forged").exists()
 
 
 @pytest.mark.parametrize(

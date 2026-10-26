@@ -18,13 +18,18 @@ from nde.stories.execute import prepare_stories
 from tests.conftest import REPO
 from tests.eval_helpers import reader
 from tests.fake_openai import FakeOpenAI
-from tests.test_baseline_d import fake_d
+from tests.test_baseline_d import critic_provider
 from tests.test_g1 import git_fixture, prepare_registered_workflow
 
 
 def prepare_gd(
     paths: dict[str, Path], tmp_path: Path, fake: FakeOpenAI, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[list[str], Path]:
+    # Record family metadata before selecting C and establishing synthetic G1.
+    source = yaml.safe_load(paths["config"].read_text())
+    for role in ("planner", "prose"):
+        source["roles"][role]["family"] = "generator"
+    paths["config"].write_text(yaml.safe_dump(source))
     common, _, config, _ = prepare_registered_workflow(paths, tmp_path, fake, monkeypatch)
     runs, batches = tmp_path / "g1-runs", tmp_path / "g1-batches"
     assert main(["eval", "g1-run", *common, "--runs-dir", str(runs)]) == 0
@@ -70,8 +75,9 @@ def prepare_gd(
     assert main(["g1-report", str(batch), "--out", str(result)]) == 0
     config["stories"]["conditions"] = [
         {"name": "C", "pipeline": "baseline_c"},
-        {"name": "D", "pipeline": "baseline_d"},
+        {"name": "D", "pipeline": "baseline_d", "params": {"critic_iterations": 1}},
     ]
+    config["roles"]["critic"] = {"provider": "fake", "model": "fake-model", "family": "critic"}
     config["stories"]["equal_budget"]["conditions"] = ["C", "D"]
     target = ControlTarget(id="preserve", kind="unchanged", selector="scenes/scene-0")
     config_path = tmp_path / "cd.yaml"
@@ -114,7 +120,7 @@ def prepare_gd(
         ),
         "prompt_sha256": {label: template.sha256 for label, template in templates.items()},
         "control_targets": {target.id: identity(target)},
-        "critic_iterations": 0,
+        "critic_iterations": 1,
         "generation_limits": {
             "max_repairs": 2,
             "max_length_attempts": 3,
@@ -128,7 +134,7 @@ def prepare_gd(
     protocol.write_text(json.dumps(gd_protocol))
     git_fixture(tmp_path, "add", "gd.json")
     git_fixture(tmp_path, "commit", "-q", "-m", "synthetic test-only G-D registration")
-    fake.default = fake_d
+    fake.default = critic_provider
     return [
         str(protocol),
         str(config_path),
@@ -163,17 +169,17 @@ def gd_batch(
     )
     [run] = list(runs.iterdir())
     plan = run / "stories/D/brief-01/r1/plan.json"
+    revision = plan.parent / "revisions/critic-1"
+    provenance = revision / "provenance.json"
+    recorded = json.loads(provenance.read_text())
     request = tmp_path / "controls.json"
     request.write_text(
         json.dumps(
             {
-                "before": str(plan),
+                "before": str(revision / "source-plan.json"),
                 "after": str(plan),
-                "revision": {
-                    "mask": {"channels": ["reader_affect"]},
-                    "locks": ["scenes/scene-0"],
-                    "instruction": "Preserve the locked opening",
-                },
+                "revision": recorded["revision"],
+                "revision_provenance": str(provenance),
                 "targets": [{"id": "preserve", "kind": target_kind, "selector": "scenes/scene-0"}],
             }
         )

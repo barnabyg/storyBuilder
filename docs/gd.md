@@ -26,7 +26,8 @@ analyses and omitted margins are rejected; G1's 21/30 rule is not reused.
 After the check passes, use `nde gd run` with the same inputs and optional
 `--runs-dir`, `--cache`, and `--ledger` paths. This uses the shared experiment,
 prose, equal-budget, length-selection and accounting machinery. The run saves
-`gd-generation.json` binding its final manifest to the pre-registration.
+`gd-generation.json` binding its final manifest, calls and story artifacts to
+the pre-registration.
 Ordinary `nde run` development output cannot masquerade as registered generation.
 
 Prepare deterministic plan-only control reports using `nde control-report`.
@@ -36,6 +37,11 @@ Admission recomputes controls, checks registered predicate definitions and exact
 accepted D plan identities, and uses strict cohort, final-length and budget
 readiness. Known failed predicates remain available for a failed gate outcome;
 unknown predicates and invalid lock/scope/validator evidence block admission.
+Control reports must name the accepted operator's provenance and match its
+saved source, mask, output and calls in D's refinement history. Merely
+constructing a different before-plan cannot establish a gate edit. Keep the
+complete revision artifacts; a plan/provenance pair alone is insufficient for
+this gate evidence.
 The batch seals its protocol, controls, prerequisite history and artifact hashes.
 
 Use the existing `nde eval serve --batch NAME` reader. Coherence and originality

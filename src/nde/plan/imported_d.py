@@ -62,7 +62,9 @@ class DPlanningProvenance(Strict):
     refinement: SavedRefinement | None = None
 
 
-def _history_chain(history: SavedRefinement, params: RefinementParams, plan: NarrativePlan) -> None:
+def validate_saved_history(
+    history: SavedRefinement, params: RefinementParams, plan: NarrativePlan
+) -> None:
     iterations = history.iterations
     last = iterations[-1].status if iterations else None
     terminal = {
@@ -124,7 +126,7 @@ def _expected_steps(plan: NarrativePlan, provenance: DPlanningProvenance) -> dic
     iterations = history.iterations
     if len(iterations) > params.critic_iterations or (params.critic_iterations and not iterations):
         raise PlanError("saved D critic history violates configured iteration bounds")
-    _history_chain(history, params, plan)
+    validate_saved_history(history, params, plan)
     for number, record in enumerate(iterations, 1):
         if record.iteration != number:
             raise PlanError("saved D iteration sequence is incomplete")

@@ -1,5 +1,6 @@
 """Registered generation and sealed G-D admission using the existing reader."""
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -23,8 +24,9 @@ from nde.eval.rubric import Rubric
 from nde.files import write_text_lf
 from nde.narrative.ledger import plan_identity
 from nde.narrative.workflow import load_plan
+from nde.plan.imported_d import DPlanningProvenance, validate_saved_history
 from nde.runs.config import load_config
-from nde.runs.records import read_manifest, read_stories
+from nde.runs.records import StoryRecord, read_manifest, read_stories
 from nde.runs.runner import RunOptions, run_experiment
 
 GD_BINDING = "gd.json"
@@ -39,6 +41,7 @@ class GenerationBinding(Record):
     selection_sha256: str
     test_only: bool
     manifest_sha256: str
+    artifact_checksums: dict[str, str] = Field(default_factory=dict[str, str])
 
 
 class GDBinding(Record):
@@ -74,6 +77,11 @@ def generate_gd(inputs: GDInputs, options: RunOptions) -> Path:
 
 
 def _generation_binding(protocol: GDProtocol, checksum: str, path: Path) -> GenerationBinding:
+    files = {
+        (Path(record.path) / filename).as_posix()
+        for record in read_stories(path)
+        for filename in record.files
+    } | {"manifest.json", "stories.jsonl", "calls.jsonl"}
     return GenerationBinding(
         protocol_sha256=checksum,
         config_sha256=protocol.config_sha256,
@@ -81,6 +89,7 @@ def _generation_binding(protocol: GDProtocol, checksum: str, path: Path) -> Gene
         selection_sha256=protocol.selection_sha256,
         test_only=protocol.test_only,
         manifest_sha256=file_checksum(path / "manifest.json"),
+        artifact_checksums={name: file_checksum(path / name) for name in sorted(files)},
     )
 
 
@@ -108,6 +117,45 @@ def _artifact_checksums(sources: tuple[Source, Source]) -> dict[str, str]:
         path = (source.run_dir / GD_GENERATION).resolve()
         artifacts[str(path)] = file_checksum(path)
     return artifacts
+
+
+def _operator_revision(report: dict[str, Any], run: Path, story: StoryRecord) -> None:
+    root = (run / story.path).resolve()
+    proof = report.get("revision_provenance_path")
+    if not report.get("accepted_revision") or not isinstance(proof, str):
+        raise BatchError("controls require accepted operator revision evidence")
+    path = Path(proof).resolve()
+    if (
+        not path.is_relative_to(root / "revisions")
+        or path.relative_to(root).as_posix() not in story.files
+    ):
+        raise BatchError("control provenance is not a saved D operator revision artifact")
+    record = json.loads(path.read_text(encoding="utf-8"))
+    planning = DPlanningProvenance.model_validate_json(
+        (root / "planning-provenance.json").read_text(encoding="utf-8")
+    )
+    if planning.refinement is None:
+        raise BatchError("D control evidence lacks accepted refinement history")
+    validate_saved_history(planning.refinement, planning.params, load_plan(root / "plan.json"))
+    matches = [
+        iteration
+        for iteration in planning.refinement.iterations
+        if iteration.status in {"accepted", "noop"}
+        and iteration.before_sha256 == record.get("before_sha256")
+        and iteration.after_sha256 == record.get("after_sha256")
+        and iteration.mask is not None
+        and iteration.mask.model_dump(mode="json") == record.get("revision")
+    ]
+    calls = record.get("calls", [])
+    steps = {call.get("step") for call in calls}
+    attributable = [call.model_dump(mode="json") for call in planning.calls if call.step in steps]
+    if len(matches) != 1 or not calls or calls != attributable:
+        raise BatchError("control provenance differs from the accepted D refinement history")
+    if (
+        plan_identity(load_plan(path.parent / "source-plan.json")) != report["before_sha256"]
+        or plan_identity(load_plan(path.parent / "plan.json")) != report["after_sha256"]
+    ):
+        raise BatchError("control source/output differs from the saved D operator revision")
 
 
 def control_evidence(
@@ -144,6 +192,7 @@ def control_evidence(
         plan = d.run_dir / stories[brief].path / "plan.json"
         if report.get("after_sha256") != plan_identity(load_plan(plan)):
             raise BatchError(f"{brief}: controls concern a different accepted D plan")
+        _operator_revision(report, d.run_dir, stories[brief])
         reports[brief] = report
         artifacts[str(path.resolve())] = file_checksum(path)
         for filename, checksum in report["inputs"].items():

@@ -6,6 +6,8 @@ import pytest
 
 from nde.cli import main
 from nde.controllability import replay_report
+from nde.narrative.workflow import load_plan
+from nde.plan.revision import RevisionSpec, identity
 
 
 def packet(tmp_path: Path) -> Path:
@@ -34,6 +36,7 @@ def packet(tmp_path: Path) -> Path:
     value = {
         "before": "before.json",
         "after": "after.json",
+        "revision_provenance": "revision.json",
         "revision": {
             "mask": {"units": ["scenes/s4"]},
             "locks": ["scenes/s0"],
@@ -55,6 +58,16 @@ def packet(tmp_path: Path) -> Path:
 
 
 def report(tmp_path: Path, request: Path) -> dict[str, Any]:
+    value = json.loads(request.read_text())
+    if value.get("revision_provenance"):
+        # Synthetic operator record for known-answer metric fixtures only.
+        proof = {
+            "status": "accepted",
+            "before_sha256": identity(load_plan(request.parent / value["before"])),
+            "after_sha256": identity(load_plan(request.parent / value["after"])),
+            "revision": RevisionSpec.model_validate(value["revision"]).model_dump(mode="json"),
+        }
+        (request.parent / value["revision_provenance"]).write_text(json.dumps(proof))
     out = tmp_path / "report"
     assert main(["control-report", str(request), "--out", str(out)]) == 0
     value = json.loads((out / "control-report.json").read_text(encoding="utf-8"))
@@ -170,3 +183,13 @@ def test_replay_rejects_changed_sources_instead_of_trusting_status(tmp_path: Pat
     (tmp_path / "after.json").write_text(json.dumps(plan), encoding="utf-8")
     with pytest.raises(ValueError, match="changed"):
         replay_report(saved)
+
+
+def test_unbound_plan_difference_cannot_claim_an_accepted_revision(tmp_path: Path) -> None:
+    request = packet(tmp_path)
+    raw = json.loads(request.read_text())
+    raw.pop("revision_provenance")
+    request.write_text(json.dumps(raw))
+    value = report(tmp_path, request)
+    assert value["status"] == "unknown"
+    assert not value["accepted_revision"]
