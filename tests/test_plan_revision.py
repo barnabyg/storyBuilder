@@ -1,4 +1,6 @@
+import errno
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +42,48 @@ def revise(tmp_path: Path, value: dict[str, Any], expected: int = 0) -> Path:
     )
     [result] = set(runs.iterdir()) - before
     return result
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows directory sharing semantics")
+@pytest.mark.parametrize("persistent", [False, True])
+def test_windows_publication_locks_preserve_artifacts_without_repeating_provider_calls(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    persistent: bool,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = lambda _body: completion(json.dumps(skeleton()))
+    value = revision_config(
+        tmp_path,
+        fake_llm.base_url,
+        {"mask": {"channels": ["arcs"]}, "instruction": "Keep the accepted arc"},
+    )
+    source = (tmp_path / "source.json").read_bytes()
+    native_rename = os.rename
+    failures = 0
+
+    def locked_rename(origin: Path, destination: Path) -> None:
+        nonlocal failures
+        # Fault injection at the OS filesystem boundary, as a Windows scanner lock.
+        if origin.name.startswith(".plan-") and (persistent or failures < 2):
+            failures += 1
+            raise PermissionError(errno.EACCES, "Synthetic sharing lock", str(origin), 5)
+        native_rename(origin, destination)
+
+    monkeypatch.setattr(os, "rename", locked_rename)
+    result = revise(tmp_path, value, expected=2 if persistent else 0)
+    assert (tmp_path / "source.json").read_bytes() == source
+    assert fake_llm.call_count == 1
+    folder = result / "plans/brief-01"
+    if persistent:
+        assert not (folder / "r1").exists()
+        [staging] = folder.glob(".plan-*")
+        assert (staging / "revisions/revision/provenance.json").exists()
+        assert (staging / "planning/revision-revision/1.txt").exists()
+    else:
+        assert (folder / "r1/plan.json").exists()
+        assert (folder / "r1/cards.html").exists()
 
 
 def test_channel_revision_saves_cards_changes_and_lock_identities(

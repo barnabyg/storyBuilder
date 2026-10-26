@@ -2,6 +2,7 @@
 
 import json
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +26,27 @@ from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.state import RunState
 from nde.schema.brief import Brief
 from nde.stories.pipeline import StepFailedError, StoryContext
+
+PUBLISH_ATTEMPTS = 10
+PUBLISH_RETRY_SECONDS = 0.05
+WINDOWS_SHARING_ERRORS = frozenset({5, 32, 33})
+
+
+def _publish(staging: Path, destination: Path) -> None:
+    """Windows scanners may briefly deny renaming a just-written directory."""
+    for attempt in range(PUBLISH_ATTEMPTS):
+        try:
+            staging.rename(destination)
+        except PermissionError as error:
+            if (
+                getattr(error, "winerror", None) not in WINDOWS_SHARING_ERRORS
+                or attempt == PUBLISH_ATTEMPTS - 1
+            ):
+                # Keep the complete staging bundle for inspection on permanent failure.
+                raise
+            time.sleep(PUBLISH_RETRY_SECONDS)
+        else:
+            return
 
 
 @dataclass(frozen=True)
@@ -144,7 +166,7 @@ def run_plans(run: PlanRun) -> bool:
                     destination = staging / name
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     write_text_lf(destination, content)
-                staging.rename(destination_folder)
+                _publish(staging, destination_folder)
                 records.append(record)
                 write_text_lf(
                     run_dir / "plans.jsonl",
