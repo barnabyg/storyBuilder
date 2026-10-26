@@ -28,6 +28,7 @@ from nde.gitinfo import git
 from nde.runs.config import ConfigError, LoadedConfig, load_config
 from nde.runs.records import read_manifest, read_stories
 from nde.runs.runner import RunOptions, run_experiment
+from nde.tiers import load_selection, selection_problems
 
 G1_BINDING = "g1.json"
 GENERATION_BINDING = "g1-generation.json"
@@ -182,9 +183,6 @@ def _schema_evidence(protocol: G1Protocol, directory: Path) -> None:
 def _selection(protocol: G1Protocol, inputs: G1Inputs) -> None:
     if file_checksum(inputs.selection) != protocol.selection_sha256:
         raise ValueError("tier selection checksum differs from registration")
-    # Imported only after validating protocol and G-schema prerequisites.
-    from nde.tiers import load_selection, selection_problems  # noqa: PLC0415
-
     selection = load_selection(inputs.selection)
     problems = selection_problems(selection, inputs.config)
     if problems:

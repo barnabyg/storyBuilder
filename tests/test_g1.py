@@ -25,6 +25,7 @@ from tests.test_tiers import tier_provider
 
 def git_fixture(repo: Path, *args: str) -> None:
     # S603/S607: fixed git arguments in a temporary synthetic test repository.
+    # Review these exceptions if arguments accept non-test data or the executable changes.
     subprocess.run(  # noqa: S603
         ["git", *args],  # noqa: S607
         cwd=repo,

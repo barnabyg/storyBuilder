@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from nde.eval import g1
-from nde.eval.batch import BatchError, Source
+from nde.eval.batch import SIDES, BatchError, Source
 from nde.eval.rubric import DEFAULT_RUBRIC_DIR, RubricError, load_rubric
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
@@ -53,7 +53,7 @@ def run(args: argparse.Namespace) -> int:
             print(f"registered G1 run {status}: {path}")
             return 0 if status == "succeeded" else 1
         sources: list[list[str]] = args.sources
-        if len(sources) != 2:  # noqa: PLR2004 - a G1 batch compares C and B
+        if len(sources) != len(SIDES):
             raise BatchError("give --from exactly twice, C then B")
         first, second = (Source(Path(path), condition) for path, condition in sources)
         checked = g1.require_g1(inputs)

@@ -127,7 +127,7 @@ def _build(args: argparse.Namespace) -> int:
 def _readiness(args: argparse.Namespace) -> int:
     sources: list[list[str]] = args.sources
     try:
-        if len(sources) != 2:  # noqa: PLR2004 - gate admission compares exactly two conditions
+        if len(sources) != len(batches.SIDES):
             raise ValueError("give --from exactly twice")
         cohort = readiness.GateCohort.model_validate_json(args.cohort.read_text(encoding="utf-8"))
         first, second = (batches.Source(Path(run), condition) for run, condition in sources)
