@@ -93,14 +93,36 @@ def register(config: Path, out: Path) -> dict[str, Any]:
 
 def assess(protocol: Path) -> dict[str, Any]:
     registered = read_sealed(protocol)
-    check_snapshot(registered["inputs"])
     policy = G2Policy.model_validate(registered["policy"])
-    _pilot_review_inputs(
-        policy, read_sealed(policy.review / "packet.json"), read_sealed(policy.pilot / "pilot.json")
-    )
-    review = reliability.report(policy.review)
-    extraction = pilot.report(policy.pilot)
     pending: list[str] = []
+    try:
+        check_snapshot(registered["inputs"])
+        _pilot_review_inputs(
+            policy,
+            read_sealed(policy.review / "packet.json"),
+            read_sealed(policy.pilot / "pilot.json"),
+        )
+        review = reliability.report(policy.review)
+        extraction = pilot.report(policy.pilot)
+    except (OSError, ValueError) as error:
+        pending.append(f"registered evidence unavailable: {error}")
+        review = {
+            "id": None,
+            "channels": {},
+            "core_failures": [],
+            "test_only": registered["test_only"],
+            "available": False,
+        }
+        extraction = {
+            "id": None,
+            "test_only": registered["test_only"],
+            "available": False,
+            "completed_stories": 0,
+            "coverage": 0,
+            "status": "unavailable",
+            "unresolved_accounting_usd": None,
+            "scaling": {"per_completed_story_usd": None, "incomplete_data": True},
+        }
     failed: list[str] = []
     for channel in reliability.CORE:
         row = review["channels"].get(channel)
@@ -120,6 +142,7 @@ def assess(protocol: Path) -> dict[str, Any]:
         pending.append("pilot coverage below registered minimum")
     if (
         extraction["status"] != "complete"
+        or extraction["unresolved_accounting_usd"] is None
         or extraction["unresolved_accounting_usd"] > ACCOUNTING_TOLERANCE_USD
     ):
         pending.append("pilot incomplete or accounting unresolved")

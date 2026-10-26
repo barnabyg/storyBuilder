@@ -130,3 +130,17 @@ def test_g2_cannot_approve_pilot_using_a_separate_annotation_run(
     assert (
         main(["corpus-g2", "register", str(config), "--out", str(tmp_path / "rejected.json")]) == 2
     )
+
+
+def test_g2_emits_pending_evidence_when_registered_features_go_missing(
+    tmp_path: Path,
+    fake_llm: FakeOpenAI,
+) -> None:
+    pilot, _, protocol = g2_packet(tmp_path, fake_llm)
+    (pilot / "features/lamp/features.json").unlink()
+    out = tmp_path / "pending-missing-feature"
+    assert main(["corpus-g2", "report", str(protocol), "--out", str(out)]) == 0
+    result = json.loads((out / "decision.json").read_text())
+    assert result["outcome"] == "pending"
+    assert result["criteria_outcome"] == "pending"
+    assert any("missing or changed" in problem for problem in result["pending"])
