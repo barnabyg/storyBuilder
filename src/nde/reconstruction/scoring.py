@@ -138,13 +138,18 @@ def _long_range(view: dict[str, Any], field: str, index: int) -> bool:
             start, end = _scene_index(setup["scene_id"]), _scene_index(edge["payoff_scene_id"])
         else:
             end = _scene_index(edge["scene_id"])
+            holder = edge.get("holder_id") if field == "knowledge_uses" else None
             origins = [
                 _scene_index(reveal["scene_id"])
                 for reveal in view.get("reveal_links", [])
-                if reveal["fact_id"] == edge["fact_id"] and _scene_index(reveal["scene_id"]) < end
+                if reveal["fact_id"] == edge["fact_id"]
+                and _scene_index(reveal["scene_id"]) < end
+                and (holder is None or holder in reveal["holder_ids"])
             ]
             fact = view["knowledge_facts"][int(edge["fact_id"].rsplit("/", 1)[-1])]
-            if fact["initial_holder_ids"]:
+            if fact["initial_holder_ids"] and (
+                holder is None or holder in fact["initial_holder_ids"]
+            ):
                 origins.append(-1)
             if not origins:
                 return False

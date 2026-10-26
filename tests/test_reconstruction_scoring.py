@@ -2,7 +2,7 @@
 
 import copy
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 
@@ -15,11 +15,11 @@ from nde.reconstruction.scoring import score_pair
 def score_inputs(
     directory: Path,
     *,
-    missing: bool = False,
-    mutation: bool = False,
-    duplicate: bool = False,
-    soft: bool = False,
+    scenario: Literal["exact", "missing", "mutation", "duplicate", "soft", "knowledge"] = "exact",
 ) -> tuple[Path, Path, Path]:
+    missing, mutation, duplicate, soft, knowledge = (
+        scenario == name for name in ("missing", "mutation", "duplicate", "soft", "knowledge")
+    )
     plan = NarrativePlan.model_validate(
         {
             "id": "p",
@@ -36,6 +36,21 @@ def score_inputs(
             {"id": "edge2", "cause_scene_id": "s2", "effect_scene_id": "s3"},
         ]
         plan = NarrativePlan.model_validate(content)
+    if knowledge:
+        content = plan.model_dump(mode="json")
+        content["characters"] = [{"id": "a", "name": "Ann"}, {"id": "b", "name": "Bea"}]
+        for scene in content["scenes"]:
+            scene["character_ids"] = ["a", "b"]
+        content["knowledge_facts"] = [
+            {"id": "fact", "description": "A secret", "initial_holder_ids": ["a"]}
+        ]
+        content["reveal_links"] = [
+            {"id": "reveal", "fact_id": "fact", "scene_id": "s1", "holder_ids": ["b"]}
+        ]
+        content["knowledge_uses"] = [
+            {"id": "use", "fact_id": "fact", "scene_id": "s2", "holder_id": "b"}
+        ]
+        plan = NarrativePlan.model_validate(content)
     provenance = {
         "work_id": "work",
         "author_id": "author",
@@ -43,7 +58,9 @@ def score_inputs(
         "split": "test",
     }
     policy = "soft" if soft else "hard"
-    record = encode_plan(plan, {"plot": "hard", "causality": policy}, provenance)
+    record = encode_plan(
+        plan, {"plot": "hard", "causality": policy, "information": "hard"}, provenance
+    )
     slots = copy.deepcopy(record["slots"])
     positions = [
         index
@@ -53,6 +70,12 @@ def score_inputs(
             duplicate and slot["path"][0] == "causal_links" and slot["path"][-1] == "cause_scene_id"
         )
     ]
+    if knowledge:
+        positions = [
+            index
+            for index, slot in enumerate(slots)
+            if slot["path"] == ["knowledge_uses", 0, "holder_id"]
+        ]
     targets: list[dict[str, Any]] = []
     for position in positions:
         targets.append(
@@ -142,7 +165,7 @@ def score_inputs(
 def test_scores_only_masked_answers_and_keeps_missing_outputs_in_denominator(
     tmp_path: Path,
 ) -> None:
-    inputs = score_inputs(tmp_path, missing=True)
+    inputs = score_inputs(tmp_path, scenario="missing")
     report = score_pair(*inputs, tmp_path / "scores")
     assert report["summary"]["candidate"]["hard"] == {"correct": 1, "total": 1, "accuracy": 1}
     assert report["summary"]["comparator"]["hard"] == {"correct": 0, "total": 1, "accuracy": 0}
@@ -153,7 +176,7 @@ def test_scores_only_masked_answers_and_keeps_missing_outputs_in_denominator(
 
 
 def test_unmasked_mutations_fail_validation_even_with_correct_hidden_answer(tmp_path: Path) -> None:
-    inputs = score_inputs(tmp_path, mutation=True)
+    inputs = score_inputs(tmp_path, scenario="mutation")
     report = score_pair(*inputs, tmp_path / "scores")
     assert report["summary"]["candidate"]["validator_pass_rate"] == 0
     assert "unmasked-content" in " ".join(report["rows"][0]["candidate"]["diagnostics"])
@@ -178,7 +201,7 @@ def test_local_edges_cannot_count_as_long_range_recovery(tmp_path: Path) -> None
 def test_duplicate_edges_are_false_positives_and_partial_recovery_is_fractional(
     tmp_path: Path,
 ) -> None:
-    inputs = score_inputs(tmp_path, duplicate=True)
+    inputs = score_inputs(tmp_path, scenario="duplicate")
     report = score_pair(*inputs, tmp_path / "scores")
     edge = report["rows"][0]["candidate"]["edges"]["causal"]
     assert edge["true_positive"] == 1
@@ -189,8 +212,18 @@ def test_duplicate_edges_are_false_positives_and_partial_recovery_is_fractional(
 
 
 def test_soft_targets_never_become_hard_accuracy_labels(tmp_path: Path) -> None:
-    inputs = score_inputs(tmp_path, soft=True)
+    inputs = score_inputs(tmp_path, scenario="soft")
     report = score_pair(*inputs, tmp_path / "scores")
     assert report["rows"][0]["candidate"]["hard"]["total"] == 0
     assert report["rows"][0]["candidate"]["soft_diagnostic"]["accuracy"] == 1
     assert report["rows"][0]["candidate"]["edges"]["causal"]["expected"] == 0
+
+
+def test_another_characters_initial_knowledge_cannot_make_a_local_use_long_range(
+    tmp_path: Path,
+) -> None:
+    inputs = score_inputs(tmp_path, scenario="knowledge")
+    report = score_pair(*inputs, tmp_path / "scores")
+    result = report["rows"][0]["candidate"]
+    assert result["edges"]["knowledge"]["f1"] == 1
+    assert result["long_range_edges"]["knowledge"]["expected"] == 0

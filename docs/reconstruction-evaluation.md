@@ -21,7 +21,9 @@ repeated gold edges represent one relation. Empty gold denominators are
 unavailable, rather than automatic perfect recovery. Long-range recovery is
 reported separately: causal or setup/payoff endpoints have at least one
 intervening scene; knowledge edges use the earliest represented prior reveal or
-explicit initial-holder anchor, and an unknown origin is unavailable.
+explicit initial-holder anchor, and an unknown origin is unavailable. Knowledge
+uses follow the using character's acquisition history; another character's
+earlier knowledge cannot turn a local use into long-range recovery.
 
 The established narrative validators inspect reconstructed retained views with
 empty excluded channels. This is structural validity of the registered view,
