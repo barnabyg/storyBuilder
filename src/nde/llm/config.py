@@ -52,7 +52,12 @@ class ModelBinding(Strict):
     @classmethod
     def _family_is_case_insensitive(cls, family: str | None) -> str | None:
         """Families compare in lower case, so "OpenAI" and "openai" are one family."""
-        return None if family is None else family.strip().lower()
+        if family is None:
+            return None
+        normalized = family.strip().lower()
+        if not normalized:
+            raise ValueError("model family must contain a non-whitespace name")
+        return normalized
 
     @property
     def label(self) -> str:

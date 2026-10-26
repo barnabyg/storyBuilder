@@ -191,7 +191,7 @@ def test_d_budget_abort_keeps_stage_provenance(
     assert fake_llm.call_count == 0
 
 
-@pytest.mark.parametrize("family", [None, "generator"])
+@pytest.mark.parametrize("family", [None, "generator", "   "])
 def test_critic_family_rule_is_checked_before_any_generation(
     fake_llm: FakeOpenAI,
     monkeypatch: pytest.MonkeyPatch,
@@ -210,7 +210,7 @@ def test_critic_family_rule_is_checked_before_any_generation(
         binding["family"] = "generator"
     value["roles"]["critic"] = {"provider": "fake", "model": "fake-model", "family": family}
     assert main(["run", str(write_config(tmp_path, value))]) == 2
-    assert "critic family" in capsys.readouterr().err
+    assert "family" in capsys.readouterr().err
     assert fake_llm.call_count == 0
 
 
