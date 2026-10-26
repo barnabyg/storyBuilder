@@ -216,6 +216,12 @@ def test_incomplete_or_corrupted_saved_evidence_never_passes(
     )
     report = json.loads((out / "evidence.json").read_text(encoding="utf-8"))
     assert report["gate_status"] == expected_status
+    if scenario == "human_diagnostic":
+        for name in ("evidence.md", "evidence.html"):
+            content = (out / name).read_text(encoding="utf-8")
+            assert (
+                "human constraint_human_assessment [hc1 character story]: earned ending" in content
+            )
 
 
 def test_measured_correction_above_target_fails_owner_gate(

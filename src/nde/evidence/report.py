@@ -172,6 +172,10 @@ def _lines(report: Report) -> list[str]:
         lines.extend(f"pending: {problem}" for problem in row.pending)
         lines.extend(f"failed: {problem}" for problem in row.failures)
         lines.extend(f"mechanically failed: {problem}" for problem in row.mechanical_failures)
+        lines.extend(
+            f"{item.severity} {item.code} [{item.location}]: {item.message}"
+            for item in row.diagnostics
+        )
         lines.extend(row.trajectories or ["Trajectories: missing"])
     lines.append("## Trajectory comparisons")
     lines.extend(
