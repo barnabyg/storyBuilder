@@ -5,6 +5,16 @@ from typing import Literal
 from pydantic import Field
 
 from nde.narrative.base import Identified, Span, Strict
+from nde.narrative.interpretation import (
+    Arc,
+    Discourse,
+    Motif,
+    MotifEcho,
+    ReaderAffect,
+    Subtext,
+    Tension,
+    Theme,
+)
 from nde.narrative.state import Constraint, RelationshipTransition, StateTransition
 from nde.narrative.structure import (
     CausalLink,
@@ -15,7 +25,7 @@ from nde.narrative.structure import (
     Setup,
 )
 
-__all__ = ["Identified", "Span", "Strict"]
+__all__ = ["Beat", "Character", "Identified", "NarrativePlan", "Scene", "Source", "Span", "Strict"]
 
 
 class Source(Identified):
@@ -61,3 +71,11 @@ class NarrativePlan(Identified):
         default_factory=list[RelationshipTransition]
     )
     constraints: list[Constraint] = Field(default_factory=list[Constraint])
+    arcs: list[Arc] = Field(default_factory=list[Arc])
+    reader_affect: list[ReaderAffect] = Field(default_factory=list[ReaderAffect])
+    tension: list[Tension] = Field(default_factory=list[Tension])
+    themes: list[Theme] = Field(default_factory=list[Theme])
+    motifs: list[Motif] = Field(default_factory=list[Motif])
+    motif_echoes: list[MotifEcho] = Field(default_factory=list[MotifEcho])
+    discourse: list[Discourse] = Field(default_factory=list[Discourse])
+    subtext: list[Subtext] = Field(default_factory=list[Subtext])

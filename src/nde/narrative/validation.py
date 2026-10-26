@@ -1,17 +1,25 @@
 """Named diagnostics used by inspection, repair and mutation evidence."""
 
 from collections.abc import Iterable
+from typing import Protocol
 
 from nde.files import checksum_lf
 from nde.narrative.diagnostics import Diagnostic, Validation
-from nde.narrative.models import Identified, NarrativePlan, Span
+from nde.narrative.interpretation import Annotation
+from nde.narrative.interpretation_validation import interpretation_diagnostics
+from nde.narrative.models import NarrativePlan, Span
 from nde.narrative.state_validation import state_diagnostics
 from nde.narrative.structural_validation import validate_structure
 
-__all__ = ["Diagnostic", "Validation"]
+__all__ = ["Diagnostic", "Validation", "check_ids", "check_spans", "validate_plan"]
 
 
-def check_ids(records: Iterable[Identified]) -> list[Diagnostic]:
+class HasID(Protocol):
+    @property
+    def id(self) -> str: ...
+
+
+def check_ids(records: Iterable[HasID]) -> list[Diagnostic]:
     seen: set[str] = set()
     diagnostics: list[Diagnostic] = []
     for record in records:
@@ -47,9 +55,30 @@ def check_spans(plan: NarrativePlan, spans: Iterable[tuple[str, Span]]) -> list[
 
 
 def validate_plan(plan: NarrativePlan) -> Validation:
-    records: list[Identified] = [plan, *plan.characters, *plan.sources, *plan.scenes]
+    records: list[HasID] = [plan, *plan.characters, *plan.sources, *plan.scenes]
     records.extend(beat for scene in plan.scenes for beat in scene.beats)
     records.extend([*plan.states, *plan.relationships, *plan.constraints])
+    records.extend(
+        [
+            *plan.causal_links,
+            *plan.setups,
+            *plan.payoff_links,
+            *plan.knowledge_facts,
+            *plan.reveal_links,
+            *plan.knowledge_uses,
+        ]
+    )
+    annotations: list[Annotation] = [
+        *plan.arcs,
+        *plan.reader_affect,
+        *plan.tension,
+        *plan.themes,
+        *plan.motifs,
+        *plan.discourse,
+        *plan.subtext,
+    ]
+    records.extend(annotations)
+    records.extend(plan.motif_echoes)
     diagnostics = check_ids(records)
     characters = {character.id for character in plan.characters}
     spans: list[tuple[str, Span]] = []
@@ -82,7 +111,10 @@ def validate_plan(plan: NarrativePlan) -> Validation:
                 )
         spans.extend((scene.id, span) for span in scene.evidence)
         spans.extend((beat.id, span) for beat in scene.beats for span in beat.evidence)
+    spans.extend((record.id, span) for record in annotations for span in record.evidence)
+    spans.extend((echo.id, span) for echo in plan.motif_echoes for span in echo.evidence)
     diagnostics.extend(check_spans(plan, spans))
     diagnostics.extend(validate_structure(plan))
     diagnostics.extend(state_diagnostics(plan))
+    diagnostics.extend(interpretation_diagnostics(plan))
     return Validation(diagnostics=diagnostics)
