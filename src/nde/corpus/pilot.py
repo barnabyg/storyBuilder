@@ -14,7 +14,7 @@ from pydantic import Field, model_validator
 from nde import g1_report
 from nde.corpus.acquisition import load_work
 from nde.corpus.extraction import INSTRUCTION, read_extraction
-from nde.corpus.extraction_records import INTERPRETIVE_CHANNELS, ExtractionOptions
+from nde.corpus.extraction_records import INTERPRETIVE_CHANNELS, PASS_NAMES, ExtractionOptions
 from nde.corpus.families import FamilyConfig, compare_families, family_report
 from nde.corpus.features import extract_features, load_features
 from nde.corpus.records_io import (
@@ -139,7 +139,7 @@ def _prepare(config_path: Path, out: Path, *, expansion: bool = False) -> dict[s
         load_segmentation(work.segmentation, work.work_dir)
         files += [work.segmentation, *evidence_files(work.work_dir)]
         for binding in family.annotators:
-            for name in ("structural", "state", "interpretive"):
+            for name in PASS_NAMES:
                 rows.append(
                     {
                         "work_id": work.work_id,
@@ -155,7 +155,7 @@ def _prepare(config_path: Path, out: Path, *, expansion: bool = False) -> dict[s
         "inputs": snapshot(files),
         "schema_sha256": hashlib_text(schema_json()),
         "prompt_sha256": hashlib_text(INSTRUCTION),
-        "passes": ["structural", "state", "interpretive"],
+        "passes": list(PASS_NAMES),
         "interpretation_channels": list(INTERPRETIVE_CHANNELS),
         "test_only": config.test_only,
         "expansion": expansion,
@@ -236,7 +236,7 @@ def report(out: Path) -> dict[str, Any]:
                 if entry and (Path(entry["directory"]) / "extraction.json").is_file()
                 else None
             )
-            for name in ("structural", "state", "interpretive"):
+            for name in PASS_NAMES:
                 current = (
                     next((p for p in session.passes if p.name == name), None) if session else None
                 )
