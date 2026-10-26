@@ -288,8 +288,9 @@ def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: i
     except (ProviderError, BudgetExceededError) as failure:
         record.status = "failed"
         record.error = str(failure)
-        save(run, job)
-        run.state.stories.append(record)
+        if ctx.files:
+            save(run, job)
+            run.state.stories.append(record)
         raise
     else:
         record.attempts = _use(job, drafts)
