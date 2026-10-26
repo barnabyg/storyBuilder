@@ -47,6 +47,7 @@ dev = [
 ]
 ml = [
     "torch==2.14.1",
+    "numpy==2.4.4",
 ]
 
 [tool.ruff]
@@ -79,5 +80,7 @@ testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra", "-m", "not live"]
 markers = [
     "live: calls a real LLM provider; opt in with `uv run pytest -m live`",
+    "ml: actual local CPU model training/checkpoint tests; required in the CPU ML lane",
 ]
 filterwarnings = ["error"]
+

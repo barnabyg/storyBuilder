@@ -20,3 +20,18 @@ jobs:
         run: uv sync --locked
       - name: Canonical verification
         run: uv run --locked nde-verify
+
+  cpu-ml:
+    runs-on: ubuntu-latest
+    env:
+      NDE_REQUIRE_ML: "1"
+      CUDA_VISIBLE_DEVICES: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.8.14"
+      - name: Install the locked CPU ML environment
+        run: uv sync --locked --group ml
+      - name: Canonical verification including real CPU model tests
+        run: uv run --locked --group ml nde-verify
