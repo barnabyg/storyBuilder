@@ -157,6 +157,10 @@ def prepare_stories(
         return None
     briefs = _select_briefs(stories.briefs, briefs_dir)
     conditions = [_condition(loaded, spec) for spec in stories.conditions]
+    if any(condition.spec.params.get("exemplars") for condition in conditions) and any(
+        brief.split != "dev" for brief in briefs
+    ):
+        raise ConfigError("corpus exemplars may be used only on dev briefs")
     needs = [need for condition in conditions for need in condition.pipeline.templates()]
     if stories.equal_budget is not None:
         needs.append(TemplateNeed(stories.equal_budget.revision_prompt, REVISION_VARIABLES))

@@ -84,6 +84,8 @@ class StoryContext:
     prefix: str = ""
     # Intermediate outputs to keep beside the story, by path relative to its folder.
     files: dict[str, str] = field(default_factory=dict[str, str])
+    # Approved development examples, supplied only to structural requests.
+    planning_examples: str | None = None
 
     def _prompt(self, ref: PromptRef, variables: Mapping[str, str]) -> Prompt:
         template = self.templates[ref.label]

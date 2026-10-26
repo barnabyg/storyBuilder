@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import Field
 
+from nde.corpus.exemplar_records import check_exemplars
 from nde.gitinfo import git
 from nde.narrative.interpretation import Arc, ReaderAffect
 from nde.narrative.models import Character, NarrativePlan, Scene, Strict
@@ -15,6 +16,7 @@ from nde.narrative.workflow import rendered_files, schema_json
 from nde.plan.narrative import (
     NarrativePlanningParams,
     generated_errors,
+    prepare_exemplars,
     request_plan,
     stable_errors,
 )
@@ -51,6 +53,7 @@ class GlobalIntentions(Strict):
 
 
 def coarse_templates(params: CoarseParams) -> list[TemplateNeed]:
+    check_exemplars(params.exemplars)
     return [
         TemplateNeed(params.intentions_prompt, frozenset({"brief", "constraints"})),
         TemplateNeed(params.skeleton_prompt, frozenset({"brief", "constraints", "intentions"})),
@@ -77,6 +80,7 @@ def intention_errors(global_plan: GlobalIntentions, plan: NarrativePlan) -> list
 
 def generate_coarse_plan(ctx: StoryContext, params: CoarseParams) -> NarrativePlan:
     """All requests use the same gateway/repair/accounting path as C."""
+    prepare_exemplars(ctx, params.exemplars)
     first = len(ctx.state.calls)
     status = "failed"
     constraints = [

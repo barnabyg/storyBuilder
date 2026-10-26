@@ -29,6 +29,8 @@ class BaselineCParams(NarrativePlanningParams):
     def _import_is_attributed(self) -> Self:
         if (self.saved_plan is None) != (self.provenance is None):
             raise ValueError("saved_plan and provenance must be supplied together")
+        if self.saved_plan is not None and self.exemplars is not None:
+            raise ValueError("imported plans cannot acquire new exemplar conditioning")
         return self
 
     def planning(self) -> NarrativePlanningParams:

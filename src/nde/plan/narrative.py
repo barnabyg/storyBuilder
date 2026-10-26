@@ -8,8 +8,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
+from nde.corpus.exemplar_records import ExemplarSelection, check_exemplars, load_exemplars
 from nde.gitinfo import git
 from nde.llm import structured
+from nde.llm.client import Message
 from nde.llm.gateway import Prompt
 from nde.narrative.interpretation import iter_annotations
 from nde.narrative.models import NarrativePlan, Strict
@@ -29,9 +31,11 @@ class NarrativePlanningParams(Strict):
     skeleton_prompt: PromptRef = Field(default_factory=lambda: SKELETON)
     channels_prompt: PromptRef = Field(default_factory=lambda: CHANNELS)
     constraints: list[Constraint] = Field(default_factory=list[Constraint])
+    exemplars: ExemplarSelection | None = None
 
 
 def planning_templates(params: NarrativePlanningParams) -> list[TemplateNeed]:
+    check_exemplars(params.exemplars)
     return [
         TemplateNeed(params.skeleton_prompt, frozenset({"brief", "constraints"})),
         TemplateNeed(params.channels_prompt, frozenset({"brief", "plan", "scene_id"})),
@@ -67,6 +71,17 @@ def request_plan[T: BaseModel](
 ) -> T:
     template = ctx.templates[step.prompt.label]
     messages = template.render(step.variables)
+    if ctx.planning_examples:
+        first_message = messages[0]
+        if first_message["role"] == "system":
+            system: Message = {
+                "role": "system",
+                "content": first_message["content"] + ctx.planning_examples,
+            }
+            messages = (system, *messages[1:])
+        else:
+            system: Message = {"role": "system", "content": ctx.planning_examples}
+            messages = (system, *messages)
     binding = ctx.roles[step.role]
     response_format = structured.response_format(model)
     if not ctx.gateway.supports_json_schema(binding):
@@ -87,6 +102,8 @@ def request_plan[T: BaseModel](
     errors: list[str] = []
     try:
         for attempt in range(ctx.structured_config.max_repairs + 1):
+            if ctx.planning_examples:
+                ctx.keep(f"planning/{step.name}/{attempt + 1}.request.json", json.dumps(messages))
             ctx.state.current_call = attribution.call
             response = ctx.gateway.complete(
                 binding,
@@ -145,6 +162,7 @@ def _keep_plan(ctx: StoryContext, plan: NarrativePlan) -> None:
 
 def generate_plan(ctx: StoryContext, params: NarrativePlanningParams) -> NarrativePlan:
     """Generate a validated L plan; retain every attempt, including failed calls."""
+    prepare_exemplars(ctx, params.exemplars)
     first = len(ctx.state.calls)
     status = "failed"
     selected: NarrativePlan | None = None
@@ -229,3 +247,21 @@ def generate_plan(ctx: StoryContext, params: NarrativePlanningParams) -> Narrati
             "calls": [call.model_dump(mode="json") for call in calls],
         }
         ctx.keep("planning-provenance.json", json.dumps(provenance, indent=2) + "\n")
+
+
+def prepare_exemplars(ctx: StoryContext, selection: ExemplarSelection | None) -> None:
+    if selection is None:
+        ctx.planning_examples = None
+        return
+    if ctx.brief.split != "dev":
+        raise StepFailedError("exemplars", "corpus exemplars may be used only on dev briefs")
+    examples = load_exemplars(selection)
+    text = json.dumps(examples, sort_keys=True)
+    ctx.planning_examples = (
+        "\n\nCORPUS_EXEMPLARS\n"
+        + text
+        + "\nUse these approved structural examples as optional inspiration. "
+        "Their source evidence belongs to the source works; never copy it into generated evidence. "
+        "Keep hard targets and soft-only uncertain targets distinct.\nEND_CORPUS_EXEMPLARS\n"
+    )
+    ctx.keep("corpus-exemplars.json", json.dumps(examples, indent=2) + "\n")
