@@ -264,6 +264,8 @@ class CallRecord(_Record):
     cost_usd: float
     # What the call's tokens cost at list price, cached or not.
     token_cost_usd: float
+    # A reused plan's original experimental calls, attributed here without new spend.
+    imported_from: str | None = None
 
 
 type StoryStatus = Literal["ok", "failed"]

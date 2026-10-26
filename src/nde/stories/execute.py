@@ -9,7 +9,9 @@ from pydantic import ValidationError
 
 from nde.briefs import BriefError, load_briefs, split_checksum
 from nde.files import checksum_lf, write_text_lf
+from nde.llm.errors import ProviderError
 from nde.llm.gateway import Gateway
+from nde.llm.ledger import BudgetExceededError
 from nde.prose.revision import REVISION_VARIABLES, revise
 from nde.runs.config import (
     BriefSelection,
@@ -283,6 +285,12 @@ def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: i
     except StepFailedError as failure:
         record.status = "failed"
         record.error = str(failure)
+    except (ProviderError, BudgetExceededError) as failure:
+        record.status = "failed"
+        record.error = str(failure)
+        save(run, job)
+        run.state.stories.append(record)
+        raise
     else:
         record.attempts = _use(job, drafts)
     save(run, job)
