@@ -110,6 +110,7 @@ def make_task(record: Record, schedule: Record, *, seed: int = 7, repetition: in
         {"record": record["id"], "schedule": schedule, "seed": seed, "repetition": repetition}
     )
     # S311: repeatable scientific corruption, never security-sensitive randomness.
+    # Revisit this exception if corruption selection acquires a security-sensitive purpose.
     rng = random.Random(stable_seed)  # noqa: S311
     count = math.ceil(len(groups) * schedule["rate"])
     if schedule["kind"] == "span":
