@@ -12,6 +12,7 @@ from nde.corpus import pilot, reliability
 from nde.corpus.families import FamilyConfig
 from nde.corpus.records_io import (
     check_snapshot,
+    cohort_file,
     create_record,
     evidence_files,
     file_sha,
@@ -37,24 +38,53 @@ class G2Policy(Strict):
     scaling_budget_usd: float = Field(gt=0, allow_inf_nan=False)
 
 
+def _pilot_review_inputs(
+    policy: G2Policy, packet: dict[str, Any], pilot_packet: dict[str, Any]
+) -> list[Path]:
+    check_snapshot(packet["inputs"])
+    expected = {w["work_id"]: w for w in pilot_packet["config"]["works"]}
+    inputs = packet["policy"]["inputs"]
+    if {item["work_id"] for item in inputs} != set(expected):
+        raise ValueError("review population must cover the fixed pilot population")
+    if (
+        cohort_file(Path(packet["policy"]["cohort"])).resolve()
+        != cohort_file(Path(pilot_packet["config"]["cohort"])).resolve()
+    ):
+        raise ValueError("review cohort differs from registered pilot cohort")
+    files: list[Path] = []
+    for item in inputs:
+        work = expected[item["work_id"]]
+        families = policy.pilot / "stories" / item["work_id"]
+        feature = policy.pilot / "features" / item["work_id"] / "features.json"
+        required = {
+            "work_dir": Path(work["work_dir"]),
+            "segmentation": Path(work["segmentation"]),
+            "families": families,
+            "features": feature,
+        }
+        if any(Path(item[key]).resolve() != path.resolve() for key, path in required.items()):
+            raise ValueError(
+                "review evidence differs from exact pilot annotation/feature/source inputs"
+            )
+        files += [feature, Path(work["segmentation"]), *evidence_files(families)]
+    return files
+
+
 def register(config: Path, out: Path) -> dict[str, Any]:
     policy = G2Policy.model_validate(yaml.safe_load(config.read_text(encoding="utf-8")))
     packet = read_sealed(policy.review / "packet.json")
-    read_sealed(policy.pilot / "pilot.json")
     if list((policy.review / "judgements").glob("*.json")):
         raise ValueError("G2 thresholds must be frozen before collecting owner labels")
     if set(reliability.CORE) - set(packet["policy"]["channels"]):
         raise ValueError("G2 registration requires all core channels")
-    review_inputs = {r["work_id"] for r in packet["policy"]["inputs"]}
     pilot_packet = read_sealed(policy.pilot / "pilot.json")
-    if review_inputs != {w["work_id"] for w in pilot_packet["config"]["works"]}:
-        raise ValueError("review population must cover the fixed pilot population")
+    files = _pilot_review_inputs(policy, packet, pilot_packet)
     return create_record(
         out,
         {
             "policy": policy.model_dump(mode="json"),
             "inputs": snapshot(
-                [config, policy.review / "packet.json", policy.pilot / "pilot.json"]
+                [config, policy.review / "packet.json", policy.pilot / "pilot.json", *files]
             ),
             "test_only": packet["test_only"] or pilot_packet["test_only"],
         },
@@ -65,6 +95,9 @@ def assess(protocol: Path) -> dict[str, Any]:
     registered = read_sealed(protocol)
     check_snapshot(registered["inputs"])
     policy = G2Policy.model_validate(registered["policy"])
+    _pilot_review_inputs(
+        policy, read_sealed(policy.review / "packet.json"), read_sealed(policy.pilot / "pilot.json")
+    )
     review = reliability.report(policy.review)
     extraction = pilot.report(policy.pilot)
     pending: list[str] = []

@@ -2,7 +2,9 @@ import json
 from pathlib import Path
 
 from nde.cli import main
-from tests.corpus_support import label_packet
+from nde.corpus.extraction_records import ExtractionOptions
+from nde.corpus.families import compare_families
+from tests.corpus_support import label_packet, queue_annotation, review_config
 from tests.fake_openai import FakeOpenAI
 from tests.g2_support import approved_export, g2_packet
 
@@ -81,4 +83,50 @@ def test_g2_pending_and_core_failure_are_explicit(
             ]
         )
         == 2
+    )
+
+
+def test_g2_cannot_approve_pilot_using_a_separate_annotation_run(
+    tmp_path: Path,
+    fake_llm: FakeOpenAI,
+) -> None:
+    pilot, _, _ = g2_packet(tmp_path, fake_llm)
+    saved = json.loads((pilot / "pilot.json").read_text())["config"]
+    work = saved["works"][0]
+    inputs = {
+        "work": Path(work["work_dir"]),
+        "segments": Path(work["segmentation"]),
+        "cohort": Path(saved["cohort"]),
+        "family_config": Path(saved["extraction_config"]),
+    }
+    queue_annotation(inputs, fake_llm)
+    families = tmp_path / "separate-families"
+    assert (
+        compare_families(
+            inputs["family_config"],
+            inputs["work"],
+            inputs["segments"],
+            ExtractionOptions(
+                families, tmp_path / "separate-cache.sqlite", tmp_path / "separate-ledger.sqlite"
+            ),
+        ).status
+        == "complete"
+    )
+    config = review_config(tmp_path, inputs, families, pilot / "features/lamp/features.json")
+    review = tmp_path / "separate-review"
+    assert main(["corpus-review", "freeze", str(config), "--out", str(review)]) == 0
+    config = tmp_path / "separate-g2.json"
+    config.write_text(
+        json.dumps(
+            {
+                "pilot": str(pilot),
+                "review": str(review),
+                "min_stories": 1,
+                "min_owner_per_channel": 1,
+                "scaling_budget_usd": 1,
+            }
+        )
+    )
+    assert (
+        main(["corpus-g2", "register", str(config), "--out", str(tmp_path / "rejected.json")]) == 2
     )
