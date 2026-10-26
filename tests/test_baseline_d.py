@@ -104,6 +104,39 @@ def test_d_conditions_each_stage_and_reuses_prose_with_free_cached_replay(
     ).read_bytes()
 
 
+@pytest.mark.parametrize("field", ["id", "scene_ids"])
+def test_d_repairs_invalid_derived_identities_and_retains_attempt_diagnostics(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    field: str,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    plan = d_plan()
+    intentions = {
+        "id": plan["id"],
+        "title": plan["title"],
+        "characters": plan["characters"],
+        "scene_ids": [f"scene-{i}" for i in range(5)],
+        "arcs": plan["arcs"],
+        "reader_affect": plan["reader_affect"],
+    }
+    intentions[field] = "invalid/id" if field == "id" else ["invalid/id", "scene-1", "scene-2"]
+    fake_llm.queue(completion(json.dumps(intentions)))
+    fake_llm.default = fake_d
+    result = run(
+        tmp_path,
+        story_config(fake_llm.base_url, [BASELINE_D], briefs={"ids": ["brief-01"]}),
+    )
+    [story] = stories(result)
+    assert story["status"] == "ok"
+    folder = result / story["path"]
+    assert "invalid/id" in (folder / "planning/intentions/1.txt").read_text()
+    assert "pattern" in (folder / "planning/intentions/1.diagnostics.json").read_text()
+    assert (folder / "planning/intentions/2.txt").exists()
+    assert len(jsonl(result / "calls.jsonl")) == 13
+
+
 @pytest.mark.parametrize("attack", ["constraints", "global", "schema"])
 def test_d_rejects_changed_higher_level_records_and_preserves_partial_artifacts(
     fake_llm: FakeOpenAI,

@@ -97,10 +97,9 @@ def request_plan[T: BaseModel](
             attempts += 1
             try:
                 value = structured.parse(response.text, model)
+                errors = check(value)
             except ValidationError as error:
                 errors = structured.describe_errors(error)
-            else:
-                errors = check(value)
             ctx.keep(f"planning/{step.name}/{attempt + 1}.txt", response.text)
             ctx.keep(f"planning/{step.name}/{attempt + 1}.diagnostics.json", json.dumps(errors))
             if not errors and value is not None:
