@@ -73,9 +73,9 @@ class Session(Strict):
     version: Literal["1"] = "1"
     id: str
     story_id: str
-    status: Literal["running", "drafted", "exhausted", "budget_aborted", "provider_failed"] = (
-        "running"
-    )
+    status: Literal[
+        "running", "drafted", "exhausted", "budget_aborted", "provider_failed", "recovery_required"
+    ] = "running"
     source: Source
     provenance: dict[str, Any]
     config: AnnotationConfig
@@ -85,6 +85,9 @@ class Session(Strict):
     git_sha: str
     attempts: list[Attempt] = Field(default_factory=list[Attempt])
     spent_usd: float = 0
+    pending_call: bool = False
+    ledger_path: str | None = None
+    cache_path: str | None = None
     failure: str | None = None
     revisions: list[Revision] = Field(default_factory=list[Revision])
     owner_reviews: list[OwnerReview] = Field(default_factory=list[OwnerReview])

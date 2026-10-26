@@ -33,6 +33,14 @@ in another session use the shared cache with zero new spend. Exhausted sessions
 cannot gain extra attempts merely by restarting. Use a new directory and an
 explicitly revised configuration for a new experiment.
 
+Run totals are also persisted transactionally in the shared ledger, using the
+session ID, before/after each provider call. Resume requires the same ledger and
+cache paths. An in-flight call is replayed only from cache: if its response was
+not safely cached, the session becomes `recovery_required` and makes no further
+provider calls. Preserve that session and reconcile its provider receipt before
+starting another experiment. A crash before settlement can retain a conservative
+reservation in the ledger; it is unresolved accounting, not measured token cost.
+
 Record only active owner correction time. Start immediately before reading or
 editing, pause for idle time, generation and breaks, then resume explicitly:
 

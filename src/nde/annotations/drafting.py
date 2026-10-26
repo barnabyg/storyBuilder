@@ -15,7 +15,7 @@ from nde.gitinfo import git
 from nde.llm import structured
 from nde.llm.cache import ResponseCache
 from nde.llm.errors import ProviderError
-from nde.llm.gateway import Gateway, Prompt
+from nde.llm.gateway import CacheReplayError, Gateway, Prompt
 from nde.llm.ledger import BudgetExceededError, CostLedger, Pricing
 from nde.narrative.models import NarrativePlan, Source
 from nde.narrative.validation import validate_plan
@@ -131,11 +131,15 @@ def _generate(session: Session, out: Path, gateway: Gateway, messages: Prompt) -
                 return
         conversation = (*conversation, *structured.repair_messages(previous.text, previous.errors))
     for _ in range(len(session.attempts), config.max_repairs + 1):
+        recovering = session.pending_call
+        session.pending_call = True
+        save_session(out, session)
         completion = gateway.complete(
             binding,
             Prompt(messages.template, messages.version, conversation),
             seed=config.seed,
             response_format=response_format,
+            cache_only=recovering,
         )
         plan, errors = validate_annotation(completion.text, session.source)
         record = call_record(
@@ -144,7 +148,8 @@ def _generate(session: Session, out: Path, gateway: Gateway, messages: Prompt) -
         session.attempts.append(
             Attempt(text=completion.text, errors=errors, call=record.model_dump(mode="json"))
         )
-        session.spent_usd += completion.cost_usd
+        session.pending_call = False
+        session.spent_usd = gateway.ledger.run_spent if gateway.ledger else session.spent_usd
         if len(session.attempts) == 1:
             write_text_lf(out / "original.txt", completion.text)
         save_session(out, session)
@@ -160,6 +165,14 @@ def _generate(session: Session, out: Path, gateway: Gateway, messages: Prompt) -
 def draft(config_file: Path, manifest: Path, story_id: str, options: DraftOptions) -> Session:
     out = options.out
     session = _prepare(config_file, manifest, story_id, out)
+    ledger_path, cache_path = str(options.ledger.resolve()), str(options.cache.resolve())
+    if session.ledger_path not in {None, ledger_path} or session.cache_path not in {
+        None,
+        cache_path,
+    }:
+        raise PlanError("resume requires the original ledger and cache paths")
+    session.ledger_path, session.cache_path = ledger_path, cache_path
+    save_session(out, session)
     if session.status == "drafted":
         return session
     config = session.config
@@ -175,9 +188,12 @@ def draft(config_file: Path, manifest: Path, story_id: str, options: DraftOption
         config.prompt.version,
     )
     ledger = CostLedger(
-        options.ledger, per_run_usd=config.budget.per_run_usd, per_day_usd=config.budget.per_day_usd
+        options.ledger,
+        per_run_usd=config.budget.per_run_usd,
+        per_day_usd=config.budget.per_day_usd,
+        run_id=session.id,
     )
-    ledger.run_spent = session.spent_usd
+    ledger.ensure_run_spent(session.spent_usd)
     gateway = Gateway(
         config.providers,
         dict(os.environ),
@@ -195,10 +211,15 @@ def draft(config_file: Path, manifest: Path, story_id: str, options: DraftOption
         )
         _generate(session, out, gateway, prompt)
     except BudgetExceededError as error:
+        session.pending_call = False
         session.status, session.failure = "budget_aborted", str(error)
     except ProviderError as error:
+        session.pending_call = False
         session.status, session.failure = "provider_failed", str(error)
+    except CacheReplayError as error:
+        session.status, session.failure = "recovery_required", str(error)
     finally:
-        save_session(out, session)
+        session.spent_usd = ledger.run_spent
         gateway.close()
+        save_session(out, session)
     return session

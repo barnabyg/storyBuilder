@@ -236,3 +236,38 @@ def test_changed_source_is_rejected_before_provider_call(
     (tmp_path / "calibration/keeper.source.txt").write_text("changed", encoding="utf-8")
     assert main(draft_args(manifest, config, tmp_path / "work", tmp_path)) == 2
     assert fake_llm.call_count == 0
+
+
+@pytest.mark.parametrize("cache_available", [True, False])
+def test_crash_after_provider_response_keeps_spend_and_replays_only_cache(
+    tmp_path: Path,
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    cache_available: bool,
+) -> None:
+    manifest, config = annotation_inputs(tmp_path, fake_llm)
+    fake_llm.queue(completion((REPO / "examples/harbour.plan.json").read_text()))
+    out = tmp_path / "crashed"
+    args = draft_args(manifest, config, out, tmp_path)
+    replace = Path.replace
+
+    def fail_response_write(path: Path, target: Path) -> Path:
+        if path.name == "session.tmp" and json.loads(path.read_text())["attempts"]:
+            raise OSError("simulated interrupted filesystem write")
+        return replace(path, target)
+
+    with monkeypatch.context() as context:
+        context.setattr(Path, "replace", fail_response_write)
+        assert main(args) == 2
+    assert fake_llm.call_count == 1
+    if not cache_available:
+        (tmp_path / "cache.sqlite").unlink()
+    assert main(args) == (0 if cache_available else 1)
+    state = json.loads((out / "session.json").read_text())
+    assert state["spent_usd"] == pytest.approx(0.000002)
+    if cache_available:
+        assert state["attempts"][0]["call"]["cached"] is True
+    else:
+        assert state["status"] == "recovery_required"
+        assert state["attempts"] == []
+    assert fake_llm.call_count == 1

@@ -110,14 +110,39 @@ class CostLedger:
         per_run_usd: float | None = None,
         per_day_usd: float | None = None,
         clock: Clock = _utc_now,
+        run_id: str | None = None,
     ) -> None:
         self.per_run_usd = per_run_usd
         self.per_day_usd = per_day_usd
-        self.run_spent = 0.0
+        self._run_spent = 0.0
+        self._run_id = run_id
         self._clock = clock
         self._db = sqlite.connect(
             path, "CREATE TABLE IF NOT EXISTS daily_spend (day TEXT PRIMARY KEY, usd REAL NOT NULL)"
         )
+        self._db.execute(
+            "CREATE TABLE IF NOT EXISTS run_spend (id TEXT PRIMARY KEY, usd REAL NOT NULL)"
+        )
+        if run_id is not None:
+            self._db.execute("INSERT OR IGNORE INTO run_spend VALUES (?, 0)", (run_id,))
+
+    @property
+    def run_spent(self) -> float:
+        if self._run_id is None:
+            return self._run_spent
+        row: tuple[float] = self._db.execute(
+            "SELECT usd FROM run_spend WHERE id = ?", (self._run_id,)
+        ).fetchone()
+        return row[0]
+
+    def ensure_run_spent(self, recorded: float) -> None:
+        """Seed resumed accounting without overwriting a more recent durable settlement."""
+        if self._run_id is None:
+            self._run_spent = max(self._run_spent, recorded)
+        else:
+            self._db.execute(
+                "UPDATE run_spend SET usd = MAX(usd, ?) WHERE id = ?", (recorded, self._run_id)
+            )
 
     def close(self) -> None:
         self._db.close()
@@ -133,27 +158,41 @@ class CostLedger:
 
     def reserve(self, estimate: float) -> Reservation:
         """Hold `estimate` against both caps, or raise BudgetExceededError."""
-        if self.per_run_usd is not None and self.run_spent + estimate > self.per_run_usd:
-            raise BudgetExceededError("run", self.per_run_usd, self.run_spent, estimate)
         day = self._today()
         self._db.execute("BEGIN IMMEDIATE")
         try:
+            if self.per_run_usd is not None and self.run_spent + estimate > self.per_run_usd:
+                raise BudgetExceededError("run", self.per_run_usd, self.run_spent, estimate)
             spent = self.day_spent(day)
             if self.per_day_usd is not None and spent + estimate > self.per_day_usd:
                 raise BudgetExceededError("day", self.per_day_usd, spent, estimate)
             self._add(day, estimate)
+            self._add_run(estimate)
             self._db.execute("COMMIT")
         except BaseException:
             self._db.execute("ROLLBACK")
             raise
-        self.run_spent += estimate
+        if self._run_id is None:
+            self._run_spent += estimate
         return Reservation(day=day, estimate=estimate)
 
     def settle(self, reservation: Reservation, actual: float) -> None:
         """Replace a reservation's estimate with the call's actual cost."""
         delta = actual - reservation.estimate
-        self.run_spent += delta
-        self._add(reservation.day, delta)
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            self._add(reservation.day, delta)
+            self._add_run(delta)
+            self._db.execute("COMMIT")
+        except BaseException:
+            self._db.execute("ROLLBACK")
+            raise
+        if self._run_id is None:
+            self._run_spent += delta
+
+    def _add_run(self, usd: float) -> None:
+        if self._run_id is not None:
+            self._db.execute("UPDATE run_spend SET usd = usd + ? WHERE id = ?", (usd, self._run_id))
 
     def _add(self, day: str, usd: float) -> None:
         self._db.execute(

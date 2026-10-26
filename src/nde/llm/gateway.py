@@ -44,6 +44,10 @@ class Completion:
         return self.result.text
 
 
+class CacheReplayError(ValueError):
+    """An interrupted call cannot be safely repeated without its cached response."""
+
+
 @dataclass
 class Gateway:
     providers: Mapping[str, ProviderConfig]
@@ -88,6 +92,7 @@ class Gateway:
         *,
         seed: int,
         response_format: Mapping[str, Any] | None = None,
+        cache_only: bool = False,
     ) -> Completion:
         request = ChatRequest(
             model=binding.model,
@@ -96,9 +101,11 @@ class Gateway:
             params=binding.params,
             response_format=response_format,
         )
-        completion = self._cached(binding, prompt, seed, request) or self._call(
-            binding, prompt, seed, request
-        )
+        completion = self._cached(binding, prompt, seed, request)
+        if completion is None:
+            if cache_only:
+                raise CacheReplayError("interrupted call has no cached response; recovery required")
+            completion = self._call(binding, prompt, seed, request)
         self.history.append(completion)
         return completion
 
