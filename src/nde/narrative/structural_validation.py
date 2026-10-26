@@ -6,38 +6,10 @@ from graphlib import CycleError, TopologicalSorter
 from typing import TYPE_CHECKING
 
 from nde.narrative.diagnostics import Diagnostic
-from nde.narrative.structure import KnowledgeUse, RevealLink, StructuralRecord
+from nde.narrative.structure import KnowledgeUse, RevealLink
 
 if TYPE_CHECKING:
     from nde.narrative.models import NarrativePlan
-
-
-def _identities(plan: NarrativePlan) -> list[Diagnostic]:
-    seen = {
-        plan.id,
-        *(record.id for record in plan.characters),
-        *(record.id for record in plan.sources),
-        *(scene.id for scene in plan.scenes),
-        *(beat.id for scene in plan.scenes for beat in scene.beats),
-    }
-    records: list[StructuralRecord] = [
-        *plan.causal_links,
-        *plan.setups,
-        *plan.payoff_links,
-        *plan.knowledge_facts,
-        *plan.reveal_links,
-        *plan.knowledge_uses,
-    ]
-    result: list[Diagnostic] = []
-    for record in records:
-        if record.id in seen:
-            result.append(
-                Diagnostic(
-                    code="duplicate_id", location=record.id, message=f"duplicate ID {record.id}"
-                )
-            )
-        seen.add(record.id)
-    return result
 
 
 def _causality(plan: NarrativePlan) -> list[Diagnostic]:
@@ -125,7 +97,7 @@ def _setups(plan: NarrativePlan) -> list[Diagnostic]:
 
 
 def validate_structure(plan: NarrativePlan) -> list[Diagnostic]:
-    return [*_identities(plan), *_causality(plan), *_setups(plan), *_knowledge(plan)]
+    return [*_causality(plan), *_setups(plan), *_knowledge(plan)]
 
 
 def _initial_knowledge(plan: NarrativePlan) -> list[Diagnostic]:

@@ -14,6 +14,14 @@ def _fixture() -> dict[str, Any]:
     )
 
 
+def test_structural_id_collision_is_reported_once(tmp_path: Path) -> None:
+    data = _fixture()
+    data["causal_links"][0]["id"] = "s1"
+    code, _, _, result = _inspect(tmp_path, data)
+    assert code == 1
+    assert [d["code"] for d in result["diagnostics"]].count("duplicate_id") == 1
+
+
 def _inspect(tmp_path: Path, data: dict[str, Any]) -> tuple[int, str, str, dict[str, Any]]:
     file = tmp_path / "input.json"
     file.write_text(json.dumps(data), encoding="utf-8")
