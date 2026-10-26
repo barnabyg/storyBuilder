@@ -342,7 +342,15 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
     elif not within(cheaper.tokens, dearer.tokens, spec.tolerance):
         match.revised = cheaper.record.condition
         while match.passes < spec.max_revision_passes:
-            revise_story(run, cheaper, spec.revision_prompt)
+            try:
+                revise_story(run, cheaper, spec.revision_prompt)
+            except (ProviderError, BudgetExceededError) as error:
+                # Preserve both the previous selected story and partial revision artifacts.
+                save(run, cheaper)
+                match.reason = f"revision interrupted: {error}"
+                match.after = {name: jobs[name].tokens for name in spec.conditions}
+                run.state.budget_matches.append(match)
+                raise
             match.passes += 1
             if within(cheaper.tokens, dearer.tokens, spec.tolerance):
                 break

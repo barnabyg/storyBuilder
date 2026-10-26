@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 
 from nde.cli import main
-from tests.conftest import write_config
-from tests.fake_openai import FakeOpenAI, Json, Reply, completion
+from tests.conftest import REPO, write_config
+from tests.fake_openai import FakeOpenAI, Json, Reply, completion, error
 from tests.stories import (
     BASELINE_A,
     last_user_message,
@@ -18,6 +18,7 @@ from tests.stories import (
     story_text,
 )
 from tests.test_baseline_b import BASELINE_B, outline
+from tests.test_plan_generation import fake_plan
 
 # Every reply reports 10 input tokens. A story costs 2,000 output tokens; a B scene
 # costs SCENE_TOKENS, so B's budget is 15 (outline) + 5 * (10 + SCENE_TOKENS).
@@ -87,6 +88,115 @@ def test_equal_budget_mode_gives_the_cheaper_condition_revision_passes(
     revision = _revision_requests(budget_llm)[0]
     assert "lighthouse keeper" in revision
     assert story_text(2000)[:200] in revision
+
+
+def test_comparison_report_identifies_selected_final_prose_and_actual_spend(
+    budget_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    run_dir = run(tmp_path, _config(budget_llm.base_url))
+    comparison = json.loads((run_dir / "comparison.json").read_text())
+    assert len(comparison["pairs"]) == 2
+    pair = comparison["pairs"][0]
+    assert pair["comparable"]
+    assert pair["conditions"]["A"]["revision_passes"] == 1
+    assert pair["conditions"]["A"]["final_sha256"]
+    assert pair["conditions"]["A"]["tokens"] == 4020
+    assert pair["conditions"]["A"]["new_spend_usd"] > 0
+    second = run(tmp_path, _config(budget_llm.base_url))
+    replay = json.loads((second / "comparison.json").read_text())
+    assert replay["pairs"][0]["conditions"]["A"]["new_spend_usd"] == 0
+    assert replay["pairs"][0]["conditions"]["A"]["tokens"] == 4020
+
+
+def test_aborted_revision_retains_the_incomplete_pair_and_previous_selected_prose(
+    budget_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    budget_llm.default = lambda body: (
+        error(400, "revision refused") if "Revise" in last_user_message(body) else _reply(body)
+    )
+    run_dir = run(tmp_path, _config(budget_llm.base_url), expect=1)
+    comparison = json.loads((run_dir / "comparison.json").read_text())
+    assert len(comparison["pairs"]) == 2
+    first = comparison["pairs"][0]
+    assert not first["comparable"]
+    assert first["matching"]["reason"] == "revision interrupted: HTTP 400: revision refused"
+    assert first["conditions"]["A"]["final_sha256"]
+    assert not comparison["pairs"][1]["comparable"]
+
+
+def test_bc_comparison_counts_multistage_planning_and_uses_revised_final_story(
+    budget_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    def replies(body: Json) -> Reply:
+        system = str(body["messages"][0]["content"])
+        if "skeleton planner" in system or "scene-channel planner" in system:
+            reply = fake_plan(body)
+            assert isinstance(reply.body, dict)
+            return completion(reply.body["choices"][0]["message"]["content"], prompt_tokens=1000)
+        if "Revise" in last_user_message(body):
+            return completion(story_text(2000, marker="revised"), completion_tokens=2000)
+        return _reply(body)
+
+    budget_llm.default = replies
+    config = story_config(
+        budget_llm.base_url,
+        [{"name": "C", "pipeline": "baseline_c", "params": {"tier": "L"}}, BASELINE_B],
+        briefs={"ids": ["brief-01"]},
+        equal_budget={"conditions": ["C", "B"]},
+    )
+    run_dir = run(tmp_path, config)
+    comparison = json.loads((run_dir / "comparison.json").read_text())
+    [pair] = comparison["pairs"]
+    assert pair["comparable"]
+    assert pair["conditions"]["C"]["calls"] == 11
+    assert pair["conditions"]["C"]["tokens"] == 10080
+    assert pair["conditions"]["B"]["revision_passes"] == 3
+    assert pair["matching"]["revised"] == "B"
+    assert pair["conditions"]["B"]["tokens"] == 10095
+    packet = tmp_path / "realisation"
+    assert (
+        main(
+            [
+                "realisation",
+                "create",
+                str(run_dir),
+                "--condition",
+                "B",
+                "--brief",
+                "brief-01",
+                "--out",
+                str(packet),
+            ]
+        )
+        == 0
+    )
+    evidence = json.loads((packet / "packet.json").read_text())
+    assert evidence["prose"].startswith("revised")
+    assert evidence["alignment"] == "unresolved"
+    batches = tmp_path / "batches"
+    assert (
+        main(
+            [
+                "eval",
+                "batch",
+                "bc",
+                "--from",
+                str(run_dir),
+                "C",
+                "--from",
+                str(run_dir),
+                "B",
+                "--batches-dir",
+                str(batches),
+                "--rubric-dir",
+                str(REPO / "benchmark/rubric"),
+            ]
+        )
+        == 0
+    )
+    view = json.loads((batches / "bc/view.json").read_text())
+    [shown] = view["pairs"]
+    assert any(text.startswith("revised") for text in shown.values())
 
 
 def test_revised_stories_go_through_normalisation_and_length_control(

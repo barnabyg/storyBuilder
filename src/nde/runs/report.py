@@ -15,6 +15,8 @@ from nde.runs.records import (
     read_outputs,
     read_stories,
 )
+from nde.stories.comparison import compare
+from nde.stories.comparison import lines as comparison_lines
 
 
 def render_report(run_dir: Path) -> str:
@@ -65,6 +67,7 @@ def render_report(run_dir: Path) -> str:
     lines += _stories_section(manifest, stories, calls)
     lines += _budget_section(manifest, stories)
     lines += _equal_budget_section(manifest)
+    lines += comparison_lines(compare(run_dir, manifest, stories, calls))
     lines += _benchmark_section(manifest)
     lines += _structured_section(manifest)
     lines += _cost_section(manifest, calls)
@@ -374,5 +377,10 @@ def _quote(text: str) -> list[str]:
 
 def write_report(run_dir: Path) -> Path:
     path = run_dir / REPORT
+    comparison = compare(
+        run_dir, read_manifest(run_dir), read_stories(run_dir), read_calls(run_dir)
+    )
+    if comparison["pairs"]:
+        write_text_lf(run_dir / "comparison.json", json.dumps(comparison, indent=2) + "\n")
     write_text_lf(path, render_report(run_dir))
     return path
