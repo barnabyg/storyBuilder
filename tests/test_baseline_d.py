@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from tests.fake_openai import FakeOpenAI, Json, Reply, completion
+from nde.cli import main
+from tests.conftest import write_config
+from tests.fake_openai import FakeOpenAI, Json, Reply, completion, error
 from tests.stories import (
     jsonl,
     last_user_message,
@@ -152,3 +154,204 @@ def test_d_budget_abort_keeps_stage_provenance(
     assert manifest(result)["status"] == "aborted"
     assert (result / story["path"] / "planning-provenance.json").exists()
     assert fake_llm.call_count == 0
+
+
+@pytest.mark.parametrize("family", [None, "generator"])
+def test_critic_family_rule_is_checked_before_any_generation(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    family: str | None,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    value = story_config(
+        fake_llm.base_url,
+        [BASELINE_D | {"params": {"critic_iterations": 1}}],
+        briefs={"ids": ["brief-01"]},
+    )
+    for binding in value["roles"].values():
+        binding["family"] = "generator"
+    value["roles"]["critic"] = {"provider": "fake", "model": "fake-model", "family": family}
+    assert main(["run", str(write_config(tmp_path, value))]) == 2
+    assert "critic family" in capsys.readouterr().err
+    assert fake_llm.call_count == 0
+
+
+def critic_config(base_url: str, iterations: int = 1) -> dict[str, object]:
+    value = story_config(
+        base_url,
+        [
+            BASELINE_D
+            | {"params": {"critic_iterations": iterations, "revision_locks": ["scenes/scene-0"]}}
+        ],
+        briefs={"ids": ["brief-01"]},
+    )
+    for binding in value["roles"].values():
+        binding["family"] = "generator"
+    value["roles"]["critic"] = {"provider": "fake", "model": "fake-model", "family": "critic"}
+    value["structured"] = {"max_repairs": 1}
+    return value
+
+
+def critic_provider(body: Json, behavior: str = "accepted") -> Reply:
+    request = str(body["messages"][1]["content"])
+    system = str(body["messages"][0]["content"])
+    if "structural revision critic" in system:
+        checksum = request.split("Plan SHA-256: ", 1)[1].splitlines()[0]
+        if behavior == "no_issues":
+            return completion('{"issues": []}')
+        issue = {
+            "plan_sha256": "stale" if behavior == "stale" else checksum,
+            "mask": {
+                "units": [
+                    "scenes/missing/summary"
+                    if behavior == "unknown"
+                    else "scenes/scene-0/summary"
+                    if behavior == "locked"
+                    else "scenes/scene-2/summary"
+                ]
+            },
+            "proposed_change": "Add a concrete reversable decision",
+            "rationale": "Scene lacks a decision",
+        }
+        if behavior == "span":
+            issue["mask"] = {"scene_ids": ["scene-1", "scene-2"]}
+        return completion(
+            json.dumps({"issues": [issue, issue] if behavior == "contradictory" else [issue]})
+        )
+    if "masked structural revision planner" in system:
+        if behavior == "provider":
+            return error(401, "Synthetic refinement failure")
+        plan = json.loads(
+            request.split("Accepted plan:\n", 1)[1].split("\n\nExplicit revision authority", 1)[0]
+        )
+        if behavior != "noop":
+            plan["scenes"][2]["summary"] = "Mara decides to relight the lamp despite the cost"
+        if behavior == "attack":
+            plan["scenes"][0]["summary"] = "Locked scene replaced"
+        return completion(json.dumps(plan))
+    return fake_d(body)
+
+
+def test_critic_accepts_only_targeted_change_and_cache_keeps_all_experimental_calls(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = critic_provider
+    config = critic_config(fake_llm.base_url)
+    first = run(tmp_path, config)
+    [story] = stories(first)
+    folder = first / story["path"]
+    saved = json.loads((folder / "plan.json").read_text())
+    assert saved["scenes"][2]["summary"] == "Mara decides to relight the lamp despite the cost"
+    assert saved["scenes"][0]["summary"] == "Function 0 realised intention"
+    assert (
+        json.loads((folder / "refinement.json").read_text())["iterations"][0]["status"]
+        == "accepted"
+    )
+    calls = jsonl(first / "calls.jsonl")
+    assert [c["step"] for c in calls][7:9] == ["critic-1", "revision-critic-1"]
+    assert story["budget"]["calls"] == 14
+    assert len(json.loads((folder / "planning-provenance.json").read_text())["calls"]) == 9
+    second = run(tmp_path, config)
+    assert fake_llm.call_count == 14
+    assert manifest(second)["cost"]["usd"] == 0
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        ("stale", "no_actionable_issues", 13),
+        ("unknown", "no_actionable_issues", 13),
+        ("locked", "no_actionable_issues", 13),
+        ("contradictory", "no_actionable_issues", 13),
+        ("no_issues", "no_actionable_issues", 13),
+        ("noop", "noop", 14),
+        ("attack", "repeated_failure", 18),
+    ],
+)
+def test_critic_rejections_noops_and_failures_are_bounded_and_keep_last_plan(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    case: tuple[str, str, int],
+) -> None:
+    behavior, reason, calls = case
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = lambda body: critic_provider(body, behavior)
+    result = run(tmp_path, critic_config(fake_llm.base_url, iterations=3))
+    [story] = stories(result)
+    folder = result / story["path"]
+    history = json.loads((folder / "refinement.json").read_text())
+    assert history["stopping_reason"] == reason
+    assert len(history["iterations"]) <= 2
+    assert fake_llm.call_count == calls
+    plan = json.loads((folder / "plan.json").read_text())
+    assert plan["scenes"][0]["summary"] == "Function 0 realised intention"
+    if behavior != "noop":
+        assert plan["scenes"][2]["summary"] == "Function 2 realised intention"
+
+
+def test_interrupted_refinement_keeps_last_plan_and_no_successful_story(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = lambda body: critic_provider(body, "provider")
+    result = run(tmp_path, critic_config(fake_llm.base_url), expect=1)
+    [story] = stories(result)
+    folder = result / story["path"]
+    assert story["status"] == "failed"
+    assert (folder / "plan.json").exists()
+    assert not (folder / "story.md").exists()
+    assert json.loads((folder / "refinement.json").read_text())["stopping_reason"] == "interrupted"
+
+
+def test_critic_can_authorize_a_contiguous_span_without_changing_surroundings(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = lambda body: critic_provider(body, "span")
+    result = run(tmp_path, critic_config(fake_llm.base_url))
+    [story] = stories(result)
+    folder = result / story["path"]
+    history = json.loads((folder / "refinement.json").read_text())
+    assert history["iterations"][0]["status"] == "accepted"
+    plan = json.loads((folder / "plan.json").read_text())
+    assert plan["scenes"][3]["summary"] == "Function 3 realised intention"
+    assert plan["scenes"][2]["summary"] == "Mara decides to relight the lamp despite the cost"
+
+
+def test_budget_stop_during_refinement_retains_selected_plan_and_costs(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+
+    def costly_critic(body: Json) -> Reply:
+        reply = critic_provider(body)
+        if "structural revision critic" in str(body["messages"][0]["content"]):
+            assert isinstance(reply.body, dict)
+            return completion(
+                reply.body["choices"][0]["message"]["content"], completion_tokens=6000
+            )
+        return reply
+
+    fake_llm.default = costly_critic
+    value = critic_config(fake_llm.base_url)
+    value["budget"] = {"per_run_usd": 0.0018}
+    result = run(tmp_path, value, expect=1)
+    [story] = stories(result)
+    folder = result / story["path"]
+    assert manifest(result)["status"] == "aborted"
+    assert story["budget"]["calls"] == 8
+    assert (folder / "plan.json").exists()
+    assert not (folder / "story.md").exists()

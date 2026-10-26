@@ -24,7 +24,7 @@ from pydantic import BaseModel, JsonValue
 from nde.llm.config import ModelBinding
 from nde.llm.gateway import Gateway, Prompt
 from nde.llm.structured import StructuredOutputError
-from nde.runs.config import PromptRef, RoleName, StructuredConfig
+from nde.runs.config import ConfigError, PromptRef, RoleName, StructuredConfig
 from nde.runs.prompts import PromptTemplate
 from nde.runs.records import StructuredMetrics
 from nde.runs.state import Attribution, RunState, record_calls_since
@@ -150,6 +150,16 @@ class Pipeline[PlanT](ABC):
     """A generation pipeline bound to one condition's parameters."""
 
     roles: ClassVar[tuple[RoleName, ...]]
+
+    def required_roles(self) -> tuple[RoleName, ...]:
+        """Roles needed by the configured pipeline, including optional stages."""
+        return self.roles
+
+    def check_roles(self, roles: Mapping[RoleName, ModelBinding]) -> None:
+        """Validate role relationships during preparation, before any provider call."""
+        for role in self.required_roles():
+            if role not in roles:
+                raise ConfigError(f"pipeline uses role {role!r}, which has no model in `roles`")
 
     @abstractmethod
     def templates(self) -> list[TemplateNeed]:

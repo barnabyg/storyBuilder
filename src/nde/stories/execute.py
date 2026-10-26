@@ -76,7 +76,7 @@ class PreparedStories:
         """Every role a condition uses, in condition order."""
         roles: dict[RoleName, None] = {}
         for condition in self.conditions:
-            roles.update(dict.fromkeys(condition.pipeline.roles))
+            roles.update(dict.fromkeys(condition.pipeline.required_roles()))
         return list(roles)
 
     def summary(self) -> StoriesSummary:
@@ -138,11 +138,12 @@ def _condition(loaded: LoadedConfig, spec: ConditionSpec) -> Condition:
         pipeline = factory(spec.params)
     except ValidationError as error:
         raise ConfigError(f"condition {spec.name!r}: invalid params: {_format(error)}") from error
-    for role in pipeline.roles:
+    for role in pipeline.required_roles():
         if role not in loaded.config.roles:
             raise ConfigError(
                 f"condition {spec.name!r} uses role {role!r}, which has no model in `roles`"
             )
+    pipeline.check_roles(loaded.config.roles)
     return Condition(spec, pipeline)
 
 

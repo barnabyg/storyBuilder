@@ -27,3 +27,31 @@ partial artifacts and never create a successful final story.
 Fake-provider tests in `tests/test_baseline_d.py` exercise conditioned requests,
 locked/global attacks, bounded failure, budget aborts and zero-spend replay.
 Scientific Phase 4 runs and literary judgements require separate G1/G-D evidence.
+
+## Bounded structural refinement
+
+Set D's `critic_iterations` (0–10, default 0) and bind a `critic` role to enable
+refinement. Preparation requires explicit family metadata on planner, prose and
+critic. The critic must belong to a different family from both generators.
+`allow_critic_generator_family: true` is a separate explicit critic waiver; judge
+waivers do not apply. The waiver is retained in refinement records.
+
+`plan_critic@1` receives the selected plan checksum and deterministic diagnostics.
+Every issue supplies that checksum, a `RevisionMask`, a concrete proposed change
+and rationale. Stale, unknown, conflicting, locked or unsupported selections are
+recorded and rejected. Overlapping issue targets reject that proposed batch.
+Disjoint issues form one explicit candidate mask; constraints are always locked,
+alongside `revision_locks` supplied by the caller. Related edge edits require
+explicit mask authority. Scene and channel units use the same operator contract
+as `nde plan revise`.
+
+Each candidate passes schema, semantic, lock and boundary checks. Bounded repairs
+use the run's `structured.max_repairs`. No actionable issues, unchanged outputs,
+two consecutive failed candidates, or iteration exhaustion stop the loop. Provider
+and hard-budget interruption retain the last accepted plan and failed story
+artifacts. All critic/regeneration/repair calls are charged to the story's
+experimental budget. Cached calls keep those tokens with zero new provider spend.
+`refinement.json` records suggestions, masks, rejections, stopping reason and exact
+selected identity; `planning-provenance.json` includes the complete attributable
+initial-plus-refinement history. Critic preferences cannot override hard checks
+and provide no scientific or literary-quality score.
