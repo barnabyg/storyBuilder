@@ -4,6 +4,8 @@ Research tooling for structured story planning. See
 [the proposal](Narrative_Diffusion_Writing_Engine_Proposal.md) and
 [the implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
+Inspect saved narrative plans with the [plan workflow](docs/narrative-plans.md).
+
 ## Setup
 
 Install [uv](https://docs.astral.sh/uv/) 0.8.14 (pinned by `required-version` in

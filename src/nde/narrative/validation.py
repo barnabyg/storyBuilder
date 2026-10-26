@@ -1,0 +1,98 @@
+"""Named diagnostics used by inspection, repair and mutation evidence."""
+
+from collections.abc import Iterable
+from typing import Literal
+
+from pydantic import Field
+
+from nde.files import checksum_lf
+from nde.narrative.models import Identified, NarrativePlan, Span, Strict
+
+
+class Diagnostic(Strict):
+    code: str
+    location: str
+    message: str
+    severity: Literal["error", "advisory", "human"] = "error"
+
+
+class Validation(Strict):
+    diagnostics: list[Diagnostic] = Field(default_factory=list[Diagnostic])
+
+    @property
+    def valid(self) -> bool:
+        return not any(item.severity == "error" for item in self.diagnostics)
+
+
+def check_ids(records: Iterable[Identified]) -> list[Diagnostic]:
+    seen: set[str] = set()
+    diagnostics: list[Diagnostic] = []
+    for record in records:
+        if record.id in seen:
+            diagnostics.append(
+                Diagnostic(
+                    code="duplicate_id", location=record.id, message=f"duplicate ID {record.id}"
+                )
+            )
+        seen.add(record.id)
+    return diagnostics
+
+
+def check_spans(plan: NarrativePlan, spans: Iterable[tuple[str, Span]]) -> list[Diagnostic]:
+    sources = {source.id: source for source in plan.sources}
+    diagnostics: list[Diagnostic] = []
+    for location, span in spans:
+        source = sources.get(span.source_id)
+        if source is None:
+            code = "span_source"
+        elif span.source_sha256 != source.sha256:
+            code = "span_version"
+        elif not 0 <= span.start < span.end <= len(source.text):
+            code = "span_bounds"
+        else:
+            continue
+        diagnostics.append(
+            Diagnostic(
+                code=code, location=location, message=f"invalid evidence span for {span.source_id}"
+            )
+        )
+    return diagnostics
+
+
+def validate_plan(plan: NarrativePlan) -> Validation:
+    records: list[Identified] = [plan, *plan.characters, *plan.sources, *plan.scenes]
+    records.extend(beat for scene in plan.scenes for beat in scene.beats)
+    diagnostics = check_ids(records)
+    characters = {character.id for character in plan.characters}
+    spans: list[tuple[str, Span]] = []
+    for source in plan.sources:
+        if checksum_lf(source.text.encode()) != source.sha256 or "\r" in source.text:
+            diagnostics.append(
+                Diagnostic(
+                    code="source_checksum",
+                    location=source.id,
+                    message="source must match SHA-256 and use LF text",
+                )
+            )
+    for scene in plan.scenes:
+        if len(scene.character_ids) != len(set(scene.character_ids)):
+            diagnostics.append(
+                Diagnostic(
+                    code="duplicate_presence",
+                    location=scene.id,
+                    message="duplicate character presence",
+                )
+            )
+        for character in scene.character_ids:
+            if character not in characters:
+                diagnostics.append(
+                    Diagnostic(
+                        code="character_reference",
+                        location=scene.id,
+                        message=f"unknown character {character}",
+                    )
+                )
+        spans.extend((scene.id, span) for span in scene.evidence)
+        spans.extend((beat.id, span) for beat in scene.beats for span in beat.evidence)
+    diagnostics.extend(check_spans(plan, spans))
+    return Validation(diagnostics=diagnostics)

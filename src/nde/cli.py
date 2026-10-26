@@ -13,6 +13,7 @@ from nde.eval import cli as eval_cli
 from nde.eval import rubric
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
+from nde.narrative import cli as narrative_cli
 from nde.runs import prompts
 from nde.runs.config import ConfigError
 from nde.runs.records import read_manifest
@@ -127,6 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
             default=briefs.DEFAULT_BENCHMARK_DIR,
             help="benchmark folder (./benchmark)",
         )
+    narrative_cli.configure(commands.add_parser("plan", help="inspect versioned narrative plans"))
     return parser
 
 
@@ -228,6 +230,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "plan": narrative_cli.run,
     "run": _run,
     "report": _report,
     "eval": eval_cli.run,

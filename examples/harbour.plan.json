@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "id": "harbour",
+  "title": "The <harbour> light",
+  "characters": [{"id": "c1", "name": "Mara"}],
+  "scenes": [
+    {"id": "s1", "title": "The broken lamp", "summary": "Mara finds the lamp dark.",
+     "character_ids": ["c1"], "beats": [{"id": "b1", "summary": "A boat approaches."}]},
+    {"id": "s2", "title": "The signal", "summary": "Mara lights a fire on the quay.",
+     "character_ids": ["c1"]}
+  ]
+}

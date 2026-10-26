@@ -1,0 +1,39 @@
+"""Narrative plan commands."""
+
+import argparse
+import sys
+from pathlib import Path
+
+from nde.files import write_text_lf
+from nde.narrative.validation import validate_plan
+from nde.narrative.workflow import PlanError, load_plan, render, schema_json
+
+
+def configure(parser: argparse.ArgumentParser) -> None:
+    commands = parser.add_subparsers(dest="plan_command", required=True)
+    schema = commands.add_parser("schema", help="export the deterministic JSON Schema")
+    schema.add_argument("--out", type=Path, required=True)
+    for name in ("inspect", "validate"):
+        command = commands.add_parser(name)
+        command.add_argument("file", type=Path)
+        if name == "inspect":
+            command.add_argument("--out", type=Path, required=True)
+
+
+def run(args: argparse.Namespace) -> int:
+    try:
+        if args.plan_command == "schema":
+            write_text_lf(args.out, schema_json())
+            return 0
+        plan = load_plan(args.file)
+        result = render(plan, args.out) if args.plan_command == "inspect" else validate_plan(plan)
+        for diagnostic in result.diagnostics:
+            print(
+                f"{diagnostic.severity} {diagnostic.code} [{diagnostic.location}]: "
+                f"{diagnostic.message}",
+                file=sys.stderr,
+            )
+        return 0 if result.valid else 1
+    except (PlanError, OSError) as error:
+        print(f"nde plan: {error}", file=sys.stderr)
+        return 2
