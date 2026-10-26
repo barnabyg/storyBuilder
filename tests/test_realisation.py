@@ -138,3 +138,35 @@ def test_evidence_rejects_stale_sources_and_spans(tmp_path: Path, change: str) -
     report = json.loads((out / "report.json").read_text())
     assert report["owner_status"] == "pending"
     assert report["assessed"] == 0
+
+
+def test_baseline_b_packet_records_absent_channels_without_inventing_deltas(tmp_path: Path) -> None:
+    run = packet_source(tmp_path)
+    folder = run / "stories/C/brief-01/r1"
+    (folder / "plan.json").unlink()
+    record = json.loads((run / "stories.jsonl").read_text())
+    record["pipeline"] = "baseline_b"
+    (run / "stories.jsonl").write_text(json.dumps(record) + "\n")
+    (folder / "outline.json").write_text(
+        json.dumps(
+            {
+                "title": "Synthetic beat-only plan",
+                "scenes": [
+                    {
+                        "summary": "The keeper waits",
+                        "beats": ["A quiet harbour"],
+                    }
+                ],
+            }
+        )
+    )
+    out = tmp_path / "packet"
+    assert create_packet(run, out) == 0
+    packet = json.loads((out / "packet.json").read_text())
+    assert packet["plan_kind"] == "beat_outline"
+    assert packet["items"] == []
+    assert packet["alignment"] == "scene-aligned"
+    assert main(["realisation", "report", str(out)]) == 0
+    report = json.loads((out / "report.json").read_text())
+    assert report["denominator"] == 0
+    assert report["owner_status"] == "pending"

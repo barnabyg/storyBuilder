@@ -14,6 +14,7 @@ from nde.narrative.base import Strict
 from nde.narrative.models import NarrativePlan
 from nde.narrative.validation import validate_plan
 from nde.narrative.workflow import load_plan
+from nde.plan.beats import BeatOutline
 from nde.runs.records import STORY_FILE, StoryRecord, read_stories
 from nde.stories.normalise import normalise
 
@@ -31,6 +32,7 @@ class Packet(Strict):
     run: str
     story: StoryRecord
     plan_sha256: str
+    plan_kind: Literal["narrative", "beat_outline"] = "narrative"
     story_sha256: str
     prose: str
     items: list[Intent]
@@ -96,34 +98,39 @@ def _record(run: Path, condition: str, brief: str, repetition: int) -> StoryReco
     return rows[0]
 
 
+def _planning(folder: Path, story: StoryRecord) -> tuple[str, list[Intent], int]:
+    if story.pipeline == "baseline_b":
+        outline = BeatOutline.model_validate_json(
+            (folder / "outline.json").read_text(encoding="utf-8")
+        )
+        return digest(outline.model_dump_json()), [], len(outline.scenes)
+    plan = load_plan(folder / "plan.json")
+    if not validate_plan(plan).valid:
+        raise ValueError("realisation requires a validated plan")
+    return digest(plan.model_dump_json()), intentions(plan), len(plan.scenes)
+
+
 def create(run: Path, condition: str, brief: str, repetition: int, out: Path) -> Packet:
     if out.exists():
         raise ValueError("packet already exists; create a new packet to preserve history")
     story = _record(run, condition, brief, repetition)
     folder = run / story.path
-    plan = load_plan(folder / "plan.json")
-    if not validate_plan(plan).valid:
-        raise ValueError("realisation requires a validated plan")
+    plan_sha256, items, scene_count = _planning(folder, story)
     prose = (folder / STORY_FILE).read_text(encoding="utf-8")
     scenes = sorted((folder / f"attempts/{(story.chosen_attempt or 0) + 1}").glob("scene-*.md"))
     assembled = normalise(
         "\n\n".join(normalise(p.read_text(encoding="utf-8")).strip() for p in scenes)
     )
-    aligned = not story.revision_passes and len(scenes) == len(plan.scenes) and assembled == prose
-    material = {
-        "run": str(run.resolve()),
-        "story": story.model_dump(mode="json"),
-        "plan_sha256": digest(plan.model_dump_json()),
-        "story_sha256": digest(prose),
-    }
+    aligned = not story.revision_passes and len(scenes) == scene_count and assembled == prose
     packet = Packet(
         run=str(run.resolve()),
         story=story,
-        plan_sha256=digest(plan.model_dump_json()),
+        plan_sha256=plan_sha256,
+        plan_kind="beat_outline" if story.pipeline == "baseline_b" else "narrative",
         story_sha256=digest(prose),
-        packet_sha256=digest(json.dumps(material, sort_keys=True)),
+        packet_sha256="",
         prose=prose,
-        items=intentions(plan),
+        items=items,
         alignment="scene-aligned" if aligned else "unresolved",
         alignment_note="Selected scene outputs match final prose."
         if aligned
@@ -164,8 +171,7 @@ def stale_reasons(packet: Packet) -> list[str]:
                 (folder / STORY_FILE).read_text(encoding="utf-8")
             )
             != packet.story_sha256,
-            "plan changed": digest(load_plan(folder / "plan.json").model_dump_json())
-            != packet.plan_sha256,
+            "plan changed": _planning(folder, current)[0] != packet.plan_sha256,
         }
         return [name for name, changed in checks.items() if changed]
     except (OSError, ValueError) as error:
@@ -229,6 +235,10 @@ def report(folder: Path) -> dict[str, Any]:
         "realised": sum(item.rating == "realised" for item in actual.values()),
         "owner_status": "complete" if packet.items and known == len(packet.items) else "pending",
         "alignment": packet.alignment,
+        "plan_kind": packet.plan_kind,
+        "channel_note": "No belief/relationship/reveal/tension channels are represented."
+        if not packet.items
+        else "Assess the listed represented intentions.",
         "stale": stale,
         "synthetic_test_only_assessments": len(synthetic),
         "diagnostic_only_estimates": diagnostics,

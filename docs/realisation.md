@@ -37,3 +37,8 @@ prose must equal the selected story after all length and budget revisions.
 Submit a partial review and confirm the denominator stays fixed and missing
 items remain pending. Replacing `story.md` must make `report` exit 1 and retain
 the old files in `history/`.
+
+Baseline B packets use the saved `outline.json` and final prose. Their
+denominator is explicitly zero for channels the beat outline does not
+represent; the workflow never invents belief/relationship/reveal/tension
+intentions to fill those gaps.
