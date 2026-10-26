@@ -10,6 +10,7 @@ from typing import Any, cast
 from nde.corpus.records_io import check_snapshot, create_record, read_sealed, report_files, snapshot
 from nde.reconstruction.codec import load_encoding
 from nde.reconstruction.dataset import load_dataset
+from nde.reconstruction.training_data import load_training_dataset
 
 METRIC = "canonical-typed-record-multiset-jaccard-v1"
 
@@ -26,6 +27,8 @@ def load_view(path: Path) -> dict[str, Any]:
     value = read_sealed(path)
     if value.get("kind") == "reconstruction-dataset":
         return load_dataset(path)
+    if value.get("kind") in {"reconstruction-subset", "reconstruction-augmentation"}:
+        return load_training_dataset(path)
     if "specification" in value and "records" in value:
         return load_encoding(path)
     check_snapshot(value.get("inputs", {}))
