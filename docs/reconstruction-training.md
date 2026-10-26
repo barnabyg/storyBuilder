@@ -46,3 +46,23 @@ Ordinary imports do not load torch. Install optional pinned dependencies with
 with `NDE_REQUIRE_ML=1`, so absent runtime support fails rather than skipping training
 mechanics. Tests perform actual CPU parameter updates, optimizer/RNG resume,
 checkpoint publication recovery and reconstruction without downloads or a GPU.
+
+
+## Matched autoregressive infilling
+
+Set `objective` to `ar` for a causal infilling baseline using the same native
+weights, byte vocabulary, parameter count, saved tasks and resource caps.
+`match DENOISER_CONFIG AR_CONFIG` rejects changes in seed, initialization,
+optimizer settings, data/tasks, vocabulary or budget policy. Equal epoch counts
+alone are not used to assert compute equality.
+
+Both objectives see the same complete visible prefix. AR training shifts gold
+replacement bytes by one position; causal attention hides future target bytes.
+At inference only generated prior bytes enter the target stream. Completion stops
+at EOS or the fixed registered capacity. The denoiser predicts its masked output
+block in one pass. Their different actual forward-pass, token and attention work
+is recorded separately, alongside their common registered caps. This is a declared
+budget comparison, not a claim that unequal realized inference costs are equal.
+The public `inspect_attention` API allows controlled verification of causal future
+invariance. CPU integration tests perform real AR updates, checkpoint resume and
+reconstruction on exactly the saved denoiser tasks.

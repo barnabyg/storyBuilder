@@ -39,7 +39,7 @@ class TrainingConfig(Strict):
     version: Literal["1"] = "1"
     dataset: Path
     base_model: Path
-    objective: Literal["denoising"] = "denoising"
+    objective: Literal["denoising", "ar"] = "denoising"
     seed: int = 7
     learning_rate: float = Field(default=0.001, gt=0, allow_inf_nan=False)
     max_steps: int = Field(default=10, ge=1, le=100000)
@@ -263,6 +263,16 @@ def inspect_checkpoint(path: Path) -> dict[str, Any]:
     checkpoint = read_sealed(path)
     check_snapshot(checkpoint["binding"]["inputs"])
     check_snapshot(checkpoint["binding"]["scientific_evidence"]["inputs"])
+    binding = checkpoint["binding"]
+    config = TrainingConfig.model_validate(binding["config"])
+    dataset = _dataset(config.dataset, optimizer=True)
+    if (
+        dataset["id"] != binding["dataset_id"]
+        or task_set_id(dataset_tasks(dataset)) != binding["task_set_id"]
+        or inspect_model(config.base_model)["id"] != binding["base_id"]
+        or _scientific_evidence(config, dataset) != binding["scientific_evidence"]
+    ):
+        raise ValueError("checkpoint transitive training inputs changed")
     if identity(checkpoint["model_state"]) != checkpoint["parameter_sha256"]:
         raise ValueError("checkpoint parameters changed")
     return checkpoint
@@ -336,7 +346,11 @@ def _optimizer_step(
     width = config.max_output_tokens
     target, weights = target_data
     output = [1] * width
-    logits = model.forward(context + output, causal=False, context_length=len(context))
+    if config.objective == "ar":
+        output = [BOS, *target[:-1]] + [0] * (width - len(target))
+    logits = model.forward(
+        context + output, causal=config.objective == "ar", context_length=len(context)
+    )
     labels = torch.tensor(target + [0] * (width - len(target)), dtype=torch.long)
     loss_weights = torch.tensor(weights + [0.0] * (width - len(weights)))
     if float(loss_weights.sum()) == 0:
@@ -435,12 +449,23 @@ def _decode_prediction(tokens: list[int], task: dict[str, Any]) -> list[dict[str
 
 def _generate(model: Any, context: list[int], config: TrainingConfig) -> tuple[list[int], int]:
     torch = runtime()
+    width = config.max_output_tokens
+    generated: list[int] = []
+    passes = 0
     with torch.no_grad():
-        logits = model.forward(
-            context + [1] * config.max_output_tokens, causal=False, context_length=len(context)
-        )
-        generated = logits.argmax(dim=-1).tolist()
-    return generated, 1
+        if config.objective == "ar":
+            for _ in range(width):
+                output = [BOS, *generated] + [0] * (width - len(generated) - 1)
+                logits = model.forward(context + output, causal=True, context_length=len(context))
+                generated.append(int(logits[len(generated)].argmax().item()))
+                passes += 1
+                if generated[-1] == EOS:
+                    break
+        else:
+            logits = model.forward(context + [1] * width, causal=False, context_length=len(context))
+            generated = logits.argmax(dim=-1).tolist()
+            passes = 1
+    return generated, passes
 
 
 def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[str, Any]:
@@ -463,7 +488,7 @@ def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[st
         context = model_input(task)
         width = config.max_output_tokens
         length = len(context) + width
-        passes = 1
+        passes = width if config.objective == "ar" else 1
         row: dict[str, Any] = {
             "task_id": task["id"],
             "status": "invalid",
@@ -533,6 +558,7 @@ def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[st
                 "training_steps": checkpoint["step"],
                 "training_tokens": checkpoint["tokens"],
                 "training_attention_cells": checkpoint["attention_cells"],
+                "training_elapsed_seconds": checkpoint["elapsed_seconds"],
                 "inference_tokens": tokens_used,
                 "inference_attention_cells": cells_used,
             },
@@ -542,6 +568,44 @@ def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[st
     )
     report_files(out, "Reconstruction predictions", result)
     return result
+
+
+def inspect_attention(
+    base_path: Path, visible: list[int], infill: list[int], *, objective: Literal["denoising", "ar"]
+) -> list[list[float]]:
+    """Inspect native backbone logits to verify objective attention without training."""
+    base = inspect_model(base_path)
+    if not infill or any(token < 0 or token >= VOCABULARY_SIZE for token in [*visible, *infill]):
+        raise ValueError("attention probe requires valid visible/infill token IDs")
+    state = read_sealed(base_path / "weights.json")["weights"]
+    model = build(base["width"], base["max_positions"], 0, state)
+    with runtime().no_grad():
+        return model.forward(
+            visible + infill, causal=objective == "ar", context_length=len(visible)
+        ).tolist()
+
+
+def matched_configs(candidate: Path, comparator: Path) -> dict[str, Any]:
+    left, right = preflight(candidate), preflight(comparator)
+    if {left["config"]["objective"], right["config"]["objective"]} != {"denoising", "ar"}:
+        raise ValueError("matched comparison requires denoising and AR")
+    for key in (
+        "dataset_id",
+        "task_set_id",
+        "codec_id",
+        "vocabulary_id",
+        "base_id",
+        "initial_parameter_sha256",
+        "parameter_count",
+        "budget_policy",
+    ):
+        if left[key] != right[key]:
+            raise ValueError(f"unmatched {key}")
+    left_config = {k: v for k, v in left["config"].items() if k != "objective"}
+    right_config = {k: v for k, v in right["config"].items() if k != "objective"}
+    if left_config != right_config:
+        raise ValueError("unmatched training/inference resource configuration")
+    return {"matched": True, "policy": left["budget_policy"], "actual_work_required": True}
 
 
 def configure(parser: argparse.ArgumentParser) -> None:
@@ -567,6 +631,9 @@ def configure(parser: argparse.ArgumentParser) -> None:
     reconstruction.add_argument("--out", type=Path, required=True)
     inspect = commands.add_parser("inspect")
     inspect.add_argument("checkpoint", type=Path)
+    match = commands.add_parser("match")
+    match.add_argument("candidate", type=Path)
+    match.add_argument("comparator", type=Path)
 
 
 def run(args: argparse.Namespace) -> int:
@@ -588,6 +655,8 @@ def run(args: argparse.Namespace) -> int:
             )
         elif args.training_command == "reconstruct":
             result = reconstruct(args.checkpoint, args.dataset, args.out)
+        elif args.training_command == "match":
+            result = matched_configs(args.candidate, args.comparator)
         else:
             result = inspect_checkpoint(args.checkpoint)
         print(json.dumps(result, indent=2, sort_keys=True))

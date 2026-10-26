@@ -9,8 +9,10 @@ from nde.reconstruction.dataset import load_dataset
 from nde.reconstruction.tasks import model_input
 from nde.reconstruction.training import (
     initialize_model,
+    inspect_attention,
     inspect_checkpoint,
     inspect_model,
+    matched_configs,
     reconstruct,
     register_local_model,
     train,
@@ -76,6 +78,12 @@ def test_cpu_training_updates_parameters_and_resume_restores_optimizer_progress(
     config.write_text(config.read_text().replace('"max_steps": 2', '"max_steps": 3'))
     with pytest.raises(ValueError, match="changed"):
         train(config, tmp_path / "run", resume=True)
+    config.write_text(config.read_text().replace('"max_steps": 3', '"max_steps": 2'))
+    exported = json.loads(Path(load_dataset(dataset)["export_path"]).read_text())
+    source_annotation = Path(exported["records"][0]["annotation_path"])
+    source_annotation.write_text("{}")
+    with pytest.raises(ValueError, match="bound evidence"):
+        inspect_checkpoint(checkpoint)
 
 
 def test_pretrained_import_binds_original_local_weights_and_provenance(tmp_path: Path) -> None:
@@ -177,3 +185,50 @@ def test_checkpoint_publication_interruption_recovers_published_optimizer_work(
     continuous = train(config, tmp_path / "continuous")
     assert resumed["parameter_sha256"] == continuous["parameter_sha256"]
     assert resumed["tokens"] == continuous["tokens"]
+
+
+def test_cpu_ar_uses_matched_initialization_resumes_and_reconstructs_same_tasks(
+    tmp_path: Path, fake_llm: FakeOpenAI
+) -> None:
+    dataset = training_dataset(
+        tmp_path / "data", fake_llm, schedules=[{"kind": "fields", "channel": "goal", "rate": 0.1}]
+    )
+    initialize_model(tmp_path / "base", width=8, max_positions=4096)
+    common = {
+        "dataset": str(dataset),
+        "base_model": str(tmp_path / "base"),
+        "max_steps": 2,
+        "max_output_tokens": 128,
+        "test_only": True,
+    }
+    denoiser, ar = tmp_path / "denoiser.json", tmp_path / "ar.json"
+    denoiser.write_text(json.dumps(common))
+    ar.write_text(json.dumps({**common, "objective": "ar"}))
+    assert matched_configs(denoiser, ar)["matched"] is True
+    first = train(ar, tmp_path / "ar-run", max_steps_this_call=1)
+    resumed = train(ar, tmp_path / "ar-run", resume=True)
+    assert first["step"] == 1
+    assert resumed["step"] == 2
+    assert resumed["parameter_sha256"] != resumed["binding"]["initial_parameter_sha256"]
+    predictions = reconstruct(
+        tmp_path / "ar-run/checkpoints/step-00000002.json", dataset, tmp_path / "ar-predictions"
+    )
+    assert predictions["objective"] == "ar"
+    assert len(predictions["predictions"]) == 2
+    assert predictions["work"]["inference_tokens"] > 0
+    ar.write_text(json.dumps({**common, "objective": "ar", "seed": 99}))
+    with pytest.raises(ValueError, match="unmatched"):
+        matched_configs(denoiser, ar)
+
+
+def test_native_ar_attention_cannot_read_future_infill_tokens(tmp_path: Path) -> None:
+    initialize_model(tmp_path / "base", width=8, max_positions=128)
+    left = inspect_attention(tmp_path / "base", [10, 11], [2, 12, 13], objective="ar")
+    right = inspect_attention(tmp_path / "base", [10, 11], [2, 12, 99], objective="ar")
+    assert left[0] == right[0]
+    assert left[1] == right[1]
+    bidirectional = inspect_attention(
+        tmp_path / "base", [10, 11], [2, 12, 13], objective="denoising"
+    )
+    changed = inspect_attention(tmp_path / "base", [10, 11], [2, 12, 99], objective="denoising")
+    assert bidirectional[0] != changed[0]
