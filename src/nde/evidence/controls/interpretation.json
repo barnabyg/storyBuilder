@@ -1,0 +1,178 @@
+{
+  "schema_version": "1",
+  "id": "lamp",
+  "title": "The lamp",
+  "characters": [
+    {
+      "id": "c1",
+      "name": "Mara"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "s1",
+      "title": "Darkness",
+      "character_ids": [
+        "c1"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "A choice",
+      "character_ids": [
+        "c1"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "The light",
+      "character_ids": [
+        "c1"
+      ]
+    }
+  ],
+  "arcs": [
+    {
+      "id": "a1",
+      "character_id": "c1",
+      "reading": {
+        "value": "Mara takes responsibility",
+        "confidence": 0.6,
+        "alternatives": [
+          "Mara acts from fear"
+        ]
+      },
+      "trajectory": {
+        "shape": "rising",
+        "points": [
+          {
+            "scene_id": "s1",
+            "value": 0
+          },
+          {
+            "scene_id": "s2",
+            "value": 2
+          },
+          {
+            "scene_id": "s3",
+            "value": 4
+          }
+        ]
+      }
+    }
+  ],
+  "reader_affect": [
+    {
+      "id": "aff1",
+      "reading": {
+        "status": "ambiguous",
+        "alternatives": [
+          "hope",
+          "dread"
+        ]
+      },
+      "trajectory": {
+        "shape": "unknown",
+        "points": [
+          {
+            "scene_id": "s1",
+            "value": 1
+          },
+          {
+            "scene_id": "s2",
+            "value": null
+          },
+          {
+            "scene_id": "s3",
+            "value": 3
+          }
+        ]
+      }
+    }
+  ],
+  "tension": [
+    {
+      "id": "ten1",
+      "reading": {
+        "value": "The boat approaches"
+      },
+      "trajectory": {
+        "shape": "peak",
+        "points": [
+          {
+            "scene_id": "s1",
+            "value": 1
+          },
+          {
+            "scene_id": "s2",
+            "value": 4
+          },
+          {
+            "scene_id": "s3",
+            "value": 0
+          }
+        ]
+      }
+    }
+  ],
+  "themes": [
+    {
+      "id": "th1",
+      "reading": {
+        "status": "unknown"
+      }
+    }
+  ],
+  "motifs": [
+    {
+      "id": "m1",
+      "scene_ids": [
+        "s1"
+      ],
+      "reading": {
+        "value": "dark lamp"
+      }
+    },
+    {
+      "id": "m2",
+      "scene_ids": [
+        "s3"
+      ],
+      "reading": {
+        "value": "fire"
+      }
+    }
+  ],
+  "motif_echoes": [
+    {
+      "id": "echo1",
+      "from_motif_id": "m1",
+      "to_motif_id": "m2",
+      "kind": "transformation"
+    }
+  ],
+  "discourse": [
+    {
+      "id": "d1",
+      "kind": "observation",
+      "scene_ids": [
+        "s1"
+      ],
+      "reading": {
+        "value": "The opening uses short sentences"
+      }
+    }
+  ],
+  "subtext": [
+    {
+      "id": "sub1",
+      "reading": {
+        "value": "Mara hides her fear",
+        "confidence": 0.4,
+        "alternatives": [
+          "Mara feels no fear"
+        ]
+      }
+    }
+  ]
+}

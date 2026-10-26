@@ -5,6 +5,7 @@ Research tooling for structured story planning. See
 [the implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 Inspect saved narrative plans with the [plan workflow](docs/narrative-plans.md).
+Generate a reproducible [G-schema evidence packet](docs/schema-evidence.md) from saved inputs.
 
 ## Setup
 

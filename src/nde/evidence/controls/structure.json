@@ -1,0 +1,100 @@
+{
+  "schema_version": "1",
+  "id": "signal",
+  "title": "The warning signal",
+  "characters": [
+    {
+      "id": "c1",
+      "name": "Mara"
+    },
+    {
+      "id": "c2",
+      "name": "Ivo"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "s1",
+      "title": "The dark lamp",
+      "character_ids": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "The warning",
+      "character_ids": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "The safe return",
+      "character_ids": [
+        "c1",
+        "c2"
+      ]
+    }
+  ],
+  "causal_links": [
+    {
+      "id": "cause1",
+      "cause_scene_id": "s1",
+      "effect_scene_id": "s3"
+    }
+  ],
+  "setups": [
+    {
+      "id": "setup1",
+      "scene_id": "s1",
+      "description": "The spare flare is visible."
+    }
+  ],
+  "payoff_links": [
+    {
+      "id": "payoff1",
+      "setup_id": "setup1",
+      "payoff_scene_id": "s3"
+    }
+  ],
+  "knowledge_facts": [
+    {
+      "id": "fact1",
+      "description": "The lamp cannot be repaired.",
+      "initial_holder_ids": [
+        "c1"
+      ]
+    },
+    {
+      "id": "fact2",
+      "description": "A spare flare can warn the boat."
+    }
+  ],
+  "reveal_links": [
+    {
+      "id": "reveal1",
+      "fact_id": "fact2",
+      "scene_id": "s2",
+      "holder_ids": [
+        "c1",
+        "c2"
+      ]
+    }
+  ],
+  "knowledge_uses": [
+    {
+      "id": "use1",
+      "fact_id": "fact1",
+      "scene_id": "s1",
+      "holder_id": "c1"
+    },
+    {
+      "id": "use2",
+      "fact_id": "fact2",
+      "scene_id": "s3",
+      "holder_id": "c2"
+    }
+  ]
+}

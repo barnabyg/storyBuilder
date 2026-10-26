@@ -1,0 +1,28 @@
+{
+  "schema_version": "1",
+  "id": "evidence-control",
+  "title": "Evidence control",
+  "sources": [
+    {
+      "id": "source1",
+      "title": "Test text",
+      "text": "The keeper lit the lamp.\n",
+      "sha256": "945eabbe2f43363ec6288bced5bb6dfaec6d327993049db2c3395b14c25bd62a",
+      "provenance": "Synthetic deterministic validator control"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "s1",
+      "title": "Lamp",
+      "evidence": [
+        {
+          "source_id": "source1",
+          "source_sha256": "945eabbe2f43363ec6288bced5bb6dfaec6d327993049db2c3395b14c25bd62a",
+          "start": 0,
+          "end": 3
+        }
+      ]
+    }
+  ]
+}

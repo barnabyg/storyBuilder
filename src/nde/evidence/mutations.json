@@ -1,0 +1,648 @@
+{
+  "version": "1",
+  "controls": {
+    "structure": "controls/structure.json",
+    "state": "controls/state.json",
+    "interpretation": "controls/interpretation.json",
+    "evidence": "controls/evidence.json"
+  },
+  "mutations": [
+    {
+      "category": "duplicate_identity",
+      "family": "structure",
+      "description": "A structural record collides with a scene ID.",
+      "control": "structure",
+      "path": [
+        "causal_links",
+        0,
+        "id"
+      ],
+      "value": "s1",
+      "expected_code": "duplicate_id"
+    },
+    {
+      "category": "unknown_presence",
+      "family": "structure",
+      "description": "A scene names an unknown character.",
+      "control": "structure",
+      "path": [
+        "scenes",
+        0,
+        "character_ids"
+      ],
+      "value": [
+        "ghost"
+      ],
+      "expected_code": "character_reference"
+    },
+    {
+      "category": "duplicate_presence",
+      "family": "structure",
+      "description": "A character is listed twice as present.",
+      "control": "structure",
+      "path": [
+        "scenes",
+        0,
+        "character_ids"
+      ],
+      "value": [
+        "c1",
+        "c1"
+      ],
+      "expected_code": "duplicate_presence"
+    },
+    {
+      "category": "dangling_cause",
+      "family": "causality",
+      "description": "The cause endpoint does not exist.",
+      "control": "structure",
+      "path": [
+        "causal_links",
+        0,
+        "cause_scene_id"
+      ],
+      "value": "ghost",
+      "expected_code": "causal_endpoint"
+    },
+    {
+      "category": "causal_self_link",
+      "family": "causality",
+      "description": "A scene is its own cause.",
+      "control": "structure",
+      "path": [
+        "causal_links",
+        0,
+        "cause_scene_id"
+      ],
+      "value": "s3",
+      "expected_code": "causal_self_link"
+    },
+    {
+      "category": "causal_order",
+      "family": "causality",
+      "description": "An effect is earlier than its cause.",
+      "control": "structure",
+      "path": [
+        "causal_links",
+        0
+      ],
+      "value": {
+        "id": "cause1",
+        "cause_scene_id": "s3",
+        "effect_scene_id": "s1"
+      },
+      "expected_code": "causal_order"
+    },
+    {
+      "category": "causal_cycle",
+      "family": "causality",
+      "description": "A return dependency creates a cycle.",
+      "control": "structure",
+      "path": [
+        "causal_links"
+      ],
+      "value": [
+        {
+          "id": "cause1",
+          "cause_scene_id": "s1",
+          "effect_scene_id": "s3"
+        },
+        {
+          "id": "cycle",
+          "cause_scene_id": "s3",
+          "effect_scene_id": "s1"
+        }
+      ],
+      "expected_code": "causal_cycle"
+    },
+    {
+      "category": "missing_setup_scene",
+      "family": "setups",
+      "description": "The setup scene is unknown.",
+      "control": "structure",
+      "path": [
+        "setups",
+        0,
+        "scene_id"
+      ],
+      "value": "ghost",
+      "expected_code": "setup_scene_reference"
+    },
+    {
+      "category": "missing_payoff_setup",
+      "family": "setups",
+      "description": "A payoff names an unknown setup.",
+      "control": "structure",
+      "path": [
+        "payoff_links",
+        0,
+        "setup_id"
+      ],
+      "value": "ghost",
+      "expected_code": "payoff_setup_reference"
+    },
+    {
+      "category": "missing_payoff_scene",
+      "family": "setups",
+      "description": "The payoff scene is unknown.",
+      "control": "structure",
+      "path": [
+        "payoff_links",
+        0,
+        "payoff_scene_id"
+      ],
+      "value": "ghost",
+      "expected_code": "payoff_scene_reference"
+    },
+    {
+      "category": "payoff_order",
+      "family": "setups",
+      "description": "A payoff does not follow its setup.",
+      "control": "structure",
+      "path": [
+        "payoff_links",
+        0,
+        "payoff_scene_id"
+      ],
+      "value": "s1",
+      "expected_code": "payoff_order"
+    },
+    {
+      "category": "missing_knowledge_fact",
+      "family": "knowledge",
+      "description": "A reveal references an unknown fact.",
+      "control": "structure",
+      "path": [
+        "reveal_links",
+        0,
+        "fact_id"
+      ],
+      "value": "ghost",
+      "expected_code": "knowledge_fact"
+    },
+    {
+      "category": "missing_knowledge_scene",
+      "family": "knowledge",
+      "description": "A knowledge use references an unknown scene.",
+      "control": "structure",
+      "path": [
+        "knowledge_uses",
+        0,
+        "scene_id"
+      ],
+      "value": "ghost",
+      "expected_code": "knowledge_scene"
+    },
+    {
+      "category": "unknown_knowledge_holder",
+      "family": "knowledge",
+      "description": "The holder is not a known character.",
+      "control": "structure",
+      "path": [
+        "knowledge_uses",
+        0,
+        "holder_id"
+      ],
+      "value": "ghost",
+      "expected_code": "knowledge_holder"
+    },
+    {
+      "category": "duplicate_fact_holder",
+      "family": "knowledge",
+      "description": "A reveal repeats a holder/fact reference.",
+      "control": "structure",
+      "path": [
+        "reveal_links",
+        0,
+        "holder_ids"
+      ],
+      "value": [
+        "c2",
+        "c2"
+      ],
+      "expected_code": "duplicate_fact_reference"
+    },
+    {
+      "category": "premature_knowledge",
+      "family": "knowledge",
+      "description": "A character uses a fact before acquiring it.",
+      "control": "structure",
+      "path": [
+        "knowledge_uses",
+        0,
+        "fact_id"
+      ],
+      "value": "fact2",
+      "expected_code": "knowledge_before_acquisition"
+    },
+    {
+      "category": "absent_knowledge_holder",
+      "family": "knowledge",
+      "description": "A reveal holder is absent from the scene.",
+      "control": "structure",
+      "path": [
+        "scenes",
+        1,
+        "character_ids"
+      ],
+      "value": [
+        "c1"
+      ],
+      "expected_code": "knowledge_presence"
+    },
+    {
+      "category": "unknown_state_character",
+      "family": "state",
+      "description": "unknown state character.",
+      "control": "state",
+      "path": [
+        "states",
+        0,
+        "character_id"
+      ],
+      "value": "ghost",
+      "expected_code": "state_character_reference"
+    },
+    {
+      "category": "unknown_state_scene",
+      "family": "state",
+      "description": "unknown state scene.",
+      "control": "state",
+      "path": [
+        "states",
+        0,
+        "scene_id"
+      ],
+      "value": "missing",
+      "expected_code": "state_scene_reference"
+    },
+    {
+      "category": "state_before_contradiction",
+      "family": "state",
+      "description": "state before contradiction.",
+      "control": "state",
+      "path": [
+        "states",
+        1,
+        "before"
+      ],
+      "value": {
+        "value": "abandon the boat"
+      },
+      "expected_code": "state_transition"
+    },
+    {
+      "category": "relationship_unknown_participant",
+      "family": "state",
+      "description": "relationship unknown participant.",
+      "control": "state",
+      "path": [
+        "relationships",
+        0,
+        "participant_ids"
+      ],
+      "value": [
+        "c1",
+        "ghost"
+      ],
+      "expected_code": "relationship_participant"
+    },
+    {
+      "category": "relationship_duplicate_participant",
+      "family": "state",
+      "description": "relationship duplicate participant.",
+      "control": "state",
+      "path": [
+        "relationships",
+        0,
+        "participant_ids"
+      ],
+      "value": [
+        "c1",
+        "c1"
+      ],
+      "expected_code": "relationship_participant_duplicate"
+    },
+    {
+      "category": "relationship_unknown_scene",
+      "family": "state",
+      "description": "relationship unknown scene.",
+      "control": "state",
+      "path": [
+        "relationships",
+        0,
+        "scene_id"
+      ],
+      "value": "missing",
+      "expected_code": "relationship_scene_reference"
+    },
+    {
+      "category": "relationship_before_contradiction",
+      "family": "state",
+      "description": "relationship before contradiction.",
+      "control": "state",
+      "path": [
+        "relationships",
+        1,
+        "before"
+      ],
+      "value": {
+        "value": "enemies"
+      },
+      "expected_code": "relationship_transition"
+    },
+    {
+      "category": "locked_value_changed",
+      "family": "constraints",
+      "description": "locked value changed.",
+      "control": "state",
+      "path": [
+        "states",
+        2,
+        "after"
+      ],
+      "value": {
+        "value": "protect property"
+      },
+      "expected_code": "locked_value"
+    },
+    {
+      "category": "ending_fact_contradicted",
+      "family": "constraints",
+      "description": "ending fact contradicted.",
+      "control": "state",
+      "path": [
+        "states",
+        1,
+        "after"
+      ],
+      "value": {
+        "value": "abandon the boat"
+      },
+      "expected_code": "required_ending"
+    },
+    {
+      "category": "constraint_unknown_character",
+      "family": "constraints",
+      "description": "constraint unknown character.",
+      "control": "state",
+      "path": [
+        "constraints",
+        0,
+        "character_id"
+      ],
+      "value": "ghost",
+      "expected_code": "constraint_character_reference"
+    },
+    {
+      "category": "constraint_expected_missing",
+      "family": "constraints",
+      "description": "constraint expected missing.",
+      "control": "state",
+      "path": [
+        "constraints",
+        0,
+        "expected"
+      ],
+      "value": null,
+      "expected_code": "constraint_expected"
+    },
+    {
+      "category": "state_character_required",
+      "family": "state",
+      "description": "state character required.",
+      "control": "state",
+      "path": [
+        "states",
+        0,
+        "character_id"
+      ],
+      "value": null,
+      "expected_code": "state_character_required"
+    },
+    {
+      "category": "duplicate_state_transition",
+      "family": "state",
+      "description": "duplicate state transition.",
+      "control": "state",
+      "path": [
+        "states",
+        1,
+        "scene_id"
+      ],
+      "value": "s1",
+      "expected_code": "state_duplicate"
+    },
+    {
+      "category": "duplicate_relationship_transition",
+      "family": "state",
+      "description": "duplicate relationship transition.",
+      "control": "state",
+      "path": [
+        "relationships",
+        1,
+        "scene_id"
+      ],
+      "value": "s1",
+      "expected_code": "relationship_duplicate"
+    },
+    {
+      "category": "absent_state_character",
+      "family": "state",
+      "description": "absent state character.",
+      "control": "state",
+      "path": [
+        "scenes",
+        0,
+        "character_ids"
+      ],
+      "value": [
+        "c2"
+      ],
+      "expected_code": "state_presence"
+    },
+    {
+      "category": "absent_relationship_participant",
+      "family": "state",
+      "description": "absent relationship participant.",
+      "control": "state",
+      "path": [
+        "scenes",
+        0,
+        "character_ids"
+      ],
+      "value": [
+        "c1"
+      ],
+      "expected_code": "relationship_presence"
+    },
+    {
+      "category": "constraint_character_required",
+      "family": "constraints",
+      "description": "constraint character required.",
+      "control": "state",
+      "path": [
+        "constraints",
+        0,
+        "character_id"
+      ],
+      "value": null,
+      "expected_code": "constraint_character_required"
+    },
+    {
+      "category": "interpretive_scene",
+      "family": "interpretation",
+      "description": "An interpretation names an unknown scene.",
+      "control": "interpretation",
+      "path": [
+        "themes",
+        0,
+        "scene_ids"
+      ],
+      "value": [
+        "ghost"
+      ],
+      "expected_code": "interpretive_scene_reference"
+    },
+    {
+      "category": "arc_character",
+      "family": "interpretation",
+      "description": "An arc names an unknown character.",
+      "control": "interpretation",
+      "path": [
+        "arcs",
+        0,
+        "character_id"
+      ],
+      "value": "ghost",
+      "expected_code": "arc_character_reference"
+    },
+    {
+      "category": "trajectory_scene",
+      "family": "interpretation",
+      "description": "An ordinal point names an unknown scene.",
+      "control": "interpretation",
+      "path": [
+        "arcs",
+        0,
+        "trajectory",
+        "points",
+        0,
+        "scene_id"
+      ],
+      "value": "ghost",
+      "expected_code": "trajectory_scene_reference"
+    },
+    {
+      "category": "trajectory_order",
+      "family": "interpretation",
+      "description": "Trajectory points reverse story order.",
+      "control": "interpretation",
+      "path": [
+        "arcs",
+        0,
+        "trajectory",
+        "points"
+      ],
+      "value": [
+        {
+          "scene_id": "s3",
+          "value": 0
+        },
+        {
+          "scene_id": "s2",
+          "value": 2
+        },
+        {
+          "scene_id": "s1",
+          "value": 4
+        }
+      ],
+      "expected_code": "trajectory_order"
+    },
+    {
+      "category": "motif_endpoint",
+      "family": "interpretation",
+      "description": "An echo names an unknown motif occurrence.",
+      "control": "interpretation",
+      "path": [
+        "motif_echoes",
+        0,
+        "to_motif_id"
+      ],
+      "value": "ghost",
+      "expected_code": "motif_endpoint"
+    },
+    {
+      "category": "motif_self_link",
+      "family": "interpretation",
+      "description": "A motif echoes itself instead of another occurrence.",
+      "control": "interpretation",
+      "path": [
+        "motif_echoes",
+        0,
+        "to_motif_id"
+      ],
+      "value": "m1",
+      "expected_code": "motif_self_link"
+    },
+    {
+      "category": "span_source",
+      "family": "evidence",
+      "description": "Evidence names an unknown source.",
+      "control": "evidence",
+      "path": [
+        "scenes",
+        0,
+        "evidence",
+        0,
+        "source_id"
+      ],
+      "value": "ghost",
+      "expected_code": "span_source"
+    },
+    {
+      "category": "span_version",
+      "family": "evidence",
+      "description": "Evidence is bound to the wrong source version.",
+      "control": "evidence",
+      "path": [
+        "scenes",
+        0,
+        "evidence",
+        0,
+        "source_sha256"
+      ],
+      "value": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected_code": "span_version"
+    },
+    {
+      "category": "span_bounds",
+      "family": "evidence",
+      "description": "The evidence span extends beyond the text.",
+      "control": "evidence",
+      "path": [
+        "scenes",
+        0,
+        "evidence",
+        0,
+        "end"
+      ],
+      "value": 999,
+      "expected_code": "span_bounds"
+    },
+    {
+      "category": "source_checksum",
+      "family": "evidence",
+      "description": "The source text no longer matches its checksum.",
+      "control": "evidence",
+      "path": [
+        "sources",
+        0,
+        "text"
+      ],
+      "value": "Changed source text.",
+      "expected_code": "source_checksum"
+    }
+  ]
+}

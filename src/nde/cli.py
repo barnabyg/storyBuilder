@@ -12,6 +12,7 @@ from nde.corpus import provenance
 from nde.env import load_dotenv
 from nde.eval import cli as eval_cli
 from nde.eval import rubric
+from nde.evidence import cli as evidence_cli
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
 from nde.narrative import cli as narrative_cli
@@ -37,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
+    evidence_cli.configure(commands.add_parser("schema-evidence", help="G-schema review packet"))
 
     run = commands.add_parser("run", help="run an experiment config and record a run directory")
     run.add_argument("config", type=Path, help="experiment config (YAML)")
@@ -232,6 +234,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "schema-evidence": evidence_cli.run,
     "annotate": annotation_cli.run,
     "plan": narrative_cli.run,
     "run": _run,
