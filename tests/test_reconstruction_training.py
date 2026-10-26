@@ -232,3 +232,40 @@ def test_native_ar_attention_cannot_read_future_infill_tokens(tmp_path: Path) ->
     )
     changed = inspect_attention(tmp_path / "base", [10, 11], [2, 12, 99], objective="denoising")
     assert bidirectional[0] != changed[0]
+
+
+def test_interrupted_optimizer_work_remains_charged_to_the_resumed_budget(
+    tmp_path: Path, fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset = training_dataset(
+        tmp_path / "data", fake_llm, schedules=[{"kind": "fields", "channel": "goal", "rate": 0.1}]
+    )
+    initialize_model(tmp_path / "base", width=8, max_positions=4096)
+    config = tmp_path / "train.json"
+    config.write_text(
+        json.dumps(
+            {
+                "dataset": str(dataset),
+                "base_model": str(tmp_path / "base"),
+                "max_steps": 2,
+                "max_output_tokens": 128,
+                "test_only": True,
+            }
+        )
+    )
+    hardlink = Path.hardlink_to
+
+    def interrupted_link(path: Path, target: str | Path) -> None:
+        if path.name == "step-00000001.json":
+            raise OSError("simulated interruption before checkpoint publication")
+        hardlink(path, target)
+
+    monkeypatch.setattr(Path, "hardlink_to", interrupted_link)
+    with pytest.raises(OSError, match="interruption"):
+        train(config, tmp_path / "run")
+    monkeypatch.setattr(Path, "hardlink_to", hardlink)
+    resumed = train(config, tmp_path / "run", resume=True)
+    continuous = train(config, tmp_path / "continuous")
+    assert resumed["parameter_sha256"] == continuous["parameter_sha256"]
+    assert resumed["tokens"] > continuous["tokens"]
+    assert resumed["reserved_failed_tokens"] == resumed["tokens"] - continuous["tokens"]

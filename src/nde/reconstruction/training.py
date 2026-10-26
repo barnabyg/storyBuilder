@@ -26,10 +26,11 @@ from nde.corpus.records_io import (
     snapshot,
 )
 from nde.llm.config import Strict
-from nde.reconstruction.codec import tokenize
+from nde.reconstruction.codec import seal, tokenize
 from nde.reconstruction.dataset import load_dataset
 from nde.reconstruction.model import VOCABULARY_SIZE, build, pack, runtime, unpack
 from nde.reconstruction.tasks import model_input
+from nde.reconstruction.training_data import dataset_file, load_training_dataset
 
 BOS, EOS, BYTE_OFFSET = 2, 3, 4
 MIN_WIDTH, MIN_POSITIONS = 4, 8
@@ -139,12 +140,8 @@ def inspect_model(path: Path) -> dict[str, Any]:
     return model
 
 
-def dataset_file(path: Path) -> Path:
-    return path / "dataset.json" if path.is_dir() else path
-
-
 def _dataset(path: Path, *, optimizer: bool = False) -> dict[str, Any]:
-    return load_dataset(path, optimizer=optimizer)
+    return load_training_dataset(path) if optimizer else load_dataset(path)
 
 
 def task_set_id(tasks: list[dict[str, Any]]) -> str:
@@ -168,7 +165,7 @@ def _scientific_evidence(config: TrainingConfig, dataset: dict[str, Any]) -> dic
         raise ValueError("real Phase 6 training requires genuine passed G1/G2 evidence")
     original = dataset
     while "parent_path" in original:
-        original = load_dataset(Path(original["parent_path"]), optimizer=True)
+        original = load_training_dataset(Path(original["parent_path"]))
     export = validate_export(Path(original["export_path"]))
     if export["gate_id"] != second["id"]:
         raise ValueError("training export differs from registered G2 gate")
@@ -332,6 +329,20 @@ def _training_state(
         restored["state"] = {int(key): value for key, value in restored["state"].items()}
         optimizer.load_state_dict(restored)
     torch.set_rng_state(torch.tensor(state["rng_state"], dtype=torch.uint8))
+    journal = out / "work.json"
+    if journal.exists():
+        reserved = read_sealed(journal)
+        if reserved["binding_id"] != identity(binding):
+            raise ValueError("training work reservation binding changed")
+        if reserved["step_intent"] > state["step"]:
+            lost = max(0, reserved["tokens"] - state["tokens"])
+            state["reserved_failed_tokens"] = state.get("reserved_failed_tokens", 0) + lost
+            state["tokens"] = max(state["tokens"], reserved["tokens"])
+            state["attention_cells"] = max(state["attention_cells"], reserved["attention_cells"])
+            state["elapsed_seconds"] = max(
+                state["elapsed_seconds"],
+                reserved["elapsed_seconds"] + max(0.0, time.time() - reserved["started_wall_time"]),
+            )
     return model, state, optimizer
 
 
@@ -392,6 +403,19 @@ def train(
         ):
             state["status"] = "resource-stop"
             break
+        save_json(
+            out / "work.json",
+            seal(
+                {
+                    "binding_id": identity(binding),
+                    "step_intent": state["step"] + 1,
+                    "tokens": state["tokens"] + length,
+                    "attention_cells": state["attention_cells"] + width * length,
+                    "elapsed_seconds": state["elapsed_seconds"],
+                    "started_wall_time": time.time(),
+                }
+            ),
+        )
         loss = _optimizer_step(model, optimizer, context, (target, weights), config)
         state["step"] += 1
         state["sampler_position"] += 1
@@ -415,6 +439,8 @@ def train(
         "tokens": state["tokens"],
         "attention_cells": state["attention_cells"],
         "losses": state["losses"],
+        "reserved_failed_tokens": state.get("reserved_failed_tokens", 0),
+        "work_accounting": "completed work plus durable interrupted-step reservations",
         "parameter_sha256": state["parameter_sha256"],
         "binding": binding,
     }
@@ -557,6 +583,7 @@ def reconstruct(checkpoint_path: Path, dataset_path: Path, out: Path) -> dict[st
             "work": {
                 "training_steps": checkpoint["step"],
                 "training_tokens": checkpoint["tokens"],
+                "reserved_failed_training_tokens": checkpoint.get("reserved_failed_tokens", 0),
                 "training_attention_cells": checkpoint["attention_cells"],
                 "training_elapsed_seconds": checkpoint["elapsed_seconds"],
                 "inference_tokens": tokens_used,
