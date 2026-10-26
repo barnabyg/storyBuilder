@@ -8,7 +8,7 @@ from pathlib import Path
 
 from nde.corpus.provenance import DEFAULT_MANIFEST, ProvenanceError
 from nde.eval import batch as batches
-from nde.eval import report
+from nde.eval import readiness, report
 from nde.eval.calibration import CalibrationSpec, build_calibration_batch
 from nde.eval.leakage import generating_code_warning
 from nde.eval.reader import DEFAULT_PORT, HOST
@@ -30,6 +30,12 @@ def _batches_dir_option(parser: argparse.ArgumentParser) -> None:
 def configure(evaluation: argparse.ArgumentParser) -> None:
     """Add the `nde eval` subcommands to its parser."""
     sub = evaluation.add_subparsers(dest="eval_command", required=True)
+
+    ready = sub.add_parser("readiness", help="check exact registered gate cohort before reading")
+    ready.add_argument("cohort", type=Path)
+    ready.add_argument("--benchmark", type=Path, required=True)
+    ready.add_argument("--from", dest="sources", nargs=2, action="append", required=True)
+    ready.add_argument("--out", type=Path, required=True)
 
     build = sub.add_parser("batch", help="build a blind batch of story pairs from two runs")
     build.add_argument("name", help="batch name, e.g. p1-instrument")
@@ -116,6 +122,23 @@ def _build(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _readiness(args: argparse.Namespace) -> int:
+    sources: list[list[str]] = args.sources
+    try:
+        if len(sources) != 2:  # noqa: PLR2004 - gate admission compares exactly two conditions
+            raise ValueError("give --from exactly twice")
+        cohort = readiness.GateCohort.model_validate_json(args.cohort.read_text(encoding="utf-8"))
+        first, second = (batches.Source(Path(run), condition) for run, condition in sources)
+        result = readiness.check_readiness(cohort, args.benchmark, (first, second))
+    except (OSError, ValueError) as error:
+        result = readiness.ReadinessReport(
+            status="malformed", benchmark=str(args.benchmark), sources=[], problems=[str(error)]
+        )
+    readiness.write_readiness(result, args.out)
+    print(f"gate {result.status}: {args.out / 'readiness.md'}")
+    return {"ready": 0, "incomplete": 1, "malformed": 2}[result.status]
+
+
 def _calibration(args: argparse.Namespace) -> int:
     sources = [batches.Source(Path(run), condition) for run, condition in args.sources]
     spec = CalibrationSpec(
@@ -157,6 +180,7 @@ def _report(args: argparse.Namespace) -> int:
 
 def run(args: argparse.Namespace) -> int:
     handlers = {
+        "readiness": _readiness,
         "batch": _build,
         "calibration": _calibration,
         "serve": _serve,

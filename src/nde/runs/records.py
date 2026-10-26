@@ -328,6 +328,8 @@ class StoryRecord(_Record):
     error: str | None = None
     # The story's files (the story and every intermediate output), relative to `path`.
     files: list[str] = Field(default_factory=list[str])
+    # Added for strict gate admission; older runs retain selected raw artifacts.
+    sha256: str | None = None
 
 
 def write_jsonl(

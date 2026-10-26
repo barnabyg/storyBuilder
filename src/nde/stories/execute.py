@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from nde.briefs import BriefError, load_briefs, split_checksum
-from nde.files import write_text_lf
+from nde.files import checksum_lf, write_text_lf
 from nde.llm.gateway import Gateway
 from nde.prose.revision import REVISION_VARIABLES, revise
 from nde.runs.config import (
@@ -244,6 +244,8 @@ def save(run: StoryRun, job: StoryJob) -> None:
         write_text_lf(path, content)
     record = job.record
     record.files = sorted(job.ctx.files)
+    if STORY_FILE in job.ctx.files:
+        record.sha256 = checksum_lf(job.ctx.files[STORY_FILE].encode("utf-8"))
     record.budget = story_budget(run.state.calls, record.condition, record.brief, record.repetition)
 
 
