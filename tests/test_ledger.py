@@ -26,6 +26,7 @@ def test_replay_writes_ordered_planned_states_without_changing_source(tmp_path: 
     assert "allies" not in first["summary"]
     assert "cooperating" in last["summary"]
     assert "friendship" in last["after_summary"]
+    assert "Requirement hc1 (locked; c1 value): oath = protect lives" in first["summary"]
     assert "planned" in (out / "ledger.md").read_text().lower()
     assert source.read_bytes() == original
     saved = (out / "ledger.json").read_bytes()

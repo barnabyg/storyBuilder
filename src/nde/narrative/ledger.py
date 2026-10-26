@@ -74,7 +74,8 @@ def plan_identity(plan: NarrativePlan) -> str:
 def _summary(snapshot: Snapshot, plan: NarrativePlan, present: list[str]) -> str:
     lines = ["Planned state only; prose realisation is unassessed."]
     lines.extend(
-        f"Requirement {item.id} ({item.kind}): {item.key} = {item.expected or item.note}"
+        f"Requirement {item.id} ({item.kind}; {item.character_id or 'story'} {item.state_kind}): "
+        f"{item.key} = {item.expected or item.note}"
         for item in plan.constraints
     )
     lines.extend(
