@@ -28,7 +28,10 @@ from tests.conftest import REPO
     os.environ.get("NDE_BROWSER") != "1",
     reason="set NDE_BROWSER=1 to run acceptance with installed Chrome (or NDE_BROWSER_CHANNEL)",
 )
-def test_synthetic_g1_browser_controls_api_storage_and_blinding(tmp_path: Path) -> None:
+@pytest.mark.parametrize("binding_file", ["g1.json", "gd.json"])
+def test_synthetic_gate_browser_controls_api_storage_and_blinding(
+    tmp_path: Path, binding_file: str
+) -> None:
     batch = tmp_path / "synthetic-test-only"
     source_c = StorySource(run="SECRET-RUN-C", condition="SECRET-CANDIDATE", story="plan-ledger-C")
     source_b = StorySource(run="SECRET-RUN-B", condition="SECRET-COMPARATOR", story="plan-ledger-B")
@@ -48,6 +51,7 @@ def test_synthetic_g1_browser_controls_api_storage_and_blinding(tmp_path: Path) 
             pairs=[SealedPair(brief="brief-01", repetition=0, a=source_c, b=source_b)],
         ),
     )
+    (batch / "sealed" / binding_file).write_text("SECRET-PLAN-CRITIC-LEDGER")
     server = uvicorn.Server(uvicorn.Config(create_app(batch), log_level="error"))
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
@@ -59,7 +63,7 @@ def test_synthetic_g1_browser_controls_api_storage_and_blinding(tmp_path: Path) 
             while not server.started and time.monotonic() < deadline:
                 time.sleep(0.01)
             assert server.started
-            _read_in_browser(f"http://127.0.0.1:{port}")
+            _read_in_browser(f"http://127.0.0.1:{port}", binding_file)
             assert read_judgements(batch)[1].a is not None
         finally:
             server.should_exit = True
@@ -67,7 +71,7 @@ def test_synthetic_g1_browser_controls_api_storage_and_blinding(tmp_path: Path) 
             assert not thread.is_alive()
 
 
-def _read_in_browser(base: str) -> None:
+def _read_in_browser(base: str, binding_file: str) -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
             headless=True, channel=os.environ.get("NDE_BROWSER_CHANNEL", "chrome")
@@ -88,7 +92,7 @@ def _read_in_browser(base: str) -> None:
             )
             assert page.request.post(f"{base}/close").status == 409
             assert page.request.get(f"{base}/sealed/key.json").status == 404
-            assert page.request.get(f"{base}/sealed/g1.json").status == 404
+            assert page.request.get(f"{base}/sealed/{binding_file}").status == 404
             assert page.request.get(f"{base}/api/progress").status == 200
             for side in ("a", "b"):
                 page.locator(f'input[name="score-{side}-coherence"][value="4"]').check()

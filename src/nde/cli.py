@@ -11,7 +11,7 @@ from nde.annotations import cli as annotation_cli
 from nde.corpus import provenance
 from nde.env import load_dotenv
 from nde.eval import cli as eval_cli
-from nde.eval import rubric
+from nde.eval import gd_cli, rubric
 from nde.evidence import cli as evidence_cli
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
@@ -38,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
+    gd_cli.configure(commands.add_parser("gd", help="registered D-versus-C gate workflow"))
     controllability.configure(
         commands.add_parser("control-report", help="report plan-only structural edit evidence")
     )
@@ -245,6 +246,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "gd": gd_cli.run,
     "control-report": controllability.run,
     "diversity-report": diversity.run,
     "g1-report": g1_report.run,
