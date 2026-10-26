@@ -24,6 +24,7 @@ from nde.runs.runner import RunOptions, run_experiment
 from nde.stories.budget import story_budget, within
 from nde.stories.execute import prepare_stories
 from nde.stories.normalise import word_count
+from nde.stories.selected import selected_text
 
 TIERS: tuple[Tier, ...] = ("S", "M", "L")
 
@@ -277,8 +278,13 @@ def _run_rows(run: Path, packet: Comparison) -> tuple[list[dict[str, Any]], list
         path = run / story.path / STORY_FILE
         budget = story_budget(calls, story.condition, story.brief, story.repetition)
         row["attributed_budget"] = budget.model_dump(mode="json")
-        row["final_story_sha256"] = checksum_lf(path.read_bytes()) if path.is_file() else None
-        words = word_count(path.read_text(encoding="utf-8")) if path.is_file() else 0
+        try:
+            text = selected_text(run, story)
+        except (OSError, ValueError) as error:
+            text = ""
+            problems.append(f"{story.condition}/{story.brief}: selected prose unavailable: {error}")
+        row["final_story_sha256"] = checksum_lf(text.encode("utf-8")) if text else None
+        words = word_count(text)
         row["final_words"] = words
         row["length_valid"] = bool(
             path.is_file()

@@ -7,6 +7,7 @@ from nde.annotations.records import digest
 from nde.runs.records import STORY_FILE, CallRecord, Manifest, StoryRecord
 from nde.stories.budget import story_budget, within
 from nde.stories.normalise import word_count
+from nde.stories.selected import selected_text
 
 
 def _selected(run: Path, record: StoryRecord, calls: list[CallRecord]) -> dict[str, Any]:
@@ -32,9 +33,9 @@ def _selected(run: Path, record: StoryRecord, calls: list[CallRecord]) -> dict[s
         "budget_record_consistent": budget == record.budget,
     }
     try:
-        text = (run / record.path / STORY_FILE).read_text(encoding="utf-8")
+        text = selected_text(run, record)
         result.update(final_sha256=digest(text), words=word_count(text), target=record.target_words)
-    except OSError as error:
+    except (OSError, ValueError) as error:
         result.update(final_sha256=None, words=None, file_error=str(error))
     return result
 

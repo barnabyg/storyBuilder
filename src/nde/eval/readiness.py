@@ -28,7 +28,8 @@ from nde.runs.records import (
 from nde.schema.brief import Brief
 from nde.stories.budget import story_budget, within
 from nde.stories.length import in_range
-from nde.stories.normalise import normalise, word_count
+from nde.stories.normalise import word_count
+from nde.stories.selected import selected_text
 
 SHA256_HEX_LENGTH = 64
 
@@ -153,13 +154,6 @@ def _manifest_problems(
         problems.append(f"{prefix}: equal-budget settings differ from registration")
 
 
-def _safe_file(root: Path, relative: str) -> Path:
-    path = (root / relative).resolve()
-    if not path.is_relative_to(root.resolve()):
-        raise ValueError(f"artifact path escapes run directory: {relative}")
-    return path
-
-
 @dataclass(frozen=True)
 class RunEvidence:
     source: Source
@@ -182,13 +176,7 @@ def _story(
         return None
     relative = f"{record.path}/{STORY_FILE}"
     try:
-        data = _safe_file(source.run_dir, relative).read_bytes()
-        text = data.decode("utf-8").replace("\r\n", "\n")
-        raw = _safe_file(source.run_dir, f"{record.path}/story.raw.md").read_text(encoding="utf-8")
-        if normalise(raw) != text:
-            problems.append(f"{prefix}: final story differs from selected raw output")
-        if record.sha256 is not None and checksum_lf(data) != record.sha256:
-            problems.append(f"{prefix}: final story checksum changed")
+        text = selected_text(source.run_dir, record)
     except (OSError, ValueError) as error:
         problems.append(f"{prefix}: missing or unreadable final artifact: {error}")
         return None
@@ -214,7 +202,7 @@ def _story(
         condition=record.condition,
         run=str(source.run_dir.resolve()),
         path=relative,
-        sha256=checksum_lf(data),
+        sha256=checksum_lf(text.encode("utf-8")),
         words=words,
         budget=budget,
         new_spend_usd=sum(call.cost_usd for call in selected),

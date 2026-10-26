@@ -16,6 +16,7 @@ def packet_source(tmp_path: Path) -> Path:
     folder.mkdir(parents=True)
     (folder / "attempts/1").mkdir(parents=True)
     write_text_lf(folder / "story.md", "The harbour was quiet.\n")
+    write_text_lf(folder / "story.raw.md", "The harbour was quiet.\n")
     write_text_lf(folder / "attempts/1/scene-01.md", "The harbour was quiet.\n")
     write_text_lf(folder / "plan.json", (REPO / "examples/harbour-state.plan.json").read_text())
     write_jsonl(
@@ -170,3 +171,21 @@ def test_baseline_b_packet_records_absent_channels_without_inventing_deltas(tmp_
     report = json.loads((out / "report.json").read_text())
     assert report["denominator"] == 0
     assert report["owner_status"] == "pending"
+
+
+@pytest.mark.parametrize("identity", ["recorded_checksum", "legacy_raw"])
+def test_packet_creation_refuses_prose_that_the_run_did_not_select(
+    tmp_path: Path, identity: str
+) -> None:
+    run = packet_source(tmp_path)
+    if identity == "recorded_checksum":
+        record = json.loads((run / "stories.jsonl").read_text())
+        record["sha256"] = "0" * 64
+        (run / "stories.jsonl").write_text(json.dumps(record) + "\n")
+    else:
+        write_text_lf(
+            run / "stories/C/brief-01/r1/story.md", "A superseded draft was substituted.\n"
+        )
+    out = tmp_path / "packet"
+    assert create_packet(run, out) == 2
+    assert not out.exists()

@@ -15,8 +15,9 @@ from nde.narrative.models import NarrativePlan
 from nde.narrative.validation import validate_plan
 from nde.narrative.workflow import load_plan
 from nde.plan.beats import BeatOutline
-from nde.runs.records import STORY_FILE, StoryRecord, read_stories
+from nde.runs.records import StoryRecord, read_stories
 from nde.stories.normalise import normalise
+from nde.stories.selected import selected_text
 
 
 class Intent(Strict):
@@ -116,7 +117,7 @@ def create(run: Path, condition: str, brief: str, repetition: int, out: Path) ->
     story = _record(run, condition, brief, repetition)
     folder = run / story.path
     plan_sha256, items, scene_count = _planning(folder, story)
-    prose = (folder / STORY_FILE).read_text(encoding="utf-8")
+    prose = selected_text(run, story)
     scenes = sorted((folder / f"attempts/{(story.chosen_attempt or 0) + 1}").glob("scene-*.md"))
     assembled = normalise(
         "\n\n".join(normalise(p.read_text(encoding="utf-8")).strip() for p in scenes)
@@ -167,9 +168,7 @@ def stale_reasons(packet: Packet) -> list[str]:
         folder = run / current.path
         checks = {
             "story record changed": current != packet.story,
-            "final selected prose changed": digest(
-                (folder / STORY_FILE).read_text(encoding="utf-8")
-            )
+            "final selected prose changed": digest(selected_text(run, current))
             != packet.story_sha256,
             "plan changed": _planning(folder, current)[0] != packet.plan_sha256,
         }
