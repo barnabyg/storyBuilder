@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from nde import __version__, briefs, realisation
+from nde import __version__, briefs, realisation, tiers
 from nde.annotations import cli as annotation_cli
 from nde.corpus import provenance
 from nde.env import load_dotenv
@@ -38,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
+    tiers.configure(commands.add_parser("tiers", help="compare dev tiers and freeze a selection"))
     realisation.configure(commands.add_parser("realisation", help="review final prose intentions"))
     evidence_cli.configure(commands.add_parser("schema-evidence", help="G-schema review packet"))
 
@@ -235,6 +236,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "tiers": tiers.run,
     "realisation": realisation.run,
     "schema-evidence": evidence_cli.run,
     "annotate": annotation_cli.run,

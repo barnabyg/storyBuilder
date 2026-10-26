@@ -7,6 +7,7 @@ Research tooling for structured story planning. See
 Inspect saved narrative plans with the [plan workflow](docs/narrative-plans.md).
 Replay [planned scene state](docs/state-ledger.md) before writing prose.
 Generate a reproducible [G-schema evidence packet](docs/schema-evidence.md) from saved inputs.
+Compare [development tiers and freeze an owner selection](docs/tier-selection.md).
 
 ## Setup
 
