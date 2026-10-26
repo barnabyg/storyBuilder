@@ -12,11 +12,11 @@ Unicode codepoint evidence spans. No source is downloaded by annotation commands
 
 ```powershell
 uv run nde calibration import owl-creek-bridge path/to/source.txt --manifest data/manifest.calibration.yaml
-uv run nde annotate draft owl-creek-bridge --manifest data/manifest.calibration.yaml --config configs/annotation.yaml --out .nde/annotations/owl-creek-bridge
+uv run nde annotate draft owl-creek-bridge --manifest data/manifest.calibration.yaml --config configs/annotations/local.yaml --out .nde/annotations/owl-creek-bridge
 uv run nde annotate status .nde/annotations/owl-creek-bridge
 ```
 
-Copy and configure `configs/annotation.yaml`: set the annotator provider/model,
+Copy and configure `configs/annotations/local.yaml`: set the annotator provider/model,
 current prices and hard run/day caps before generation. Keys stay in environment
 variables. The prompt is checksum-versioned as `annotate_l@1`. Annotation requests
 use the complete tier-L schema. A single `max_repairs + 1` attempt limit covers

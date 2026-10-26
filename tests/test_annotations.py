@@ -78,6 +78,18 @@ def draft_args(manifest: Path, config: Path, out: Path, tmp_path: Path) -> list[
     ]
 
 
+def test_documented_annotation_configuration_runs_offline(
+    tmp_path: Path, fake_llm: FakeOpenAI
+) -> None:
+    manifest, config = annotation_inputs(tmp_path, fake_llm)
+    sample = yaml.safe_load((REPO / "configs/annotations/local.yaml").read_text())
+    sample["prompts_dir"] = str(REPO / "prompts")
+    sample["providers"]["local"]["base_url"] = fake_llm.base_url
+    config.write_text(yaml.safe_dump(sample), encoding="utf-8")
+    fake_llm.queue(completion((REPO / "examples/harbour.plan.json").read_text()))
+    assert main(draft_args(manifest, config, tmp_path / "sample", tmp_path)) == 0
+
+
 def test_draft_is_persisted_source_linked_and_explicitly_unreviewed(
     tmp_path: Path,
     fake_llm: FakeOpenAI,

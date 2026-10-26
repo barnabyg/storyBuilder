@@ -1,6 +1,6 @@
 # Replace the provider/model and prices before use. No live call is made by tests.
 seed: 7
-prompts_dir: ../prompts
+prompts_dir: ../../prompts
 providers:
   local:
     base_url: http://127.0.0.1:11434/v1
