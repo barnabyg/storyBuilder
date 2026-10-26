@@ -5,7 +5,7 @@ from typing import Protocol
 
 from nde.files import checksum_lf
 from nde.narrative.diagnostics import Diagnostic, Validation
-from nde.narrative.interpretation import Annotation
+from nde.narrative.interpretation import iter_annotations
 from nde.narrative.interpretation_validation import interpretation_diagnostics
 from nde.narrative.models import NarrativePlan, Span
 from nde.narrative.projection import tier_diagnostics
@@ -69,15 +69,7 @@ def validate_plan(plan: NarrativePlan) -> Validation:
             *plan.knowledge_uses,
         ]
     )
-    annotations: list[Annotation] = [
-        *plan.arcs,
-        *plan.reader_affect,
-        *plan.tension,
-        *plan.themes,
-        *plan.motifs,
-        *plan.discourse,
-        *plan.subtext,
-    ]
+    annotations = [record for _, record in iter_annotations(plan)]
     records.extend(annotations)
     records.extend(plan.motif_echoes)
     diagnostics = check_ids(records)

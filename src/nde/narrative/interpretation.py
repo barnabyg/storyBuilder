@@ -1,12 +1,16 @@
 """Interpretive channels retain uncertainty; trajectories describe coarse ordinals."""
 
+from collections.abc import Iterator
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import Field
 
 from nde.narrative.base import Identified, Span, Strict
 from nde.narrative.uncertainty import Reading
+
+if TYPE_CHECKING:
+    from nde.narrative.models import NarrativePlan
 
 type Ordinal = Annotated[int, Field(strict=True, ge=0, le=4)]
 
@@ -73,3 +77,18 @@ class MotifEcho(Identified):
     to_motif_id: str
     kind: Literal["repetition", "transformation", "contrast"]
     evidence: list[Span] = Field(default_factory=list[Span])
+
+
+def iter_annotations(plan: "NarrativePlan") -> Iterator[tuple[str, Annotation]]:
+    """The shared channel inventory for identity/evidence checks and presentation."""
+    for name, records in (
+        ("arcs", plan.arcs),
+        ("reader_affect", plan.reader_affect),
+        ("tension", plan.tension),
+        ("themes", plan.themes),
+        ("motifs", plan.motifs),
+        ("discourse", plan.discourse),
+        ("subtext", plan.subtext),
+    ):
+        for record in records:
+            yield name, record

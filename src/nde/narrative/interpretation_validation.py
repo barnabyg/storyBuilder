@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from nde.narrative.diagnostics import Diagnostic
-from nde.narrative.interpretation import Annotation, Arc, ReaderAffect, Tension
+from nde.narrative.interpretation import Arc, ReaderAffect, Tension, iter_annotations
 
 if TYPE_CHECKING:
     from nde.narrative.models import NarrativePlan
@@ -15,16 +15,7 @@ def interpretation_diagnostics(plan: NarrativePlan) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     scenes = {scene.id: index for index, scene in enumerate(plan.scenes)}
     characters = {character.id for character in plan.characters}
-    records: list[Annotation] = [
-        *plan.arcs,
-        *plan.reader_affect,
-        *plan.tension,
-        *plan.themes,
-        *plan.motifs,
-        *plan.discourse,
-        *plan.subtext,
-    ]
-    for record in records:
+    for _, record in iter_annotations(plan):
         if any(scene not in scenes for scene in record.scene_ids):
             diagnostics.append(
                 Diagnostic(
