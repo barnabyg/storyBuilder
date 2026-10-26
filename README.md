@@ -48,6 +48,25 @@ Blind evaluation (batches, the reader and reports) is described in
 [docs/evaluation.md](docs/evaluation.md), and the Phase 1 instrument check in
 [docs/instrument-check.md](docs/instrument-check.md).
 
+## Phase 6 reconstruction
+
+Phase 6 adds versioned structural encodings, corruption tasks, protected datasets,
+local denoising and matched AR training, paired scoring, overlap audits, bounded
+learning curves, G3 reporting, and a separate synthetic augmentation ablation.
+Existing narrative-plan and corpus-export formats remain readable.
+
+Start with the [codec and corruption workflows](docs/reconstruction-codec.md),
+then [prepare protected datasets](docs/reconstruction-data.md) and
+[train local models](docs/reconstruction-training.md). See the
+[experiment workflow](docs/reconstruction-experiments.md),
+[evaluation and G3 protocol](docs/reconstruction-evaluation.md), and
+[augmentation ablation](docs/reconstruction-augmentation.md) for comparisons.
+
+The optional ML runtime uses a supported native local backbone; it never downloads
+weights automatically. Tiny CPU fixtures establish software mechanics. Scientific
+G3 requires genuine passed G1/G2 evidence, registered budgets, identified models,
+and any registered owner meaning review. Synthetic success remains pending.
+
 ## Verification
 
 One canonical, non-mutating command runs every gate in order:
@@ -85,6 +104,19 @@ The code has no type-checker suppressions.
 
 CI (`.github/workflows/verify.yml`) runs the same command headless on every
 push and pull request.
+
+A separate CPU ML job installs the pinned optional group and sets
+`NDE_REQUIRE_ML=1`, making missing ML support a failure. Run its checks locally:
+
+```powershell
+uv sync --locked --group ml
+$env:NDE_REQUIRE_ML = "1"
+uv run --locked --group ml nde-verify
+```
+
+The ordinary dependency set stays lightweight; ML tests may skip when the
+optional group is absent. The CPU lane runs actual model updates, checkpoint
+resume, matched reconstruction, sweeps and augmentation checks.
 
 Run locally, `nde-verify` also serves a live dashboard on localhost and prints
 its address as `TEST_DASHBOARD_URL=...`. Turn it off with `--no-dashboard` or

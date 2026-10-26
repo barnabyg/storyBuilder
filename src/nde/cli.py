@@ -31,11 +31,15 @@ from nde.evidence import cli as evidence_cli
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
 from nde.narrative import cli as narrative_cli
+from nde.reconstruction import augmentation as reconstruction_augmentation
 from nde.reconstruction import codec as reconstruction_codec
 from nde.reconstruction import dataset as reconstruction_data
+from nde.reconstruction import experiments as reconstruction_experiment
+from nde.reconstruction import g3 as reconstruction_g3
 from nde.reconstruction import overlap as reconstruction_overlap
 from nde.reconstruction import scoring as reconstruction_score
 from nde.reconstruction import tasks as reconstruction_tasks
+from nde.reconstruction import training as reconstruction_train
 from nde.runs import prompts
 from nde.runs.config import ConfigError
 from nde.runs.records import read_manifest
@@ -94,6 +98,22 @@ def build_parser() -> argparse.ArgumentParser:
             "reconstruction-tasks",
             reconstruction_tasks.configure,
             "save reproducible corruption tasks",
+        ),
+        (
+            "reconstruction-train",
+            reconstruction_train.configure,
+            "train local reconstruction models",
+        ),
+        (
+            "reconstruction-experiment",
+            reconstruction_experiment.configure,
+            "run frozen paired reconstruction sweeps",
+        ),
+        ("reconstruction-g3", reconstruction_g3.configure_g3, "assess registered G3 evidence"),
+        (
+            "reconstruction-augmentation",
+            reconstruction_augmentation.configure,
+            "compare separately identified synthetic augmentation",
         ),
         ("gd-report", gd_report.configure, "report a closed registered G-D batch"),
         ("gd", gd_cli.configure, "registered D-versus-C gate workflow"),
@@ -312,6 +332,10 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "reconstruction-overlap": reconstruction_overlap.run_overlap,
     "reconstruction-score": reconstruction_score.run_score,
     "reconstruction-tasks": reconstruction_tasks.run,
+    "reconstruction-train": reconstruction_train.run,
+    "reconstruction-experiment": reconstruction_experiment.run,
+    "reconstruction-g3": reconstruction_g3.run_g3,
+    "reconstruction-augmentation": reconstruction_augmentation.run,
     "corpus": corpus_cli.run,
     "gd-report": gd_report.run,
     "gd": gd_cli.run,

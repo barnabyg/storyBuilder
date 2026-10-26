@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from nde.cli import main
 from nde.corpus.acquisition import load_work
@@ -27,7 +27,9 @@ def training_dataset(directory: Path, fake: FakeOpenAI, **options: Any) -> Path:
     return output / "dataset.json"
 
 
-def paired_datasets(directory: Path, fake: FakeOpenAI) -> tuple[Path, Path]:
+def paired_datasets(
+    directory: Path, fake: FakeOpenAI, *, split: Literal["validation", "test"] = "validation"
+) -> tuple[Path, Path]:
     """Training plus an explicitly authorized, disjoint held-out author."""
     directory.mkdir(parents=True, exist_ok=True)
     inputs = corpus_inputs(directory, fake)
@@ -47,7 +49,7 @@ def paired_datasets(directory: Path, fake: FakeOpenAI) -> tuple[Path, Path]:
             {
                 "id": "paired-fixture",
                 "works": [str(inputs["work"]), str(held)],
-                "author_splits": {"ann": "train", "bea": "validation"},
+                "author_splits": {"ann": "train", "bea": split},
             }
         )
     )
@@ -128,7 +130,7 @@ def paired_datasets(directory: Path, fake: FakeOpenAI) -> tuple[Path, Path]:
             {
                 "export": str(exported),
                 "cohort": str(cohort),
-                "split": "validation",
+                "split": split,
                 "authorized_by": "synthetic software fixture",
                 "test_only": True,
                 "annotations": [{"work_id": "door", "family": "fixture", "path": str(annotation)}],
