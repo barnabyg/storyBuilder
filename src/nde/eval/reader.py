@@ -166,8 +166,9 @@ def _pair_form(number: int, view: View, current: Judgement | None) -> str:
     if rubric is not None:
         if not required:
             sections.append(
-                '<p class="notice">Everything below is optional: give as many or as few '
-                "scores, tags and guesses as you like.</p>"
+                '<p class="notice">Required scores: '
+                + (", ".join(sorted(dimensions)) or "none")
+                + ". Other scores, tags and guesses are optional.</p>"
             )
         current_a = current.a if current else None
         current_b = current.b if current else None

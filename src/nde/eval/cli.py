@@ -8,7 +8,7 @@ from pathlib import Path
 
 from nde.corpus.provenance import DEFAULT_MANIFEST, ProvenanceError
 from nde.eval import batch as batches
-from nde.eval import readiness, report
+from nde.eval import g1_cli, readiness, report
 from nde.eval.calibration import CalibrationSpec, build_calibration_batch
 from nde.eval.leakage import generating_code_warning
 from nde.eval.reader import DEFAULT_PORT, HOST
@@ -30,6 +30,8 @@ def _batches_dir_option(parser: argparse.ArgumentParser) -> None:
 def configure(evaluation: argparse.ArgumentParser) -> None:
     """Add the `nde eval` subcommands to its parser."""
     sub = evaluation.add_subparsers(dest="eval_command", required=True)
+    for command in ("g1-check", "g1-run", "g1-batch"):
+        g1_cli.configure(sub.add_parser(command, help="protocol-bound G1 workflow"), command)
 
     ready = sub.add_parser("readiness", help="check exact registered gate cohort before reading")
     ready.add_argument("cohort", type=Path)
@@ -180,6 +182,9 @@ def _report(args: argparse.Namespace) -> int:
 
 def run(args: argparse.Namespace) -> int:
     handlers = {
+        "g1-check": g1_cli.run,
+        "g1-run": g1_cli.run,
+        "g1-batch": g1_cli.run,
         "readiness": _readiness,
         "batch": _build,
         "calibration": _calibration,

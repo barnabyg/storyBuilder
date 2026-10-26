@@ -87,6 +87,8 @@ class View(_Record):
     # A rubric dimension that is always required and that the report leads with: the
     # gate's primary measure (e.g. coherence for structure-focused gates).
     primary_dimension: str | None = None
+    # Additive gate policy; old batches retain their original required-score rules.
+    required_score_dimensions: list[str] = Field(default_factory=list[str])
 
     def required_dimensions(self) -> frozenset[str]:
         """The rubric dimensions a judgement must score for both stories."""
@@ -94,7 +96,9 @@ class View(_Record):
             return frozenset()
         if not self.optional_scores:
             return frozenset(self.rubric.dimension_ids)
-        return frozenset({self.primary_dimension} if self.primary_dimension else ())
+        return frozenset(self.required_score_dimensions) | frozenset(
+            {self.primary_dimension} if self.primary_dimension else ()
+        )
 
     @property
     def size(self) -> int:
@@ -187,6 +191,7 @@ class Scoring:
     optional: bool = False
     # A rubric dimension that stays required and leads the report (the primary measure).
     primary: str | None = None
+    required_dimensions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -256,6 +261,11 @@ def build_batch(
         scoring.rubric is None or scoring.primary not in scoring.rubric.dimension_ids
     ):
         raise BatchError(f"primary score {scoring.primary!r} is not a rubric dimension")
+    if scoring.required_dimensions and (
+        scoring.rubric is None
+        or not set(scoring.required_dimensions).issubset(scoring.rubric.dimension_ids)
+    ):
+        raise BatchError("required scores must be registered rubric dimensions")
     first, second = sources
     if (first.run_dir.resolve(), first.condition) == (second.run_dir.resolve(), second.condition):
         raise BatchError("a batch compares two different conditions")
@@ -286,6 +296,7 @@ def build_batch(
         guess_options=sorted(labels(origins).values()) if scoring.rubric is not None else [],
         optional_scores=scoring.optional,
         primary_dimension=scoring.primary,
+        required_score_dimensions=list(scoring.required_dimensions),
     )
     key = Key(
         created_at=datetime.now(UTC).isoformat(),
@@ -472,6 +483,20 @@ def close_batch(batch: Path) -> Closed:
     unit = "stories" if view.kind == "single" else "pairs"
     if done < view.size:
         raise BatchError(f"{view.size - done} of {view.size} {unit} are not judged yet")
+    if view.required_score_dimensions:
+        required = view.required_dimensions()
+        records = read_judgements(batch)
+        if set(records) != set(range(1, view.size + 1)):
+            raise BatchError("required gate judgements do not match exact batch identities")
+        for record in records.values():
+            for scores in (record.a, record.b):
+                if scores is None or not required.issubset(scores.scores):
+                    raise BatchError("required gate scores are incomplete")
+                if view.rubric is None or any(
+                    not view.rubric.scale.min <= value <= view.rubric.scale.max
+                    for value in scores.scores.values()
+                ):
+                    raise BatchError("required gate scores are outside the rubric scale")
     closed = Closed(closed_at=datetime.now(UTC).isoformat(), judged=done)
     write_text_lf(batch / CLOSED, closed.model_dump_json(indent=2) + "\n")
     return closed
