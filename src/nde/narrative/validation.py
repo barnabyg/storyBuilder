@@ -1,27 +1,11 @@
 """Named diagnostics used by inspection, repair and mutation evidence."""
 
 from collections.abc import Iterable
-from typing import Literal
-
-from pydantic import Field
 
 from nde.files import checksum_lf
-from nde.narrative.models import Identified, NarrativePlan, Span, Strict
-
-
-class Diagnostic(Strict):
-    code: str
-    location: str
-    message: str
-    severity: Literal["error", "advisory", "human"] = "error"
-
-
-class Validation(Strict):
-    diagnostics: list[Diagnostic] = Field(default_factory=list[Diagnostic])
-
-    @property
-    def valid(self) -> bool:
-        return not any(item.severity == "error" for item in self.diagnostics)
+from nde.narrative.diagnostics import Diagnostic, Validation
+from nde.narrative.models import Identified, NarrativePlan, Span
+from nde.narrative.structural_validation import validate_structure
 
 
 def check_ids(records: Iterable[Identified]) -> list[Diagnostic]:
@@ -95,4 +79,5 @@ def validate_plan(plan: NarrativePlan) -> Validation:
         spans.extend((scene.id, span) for span in scene.evidence)
         spans.extend((beat.id, span) for beat in scene.beats for span in beat.evidence)
     diagnostics.extend(check_spans(plan, spans))
+    diagnostics.extend(validate_structure(plan))
     return Validation(diagnostics=diagnostics)

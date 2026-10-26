@@ -4,6 +4,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from nde.narrative.structure import (
+    CausalLink,
+    KnowledgeFact,
+    KnowledgeUse,
+    PayoffLink,
+    RevealLink,
+    Setup,
+)
+
 
 class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -52,3 +61,9 @@ class NarrativePlan(Identified):
     characters: list[Character] = Field(default_factory=list[Character])
     sources: list[Source] = Field(default_factory=list[Source])
     scenes: list[Scene] = Field(min_length=1)
+    causal_links: list[CausalLink] = Field(default_factory=list[CausalLink])
+    setups: list[Setup] = Field(default_factory=list[Setup])
+    payoff_links: list[PayoffLink] = Field(default_factory=list[PayoffLink])
+    knowledge_facts: list[KnowledgeFact] = Field(default_factory=list[KnowledgeFact])
+    reveal_links: list[RevealLink] = Field(default_factory=list[RevealLink])
+    knowledge_uses: list[KnowledgeUse] = Field(default_factory=list[KnowledgeUse])
