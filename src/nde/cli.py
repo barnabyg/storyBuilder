@@ -18,6 +18,7 @@ from nde import (
     tiers,
 )
 from nde.annotations import cli as annotation_cli
+from nde.corpus import cli as corpus_cli
 from nde.corpus import provenance
 from nde.env import load_dotenv
 from nde.eval import cli as eval_cli
@@ -48,6 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
+    corpus_cli.configure(commands.add_parser("corpus", help="acquire and inspect corpus works"))
     for name, configure, description in (
         ("gd-report", gd_report.configure, "report a closed registered G-D batch"),
         ("gd", gd_cli.configure, "registered D-versus-C gate workflow"),
@@ -255,6 +257,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "corpus": corpus_cli.run,
     "gd-report": gd_report.run,
     "gd": gd_cli.run,
     "control-report": controllability.run,
