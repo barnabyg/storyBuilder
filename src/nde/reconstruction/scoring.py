@@ -315,6 +315,11 @@ def score_pair(
             "matching": candidate["matching"],
             "matching_mismatches": mismatches,
             "work": {"candidate": candidate["work"], "comparator": comparator["work"]},
+            "source_paths": {
+                "dataset": str(dataset_file.resolve()),
+                "candidate": str(candidate_path.resolve()),
+                "comparator": str(comparator_path.resolve()),
+            },
             "rows": rows,
             "summary": summary,
             "test_only": dataset.get("test_only", False)
@@ -348,6 +353,29 @@ def score_pair(
     )
     report_files(out, "Paired reconstruction scores", result)
     return result
+
+
+def validate_scores(path: Path) -> dict[str, Any]:
+    """Recompute rows from bound tasks/checkpoints without changing saved evidence."""
+    score = read_sealed(path)
+    check_snapshot(score["inputs"])
+    source = score["source_paths"]
+    dataset = load_view(Path(source["dataset"]))
+    tasks = dataset_tasks(dataset)
+    task_ids = [task["id"] for task in tasks]
+    rows_by_id = {row["task_id"]: row for row in score["rows"]}
+    for side in ("candidate", "comparator"):
+        prediction = _read_predictions(Path(source[side]), dataset, task_ids)
+        if prediction["id"] != score[f"{side}_id"]:
+            raise ValueError("paired score prediction identity changed")
+        by_id = {item["task_id"]: item for item in prediction["predictions"]}
+        for task in tasks:
+            row = rows_by_id[task["id"]]
+            if row["mask"] != task["metadata"] or row["provenance"] != task.get("provenance", {}):
+                raise ValueError("paired score masking/source metadata changed")
+            if _score_task(task, by_id.get(task["id"])) != rows_by_id[task["id"]][side]:
+                raise ValueError("paired scores no longer reproduce")
+    return score
 
 
 def configure_score(parser: argparse.ArgumentParser) -> None:

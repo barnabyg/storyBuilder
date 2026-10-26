@@ -41,3 +41,44 @@ canonical typed retained records on shared channels. ID-only renaming is
 normalized; missing channels are unavailable and uncertainty is preserved.
 Distance is a candidate similarity measure, not proof of memorisation or its
 absence. Ties are ordered by record identity.
+
+## Registered G3 workflow
+
+`nde reconstruction-g3 readiness CONFIG` performs a no-training check.
+`nde reconstruction-g3 register CONFIG --out PROTOCOL.json` freezes thresholds
+and evidence before held-out predictions, paired scores or owner meaning labels
+exist. `nde reconstruction-g3 report PROTOCOL.json --out OUTPUT` writes an
+immutable decision and readable report; it never starts training or Phase 7.
+
+The version-1 configuration identifies `training`, protected test `evaluation`,
+local `base_model` (`model.json` or its directory), frozen `experiment.json`,
+exact future `score_reports`, `overlap_report`, and the retained C/D `reference`
+artifact. Real readiness also requires `g1_batch` (plus any `g1_realisation`
+packets) and `g2_gate`: outcomes are recomputed through the established gate
+validators. G-D passage is not required. The model weights, datasets, export,
+G2 identity, experiment job pairs, seeds, train subsets, target vocabulary and
+resource budgets are bound to the protocol. Related examples remain aggregated
+by registered `aggregation: work` or `author`.
+
+Defaults are `validator_target: 0.95`, `positive_margin: 0.01`, final registered
+checkpoint selection, and the three separately reported long-range edge
+families. Every family must meet the positive candidate-minus-AR margin.
+Requested and actual masking rates must both be within 30–50% for primary
+results; other tasks remain identified outside the primary analysis. Missing
+results, stale checkpoints, incomplete training, changed inputs, unequal budgets
+or unresolved overlap remain pending evidence and retain their denominators.
+Completed metric failures retain the C/D reference and record the stop action.
+
+`test_only: true` permits explicitly synthetic software fixtures without real
+G1/G2 passage; a fixture criteria pass always remains scientifically pending.
+Synthetic scores and owner judgements cannot establish a literary advantage.
+
+Owner meaning evidence remains separate. If `require_meaning_review` is true,
+freeze `owner_review`, `minimum_owner_samples` (default 1), and
+`meaning_preservation_minimum` (default 0.8) before collecting labels. The review
+is a version-1 sealed `owner-meaning-review` record with nonempty `reviewer`,
+`test_only`, exact `score_ids`, input snapshots and `samples`. Each sample names
+`score_id`, `task_id`, and the actual owner's `judgement`: `preserved`, `changed`
+or `uncertain`. Missing, stale, uncertain, synthetic or unverified owner evidence
+cannot satisfy the registered requirement. The saved decision binds the review
+checksum while preserving its status separately from deterministic metrics.
