@@ -13,6 +13,7 @@ import yaml
 from pydantic import ConfigDict, Field, model_validator
 
 from nde.corpus.acquisition import load_work
+from nde.corpus.channels import CHANNEL_FIELDS
 from nde.corpus.extraction import INSTRUCTION, digest, extract, verify_extraction
 from nde.corpus.extraction_records import (
     INTERPRETIVE_CHANNELS,
@@ -253,18 +254,11 @@ def aligned_claims(plan: NarrativePlan) -> dict[str, Counter[str]]:
                 ensure_ascii=False,
             )
     channels: dict[str, list[Any]] = {
-        "plot": [scene.model_dump(mode="json") for scene in plan.scenes],
-        "causality": [item.model_dump(mode="json") for item in plan.causal_links],
-        "information": [
-            item.model_dump(mode="json")
-            for item in (*plan.knowledge_facts, *plan.reveal_links, *plan.knowledge_uses)
-        ],
         "goal": [item.model_dump(mode="json") for item in plan.states if item.kind == "goal"],
         "belief": [item.model_dump(mode="json") for item in plan.states if item.kind == "belief"],
         "values": [
             item.model_dump(mode="json") for item in plan.states if item.kind in {"value", "canon"}
         ],
-        "relationships": [item.model_dump(mode="json") for item in plan.relationships],
         "constraints": [item.model_dump(mode="json") for item in plan.constraints],
         "setups_payoffs": [
             item.model_dump(mode="json") for item in (*plan.setups, *plan.payoff_links)
@@ -272,15 +266,20 @@ def aligned_claims(plan: NarrativePlan) -> dict[str, Counter[str]]:
     }
     channels.update(
         {
+            channel: [
+                {"channel": field, **item.model_dump(mode="json")}
+                for field in fields
+                for item in getattr(plan, field)
+            ]
+            for channel, fields in CHANNEL_FIELDS.items()
+        }
+    )
+    channels.update(
+        {
             name: [item.model_dump(mode="json") for item in getattr(plan, name)]
             for name in INTERPRETIVE_CHANNELS
         }
     )
-    channels["interpretation"] = [
-        {"channel": name, **item.model_dump(mode="json")}
-        for name in INTERPRETIVE_CHANNELS
-        for item in getattr(plan, name)
-    ]
     return {
         channel: Counter(
             json.dumps(_canonical(item, identities), sort_keys=True, ensure_ascii=False)

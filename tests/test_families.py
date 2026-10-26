@@ -50,6 +50,29 @@ def test_families_are_independent_and_align_renamed_entities(
     assert report["owner_approved"] is False
 
 
+def test_causality_agreement_includes_setup_claims(tmp_path: Path, fake_llm: FakeOpenAI) -> None:
+    work, segments, path = family_inputs(tmp_path, fake_llm)
+    left, right = plan_fixture(work, segments), plan_fixture(work, segments)
+    for plan, description in ((left, "A lamp promises rescue"), (right, "A lamp promises danger")):
+        plan["setups"] = [
+            {"id": "setup", "scene_id": plan["scenes"][0]["id"], "description": description}
+        ]
+    fake_llm.queue(*(completion(json.dumps(plan)) for plan in [left] * 3 + [right] * 3))
+    out = tmp_path / "families"
+    assert (
+        families.compare_families(
+            path,
+            work,
+            segments,
+            ExtractionOptions(out, tmp_path / "cache.sqlite", tmp_path / "ledger.sqlite"),
+        ).status
+        == "complete"
+    )
+    report = families.family_report(out)
+    row = next(row for row in report["agreement"] if row["channel"] == "causality")
+    assert (row["agreed"], row["total"]) == (0, 2)
+
+
 @pytest.mark.parametrize(
     "fault", ["same-family", "missing-family", "same-binding", "provider-alias"]
 )

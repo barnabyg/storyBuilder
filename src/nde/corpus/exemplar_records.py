@@ -7,28 +7,12 @@ from typing import Any, cast
 
 from pydantic import Field
 
+from nde.corpus.channels import CHANNEL_FIELDS
 from nde.narrative.base import Strict
 from nde.narrative.models import NarrativePlan
 from nde.narrative.validation import validate_plan
 from nde.narrative.workflow import schema_json
 from nde.runs.config import ConfigError
-
-CHANNEL_FIELDS = {
-    "plot": ("scenes",),
-    "causality": ("causal_links", "setups", "payoff_links"),
-    "information": ("knowledge_facts", "reveal_links", "knowledge_uses"),
-    "relationships": ("relationships",),
-    "interpretation": (
-        "arcs",
-        "reader_affect",
-        "tension",
-        "themes",
-        "motifs",
-        "motif_echoes",
-        "discourse",
-        "subtext",
-    ),
-}
 
 
 class ExemplarSelection(Strict):
