@@ -20,6 +20,7 @@ from nde import (
 from nde.annotations import cli as annotation_cli
 from nde.corpus import cli as corpus_cli
 from nde.corpus import extraction_cli, provenance
+from nde.corpus import pilot as corpus_pilot
 from nde.corpus import reliability as corpus_review
 from nde.env import load_dotenv
 from nde.eval import cli as eval_cli
@@ -58,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
             "extract independent evidence-linked narrative channels",
         ),
         ("corpus-review", corpus_review.configure, "freeze and assess corpus channel reviews"),
+        ("corpus-pilot", corpus_pilot.configure, "run a frozen budget-capped extraction pilot"),
         ("gd-report", gd_report.configure, "report a closed registered G-D batch"),
         ("gd", gd_cli.configure, "registered D-versus-C gate workflow"),
         ("control-report", controllability.configure, "report plan-only structural edit evidence"),
@@ -266,6 +268,7 @@ def _briefs(args: argparse.Namespace) -> int:
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "extract": extraction_cli.run,
     "corpus-review": corpus_review.run,
+    "corpus-pilot": corpus_pilot.run,
     "corpus": corpus_cli.run,
     "gd-report": gd_report.run,
     "gd": gd_cli.run,
