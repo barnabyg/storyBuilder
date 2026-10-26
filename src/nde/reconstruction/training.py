@@ -26,13 +26,21 @@ from nde.corpus.records_io import (
     snapshot,
 )
 from nde.llm.config import Strict
-from nde.reconstruction.codec import seal, tokenize
+from nde.reconstruction.codec import (
+    BOS,
+    BYTE_OFFSET,
+    EOS,
+    MASK,
+    PAD,
+    VOCABULARY_SIZE,
+    seal,
+    tokenize,
+)
 from nde.reconstruction.dataset import load_dataset
-from nde.reconstruction.model import VOCABULARY_SIZE, build, pack, runtime, unpack
+from nde.reconstruction.model import build, pack, runtime, unpack
 from nde.reconstruction.tasks import model_input
 from nde.reconstruction.training_data import dataset_file, load_training_dataset
 
-BOS, EOS, BYTE_OFFSET = 2, 3, 4
 MIN_WIDTH, MIN_POSITIONS = 4, 8
 
 
@@ -220,19 +228,19 @@ def preflight(config_path: Path) -> dict[str, Any]:
 def _target_tokens(task: dict[str, Any]) -> tuple[list[int], list[float]]:
     """Only training calls this: a fixed output block prevents gold-length disclosure."""
     # Syntax is reliable; only value bytes inherit the channel target weight.
-    tokens: list[int] = [2, ord("[") + 4]
+    tokens: list[int] = [BOS, ord("[") + BYTE_OFFSET]
     weights: list[float] = [1.0, 1.0]
     for index, target in enumerate(task["targets"]):
         prefix = ("," if index else "") + '{"position":' + str(target["position"]) + ',"value":'
         prefix_tokens = list(prefix.encode("utf-8"))
-        tokens.extend(byte + 4 for byte in prefix_tokens)
+        tokens.extend(byte + BYTE_OFFSET for byte in prefix_tokens)
         weights.extend([1.0] * len(prefix_tokens))
         value = tokenize(target["value"])[1:-1]
         tokens.extend(value)
         weights.extend([float(target["weight"])] * len(value))
-        tokens.append(ord("}") + 4)
+        tokens.append(ord("}") + BYTE_OFFSET)
         weights.append(1.0)
-    tokens.extend([ord("]") + 4, 3])
+    tokens.extend([ord("]") + BYTE_OFFSET, EOS])
     weights.extend([1.0, 1.0])
     return tokens, weights
 
@@ -356,13 +364,13 @@ def _optimizer_step(
     torch = runtime()
     width = config.max_output_tokens
     target, weights = target_data
-    output = [1] * width
+    output = [MASK] * width
     if config.objective == "ar":
-        output = [BOS, *target[:-1]] + [0] * (width - len(target))
+        output = [BOS, *target[:-1]] + [PAD] * (width - len(target))
     logits = model.forward(
         context + output, causal=config.objective == "ar", context_length=len(context)
     )
-    labels = torch.tensor(target + [0] * (width - len(target)), dtype=torch.long)
+    labels = torch.tensor(target + [PAD] * (width - len(target)), dtype=torch.long)
     loss_weights = torch.tensor(weights + [0.0] * (width - len(weights)))
     if float(loss_weights.sum()) == 0:
         raise ValueError("task has no measurable weighted targets")
@@ -454,8 +462,8 @@ def _decode_prediction(tokens: list[int], task: dict[str, Any]) -> list[dict[str
         if token == EOS:
             break
         if token >= BYTE_OFFSET:
-            content.append(token - 4)
-        elif token not in {0, 2}:
+            content.append(token - BYTE_OFFSET)
+        elif token not in {PAD, BOS}:
             raise ValueError("generated special token inside JSON")
     decoded = json.loads(bytes(content).decode("utf-8"))
     if not isinstance(decoded, list):
@@ -481,14 +489,16 @@ def _generate(model: Any, context: list[int], config: TrainingConfig) -> tuple[l
     with torch.no_grad():
         if config.objective == "ar":
             for _ in range(width):
-                output = [BOS, *generated] + [0] * (width - len(generated) - 1)
+                output = [BOS, *generated] + [PAD] * (width - len(generated) - 1)
                 logits = model.forward(context + output, causal=True, context_length=len(context))
                 generated.append(int(logits[len(generated)].argmax().item()))
                 passes += 1
                 if generated[-1] == EOS:
                     break
         else:
-            logits = model.forward(context + [1] * width, causal=False, context_length=len(context))
+            logits = model.forward(
+                context + [MASK] * width, causal=False, context_length=len(context)
+            )
             generated = logits.argmax(dim=-1).tolist()
             passes = 1
     return generated, passes

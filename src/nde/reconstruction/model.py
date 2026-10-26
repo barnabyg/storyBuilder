@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, cast
 
-VOCABULARY_SIZE = 260
+from nde.reconstruction.codec import VOCABULARY_SIZE
 
 
 def runtime() -> Any:
