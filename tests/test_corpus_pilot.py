@@ -66,3 +66,28 @@ def test_pilot_cap_preserves_failed_and_unattempted_rows(
     assert any(row["status"] == "budget_aborted" for row in saved["rows"])
     assert main(args) == 1
     assert fake_llm.call_count == 0
+
+
+@pytest.mark.parametrize("change", ["missing", "stale"])
+def test_pilot_reports_incomplete_coverage_when_features_are_missing_or_stale(
+    tmp_path: Path,
+    fake_llm: FakeOpenAI,
+    change: str,
+) -> None:
+    inputs = corpus_inputs(tmp_path, fake_llm)
+    queue_annotation(inputs, fake_llm)
+    config = pilot_config(tmp_path, inputs)
+    out = tmp_path / "pilot"
+    assert main(["corpus-pilot", "run", str(config), "--out", str(out)]) == 0
+    feature = out / "features/lamp/features.json"
+    if change == "missing":
+        feature.unlink()
+    else:
+        feature.write_text("{}")
+    assert main(["corpus-pilot", "report", str(out)]) == 1
+    result = json.loads((out / "report.json").read_text())
+    assert result["completed_stories"] == 0
+    assert result["coverage"] == 0
+    assert result["features"]["lamp"]["status"] == change
+    assert len(result["rows"]) == 6
+    assert result["list_price_usd"] == pytest.approx(0.00009)

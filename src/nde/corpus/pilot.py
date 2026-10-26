@@ -208,12 +208,24 @@ def report(out: Path) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     complete = 0
     failures: list[str] = []
+    features: dict[str, dict[str, str]] = {}
     for work in config.works:
+        feature = out / "features" / work.work_id / "features.json"
+        feature_status = {"status": "current"}
+        try:
+            load_features(feature, work.work_dir, work.segmentation)
+        except (OSError, ValueError) as error:
+            feature_status = {
+                "status": "stale" if feature.is_file() else "missing",
+                "diagnostic": str(error),
+            }
+            failures.append(f"{work.work_id}: features {feature_status['status']}: {error}")
+        features[work.work_id] = feature_status
         folder = out / "stories" / work.work_id
         families: dict[str, dict[str, Any]] = {}
         if (folder / "families.json").exists():
             comparison = family_report(folder)
-            complete += comparison["status"] == "complete"
+            complete += comparison["status"] == "complete" and feature_status["status"] == "current"
             families = {row["family"]: row for row in comparison["families"]}
         family_config = yaml.safe_load(config.extraction_config.read_text(encoding="utf-8"))
         for binding in family_config["annotators"]:
@@ -266,6 +278,7 @@ def report(out: Path) -> dict[str, Any]:
         "durable_reserved_and_spent_usd": reserved_and_spent,
         "unresolved_accounting_usd": max(0, reserved_and_spent - accounted),
         "failures": failures,
+        "features": features,
         "scientific_status": "pending" if config.test_only else "requires G2 review",
         "scaling": {
             "denominator_completed_stories": complete,
