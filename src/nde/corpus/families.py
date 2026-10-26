@@ -401,6 +401,7 @@ def family_report(directory: Path) -> dict[str, Any]:
     return {
         "version": "1",
         "work_id": session.work_id,
+        "work_record_sha256": session.work_record_sha256,
         "source_sha256": session.source_sha256,
         "segmentation_sha256": session.segmentation_sha256,
         "status": session.status,

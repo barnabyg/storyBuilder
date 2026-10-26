@@ -11,8 +11,12 @@ from tests.fake_openai import FakeOpenAI, completion
 from tests.test_corpus_acquisition import acquire
 
 
-def corpus_inputs(directory: Path, fake: FakeOpenAI) -> dict[str, Path]:
-    work = acquire(directory, "BEGIN LAMP\nAnn saw the lamp.\n\n***\n\nAnn lit the lamp.\nEND LAMP")
+def corpus_inputs(directory: Path, fake: FakeOpenAI, *, work_id: str = "lamp") -> dict[str, Path]:
+    work = acquire(
+        directory,
+        "BEGIN LAMP\nAnn saw the lamp.\n\n***\n\nAnn lit the lamp.\nEND LAMP",
+        work_id=work_id,
+    )
     segments = directory / "segments"
     assert main(["corpus", "segment", str(work), "--out", str(segments)]) == 0
     config = directory / "cohort-config.json"

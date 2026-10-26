@@ -112,9 +112,16 @@ def _inputs(policy: ReviewPolicy) -> tuple[list[dict[str, Any]], list[Path]]:
         assignment = assignments[item.work_id]
         if assignment.text_sha256 != work.text_sha256:
             raise ValueError("review source differs from frozen cohort")
-        load_segmentation(item.segmentation, item.work_dir)
+        segments = load_segmentation(item.segmentation, item.work_dir)
         feature = load_features(item.features, item.work_dir, item.segmentation)
         comparison = family_report(item.families)
+        if (
+            comparison["work_id"] != work.work_id
+            or comparison["source_sha256"] != work.text_sha256
+            or comparison["work_record_sha256"] != digest(work.model_dump_json())
+            or comparison["segmentation_sha256"] != digest(segments.model_dump_json())
+        ):
+            raise ValueError("review annotations differ from named work/source/segmentation")
         if comparison.get("status") != "complete":
             raise ValueError("review requires complete independent-family annotations")
         families: list[dict[str, Any]] = comparison["families"]
@@ -256,7 +263,10 @@ def report(directory: Path) -> dict[str, Any]:
     problems: list[str] = []
     try:
         check_snapshot(packet["inputs"])
-        _inputs(ReviewPolicy.model_validate(packet["policy"]))
+        candidates, _ = _inputs(ReviewPolicy.model_validate(packet["policy"]))
+        current = {candidate["id"]: candidate for candidate in candidates}
+        if any(current.get(sample["id"]) != sample for sample in packet["samples"]):
+            raise ValueError("frozen review candidates changed; freeze a new packet")
     except (OSError, ValueError) as error:
         problems.append(str(error))
     labels: dict[str, dict[str, Any]] = {}
