@@ -9,6 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from nde.corpus.acquisition import CorpusError, acquire, load_work
+from nde.corpus.segmentation import compare_segmentation, load_segmentation, segment_work
 from nde.corpus.splits import freeze_cohort, load_cohort
 
 
@@ -26,11 +27,27 @@ def configure(parser: argparse.ArgumentParser) -> None:
     freeze.add_argument("config", type=Path)
     freeze.add_argument("--out", type=Path, required=True)
     split.add_parser("inspect").add_argument("cohort", type=Path)
+    segment = commands.add_parser("segment")
+    segment.add_argument("work", type=Path)
+    segment.add_argument("--out", type=Path, required=True)
+    check = commands.add_parser("segment-check")
+    compare = commands.add_parser("segment-compare")
+    for command in (check, compare):
+        command.add_argument("work", type=Path)
+        command.add_argument("segmentation", type=Path)
+    compare.add_argument("--gold", type=Path)
+    compare.add_argument("--out", type=Path, required=True)
 
 
 def run(args: argparse.Namespace) -> int:
     try:
-        if args.corpus_command == "split":
+        if args.corpus_command == "segment":
+            record = segment_work(args.work, args.out)
+        elif args.corpus_command == "segment-check":
+            record = load_segmentation(args.segmentation, args.work)
+        elif args.corpus_command == "segment-compare":
+            record = compare_segmentation(args.work, args.segmentation, args.gold, args.out)
+        elif args.corpus_command == "split":
             record = (
                 freeze_cohort(args.config, args.out)
                 if args.split_command == "freeze"
