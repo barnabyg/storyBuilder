@@ -38,7 +38,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nde", description="Narrative Diffusion Engine")
     parser.add_argument("--version", action="version", version=f"nde {__version__}")
     commands = parser.add_subparsers(dest="command")
-    g1_report.configure(commands.add_parser("g1-report", help="report a closed registered G1 batch"))
+    g1_report.configure(
+        commands.add_parser("g1-report", help="report a closed registered G1 batch")
+    )
     tiers.configure(commands.add_parser("tiers", help="compare dev tiers and freeze a selection"))
     realisation.configure(commands.add_parser("realisation", help="review final prose intentions"))
     evidence_cli.configure(commands.add_parser("schema-evidence", help="G-schema review packet"))
