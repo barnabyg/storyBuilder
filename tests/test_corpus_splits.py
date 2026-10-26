@@ -138,3 +138,77 @@ def test_duplicates_and_unresolved_identities_cannot_be_frozen(
     data[field] = value
     record.write_text(json.dumps(data), encoding="utf-8")
     assert freeze(tmp_path, [first, second])[1] == 1
+
+
+def test_expansion_preserves_work_exclusion_without_excluding_the_author(tmp_path: Path) -> None:
+    excluded = make_work(tmp_path / "one", "one", "ann")
+    included = make_work(tmp_path / "two", "two", "ann")
+    additional = make_work(tmp_path / "three", "three", "ann")
+    base = tmp_path / "base"
+    base.mkdir()
+    old, result = freeze(
+        base, [excluded, included], excluded_work_ids=["one"], author_splits={"ann": "train"}
+    )
+    assert result == 0
+    expansion = tmp_path / "expansion"
+    expansion.mkdir()
+    out, result = freeze(expansion, [excluded, included, additional], previous=str(old))
+    assert result == 0
+    assignments = json.loads((out / "cohort.json").read_text("utf-8"))["assignments"]
+    assert {a["work_id"]: a["split"] for a in assignments} == {
+        "one": "excluded",
+        "two": "train",
+        "three": "train",
+    }
+    assert main(["corpus", "split", "inspect", str(out)]) == 0
+
+
+def test_expansion_cannot_use_work_exclusion_to_bypass_protected_author(tmp_path: Path) -> None:
+    excluded = make_work(tmp_path / "one", "one", "ann")
+    protected = make_work(tmp_path / "two", "two", "ann")
+    additional = make_work(tmp_path / "three", "three", "ann")
+    base = tmp_path / "base"
+    base.mkdir()
+    old, result = freeze(
+        base, [excluded, protected], excluded_work_ids=["one"], protected_work_ids=["two"]
+    )
+    assert result == 0
+    expansion = tmp_path / "expansion"
+    expansion.mkdir()
+    out, result = freeze(
+        expansion,
+        [excluded, protected, additional],
+        previous=str(old),
+        train_percent=100,
+        validation_percent=0,
+    )
+    assert result == 0
+    assignments = json.loads((out / "cohort.json").read_text("utf-8"))["assignments"]
+    assert {a["work_id"]: a["split"] for a in assignments} == {
+        "one": "excluded",
+        "two": "gold",
+        "three": "gold",
+    }
+
+
+def test_protected_author_remains_protected_when_only_prior_work_is_excluded(
+    tmp_path: Path,
+) -> None:
+    excluded = make_work(tmp_path / "one", "one", "ann")
+    additional = make_work(tmp_path / "two", "two", "ann")
+    base = tmp_path / "base"
+    base.mkdir()
+    old, result = freeze(base, [excluded], excluded_work_ids=["one"], protected_work_ids=["one"])
+    assert result == 0
+    expansion = tmp_path / "expansion"
+    expansion.mkdir()
+    out, result = freeze(
+        expansion,
+        [excluded, additional],
+        previous=str(old),
+        train_percent=100,
+        validation_percent=0,
+    )
+    assert result == 0
+    assignments = json.loads((out / "cohort.json").read_text("utf-8"))["assignments"]
+    assert {a["work_id"]: a["split"] for a in assignments} == {"one": "excluded", "two": "gold"}

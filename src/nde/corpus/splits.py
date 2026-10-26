@@ -100,8 +100,37 @@ def _records(config: CohortConfig, base: Path) -> list[tuple[Path, WorkRecord, s
     return sorted(records, key=lambda row: row[1].work_id)
 
 
+def _inherited_policy(previous: Cohort | None) -> tuple[set[str], set[str]]:
+    excluded: set[str] = set()
+    protected: set[str] = set()
+    while previous is not None:
+        excluded.update(previous.config.excluded_work_ids)
+        protected.update(
+            _canonical(author, previous.config.author_aliases)
+            for author in previous.config.protected_author_ids
+        )
+        protected.update(
+            row.author_id
+            for row in previous.assignments
+            if row.work_id in previous.config.protected_work_ids
+        )
+        protected.update(
+            _canonical(author, previous.config.author_aliases)
+            for author, split in previous.config.author_splits.items()
+            if split != "train"
+        )
+        previous = (
+            load_cohort(Path(previous.config_path).parent / previous.config.previous)
+            if previous.config.previous is not None
+            else None
+        )
+    return excluded, protected
+
+
 def _author_assignments(
-    config: CohortConfig, records: list[tuple[Path, WorkRecord, str]], base: Path
+    config: CohortConfig,
+    records: list[tuple[Path, WorkRecord, str]],
+    previous: Cohort | None,
 ) -> dict[str, Split]:
     if config.train_percent + config.validation_percent > PERCENT:
         raise CorpusError("split percentages exceed 100")
@@ -121,24 +150,9 @@ def _author_assignments(
     protected.update(
         author for _, work, author in records if work.work_id in config.protected_work_ids
     )
-    if config.previous is not None:
-        previous = load_cohort(base / config.previous)
-        current = {work.work_id: (work, path, author) for path, work, author in records}
-        for assignment in previous.assignments:
-            row = current.get(assignment.work_id)
-            if (
-                row is None
-                or json_digest(row[0]) != assignment.record_sha256
-                or str(row[1]) != assignment.work_dir
-                or row[2] != assignment.author_id
-            ):
-                raise CorpusError("expansion changed or removed a frozen work")
-            if (
-                assignment.author_id in explicit
-                and explicit[assignment.author_id] != assignment.split
-            ):
-                raise CorpusError("expansion reassigned a frozen author")
-            explicit[assignment.author_id] = assignment.split
+    protected.update(_inherited_policy(previous)[1])
+    if previous is not None:
+        _preserve_author_assignments(previous, records, explicit)
     for author in protected:
         if author in explicit and explicit[author] not in {
             "gold",
@@ -161,13 +175,38 @@ def _author_assignments(
     return explicit
 
 
+def _preserve_author_assignments(
+    previous: Cohort,
+    records: list[tuple[Path, WorkRecord, str]],
+    explicit: dict[str, Split],
+) -> None:
+    work_exclusions = _inherited_policy(previous)[0]
+    current = {work.work_id: (work, path, author) for path, work, author in records}
+    for assignment in previous.assignments:
+        row = current.get(assignment.work_id)
+        if (
+            row is None
+            or json_digest(row[0]) != assignment.record_sha256
+            or str(row[1]) != assignment.work_dir
+            or row[2] != assignment.author_id
+        ):
+            raise CorpusError("expansion changed or removed a frozen work")
+        if assignment.work_id in work_exclusions:
+            continue
+        if assignment.author_id in explicit and explicit[assignment.author_id] != assignment.split:
+            raise CorpusError("expansion reassigned a frozen author")
+        explicit[assignment.author_id] = assignment.split
+
+
 def _build(config_path: Path) -> Cohort:
     config = CohortConfig.model_validate(yaml.safe_load(config_path.read_text("utf-8")))
     records = _records(config, config_path.parent)
-    splits = _author_assignments(config, records, config_path.parent)
+    previous = load_cohort(config_path.parent / config.previous) if config.previous else None
+    exclusions = set(config.excluded_work_ids) | _inherited_policy(previous)[0]
+    splits = _author_assignments(config, records, previous)
     assignments: list[Assignment] = []
     for path, work, author in records:
-        split = "excluded" if work.work_id in config.excluded_work_ids else splits[author]
+        split = "excluded" if work.work_id in exclusions else splits[author]
         assignments.append(
             Assignment(
                 work_dir=str(path),
@@ -185,6 +224,10 @@ def _build(config_path: Path) -> Cohort:
                 eligible=split == "train",
             )
         )
+    if previous is not None:
+        current_splits = {assignment.work_id: assignment.split for assignment in assignments}
+        if any(current_splits[old.work_id] != old.split for old in previous.assignments):
+            raise CorpusError("expansion reassigned a frozen work")
     value = Cohort(
         id=config.id,
         config_path=str(config_path.resolve()),
