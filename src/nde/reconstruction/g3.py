@@ -64,6 +64,8 @@ def _file(path: Path, name: str) -> Path:
 
 def _matrix_binding(policy: G3Policy, experiment: dict[str, Any]) -> dict[str, Any]:
     config = experiment["config"]
+    if len(config["train_datasets"]) != 1:
+        raise ValueError("G3 requires one audited training population per registered gate")
     if (
         _file(Path(config["base_model"]), "model.json").resolve()
         != _file(policy.base_model, "model.json").resolve()
@@ -131,6 +133,25 @@ def _gate_evidence(policy: G3Policy) -> dict[str, Any]:
     }
 
 
+def _export_lineage(
+    policy: G3Policy,
+    training: dict[str, Any],
+    evaluation: dict[str, Any],
+    gate: dict[str, Any],
+) -> None:
+    original = training
+    while "parent_path" in original:
+        original = load_view(Path(original["parent_path"]))
+    if original.get("export_path"):
+        export = validate_export(Path(original["export_path"]))
+        if export["id"] != evaluation.get("export_id") or (
+            gate["gate_ids"]["g2"] is not None and export["gate_id"] != gate["gate_ids"]["g2"]
+        ):
+            raise ValueError("G3 training/evaluation export differs from registered G2 evidence")
+    elif not policy.test_only:
+        raise ValueError("G3 is not scientifically ready: approved training export lineage missing")
+
+
 def _readiness(policy: G3Policy) -> dict[str, Any]:
     training, evaluation = load_view(policy.training), load_view(policy.evaluation)
     if training.get("role") != "optimizer" or training.get("split") != "train":
@@ -160,12 +181,7 @@ def _readiness(policy: G3Policy) -> dict[str, Any]:
     if not policy.reference.is_file():
         raise ValueError("identified C/D reference baseline is missing")
     gate = _gate_evidence(policy)
-    if training.get("export_path"):
-        export = validate_export(Path(training["export_path"]))
-        if export["id"] != evaluation.get("export_id") or (
-            gate["gate_ids"]["g2"] is not None and export["gate_id"] != gate["gate_ids"]["g2"]
-        ):
-            raise ValueError("G3 training/evaluation export differs from registered G2 evidence")
+    _export_lineage(policy, training, evaluation, gate)
     pending = gate["pending"]
     files = [
         _file(policy.training, "dataset.json"),

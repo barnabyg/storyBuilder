@@ -286,3 +286,18 @@ def test_synthetic_owner_review_cannot_satisfy_registered_meaning_requirement(
     result = assess(protocol)
     assert result["owner_review"]["status"] == "test-only"
     assert result["criteria_outcome"] == "pending"
+
+
+def test_g3_rejects_matrix_populations_outside_its_registered_overlap_audit(
+    tmp_path: Path,
+) -> None:
+    config, _ = g3_inputs(tmp_path)
+    experiment = tmp_path / "experiment.json"
+    matrix = read_sealed(experiment)
+    other = tmp_path / "unaudited-train.json"
+    create_record(other, {"role": "optimizer", "split": "train", "inputs": {}})
+    matrix["config"]["train_datasets"].append(str(other))
+    experiment.unlink()
+    create_record(experiment, matrix)
+    with pytest.raises(ValueError, match="one audited training population"):
+        readiness(config)

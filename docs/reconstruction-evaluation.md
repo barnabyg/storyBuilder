@@ -62,6 +62,12 @@ G2 identity, experiment job pairs, seeds, train subsets, target vocabulary and
 resource budgets are bound to the protocol. Related examples remain aggregated
 by registered `aggregation: work` or `author`.
 
+Each G3 protocol covers one audited training population and its registered
+author-grouped subsets. The overlap audit covers that population; every subset
+retains its approved export/G2 lineage. A broader sweep may compare several
+training populations or granularities, but each requires its own G3 registration
+and audit. Unrelated, unaudited populations cannot enter the same gate decision.
+
 Defaults are `validator_target: 0.95`, `positive_margin: 0.01`, final registered
 checkpoint selection, and the three separately reported long-range edge
 families. Every family must meet the positive candidate-minus-AR margin.
