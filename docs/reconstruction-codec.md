@@ -28,3 +28,26 @@ and internal references. Evidence/source data and excluded labels are deliberate
 not reversible from tensors. Source/export/schema/codec changes are rejected;
 scene/token capacity violations produce errors without truncation. Retained-view
 validator success cannot establish that omitted annotation channels are complete.
+
+`reconstruction-tasks create ENCODING --schedule CONFIG --out DIRECTORY` freezes
+`tasks.json` and a readable report. The configuration contains `seed`,
+`repetitions` and a `schedules` list of `{ "kind": "fields", "rate": 0.3 }`.
+Kinds are random eligible scalar fields, whole scenes, whole channels and a
+contiguous canonical field span. Rates must be 10–70%; unit counts round upward.
+Scene masks include eligible fields in annotations/links touching the scene,
+including both endpoints of causal edges and the setup scene of payoff links.
+Immutable ID/list-length scaffolding and unknown readings remain visible.
+Optional `channel` restricts eligible channels. Span `start` and `count` allow
+registered first/middle/last/full boundary experiments; explicit count overrides
+the requested rate and the report records actual field coverage separately.
+Empty eligible channels produce zero coverage rather than inventing targets.
+
+The task saves the exact visible slots, their identity, allowed positions and a
+separate evaluator-only target list. Seeds bind source record, schedule and
+repetition. `model_input` exposes compact path/value tuples only, with distinct
+mask objects for hidden values; it never serializes targets, gold views, source
+text or auxiliary provenance. Both objectives consume this same saved input.
+Reconstruction requires exactly the allowed prediction positions and preserves
+all observations; missing/extra predictions or invalid decoded references produce
+diagnostics. Hard targets have loss weight 1; soft targets have registered weight
+0.25; scaffolding, excluded and uncertain fields have zero loss.
