@@ -17,6 +17,10 @@ conditional and unconditional examples update the same attention backbone and
 denoising cross-entropy objective. The endpoints are rejected because a wholly
 conditioned or wholly unconditioned run cannot train both guidance modes. Small
 finite runs still record exactly which modes actually occurred.
+Initial checkpoints remain inspectable and resumable, but sampling requires an
+actual parameter update and recorded conditional training exposure. Dropped or
+guided sampling additionally requires unconditional training exposure. A short
+run that has not trained the needed modes must continue training before inference.
 
 Approved hard channels have loss weight 1 and soft channels retain Phase 6's
 weight 0.25. Uncertain asserted literary values, alternatives and confidence have

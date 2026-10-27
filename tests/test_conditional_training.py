@@ -7,7 +7,7 @@ import pytest
 
 from nde.conditional.data import Conditions
 from nde.conditional.training import candidate_cost, inspect_checkpoint, sample_candidate
-from nde.corpus.records_io import identity, read_json, read_sealed
+from nde.corpus.records_io import create_record, identity, read_json, read_sealed
 from tests.conditional_support import (
     tiny_conditional_dataset,
     trained_checkpoint,
@@ -45,6 +45,31 @@ def test_actual_layout_training_resume_and_sampling_do_not_require_hidden_target
     assert resumed["losses"] == continuous["losses"]
     assert resumed["optimizer_state"]["state"]
     assert resumed["sampler_position"] == 2
+    no_conditioning = {**resumed, "conditioning_modes": ["unconditional", "unconditional"]}
+    unconditioned_checkpoint = tmp_path / "no-conditioning.json"
+    create_record(unconditioned_checkpoint, no_conditioning)
+    assert (
+        training_command(
+            ["sample", str(unconditioned_checkpoint), "--out", str(tmp_path / "unconditioned")]
+        )
+        == 2
+    )
+    no_unconditional = {**resumed, "conditioning_modes": ["conditional", "conditional"]}
+    conditional_checkpoint = tmp_path / "conditional-only.json"
+    create_record(conditional_checkpoint, no_unconditional)
+    assert (
+        training_command(
+            [
+                "sample",
+                str(conditional_checkpoint),
+                "--guidance-scale",
+                "2",
+                "--out",
+                str(tmp_path / "untrained-guidance"),
+            ]
+        )
+        == 2
+    )
     (tmp_path / "data").rename(tmp_path / "unavailable-training-source")
     checkpoint = run / "checkpoints/step-00000002.json"
     assert training_command(["sample", str(checkpoint), "--out", str(tmp_path / "sample")]) == 0
@@ -64,6 +89,12 @@ def test_training_refuses_capacity_configuration_changes_and_retains_resource_ca
     run = tmp_path / "run"
     assert training_command(["train", str(config), "--out", str(run)]) == 0
     assert read_json(run / "report.json")["status"] == "resource-stop"
+    assert (
+        training_command(
+            ["sample", str(run / "checkpoints/step-00000000.json"), "--out", str(tmp_path / "zero")]
+        )
+        == 2
+    )
     assert training_command(["resume", str(config), "--out", str(run)]) == 0
     assert read_json(run / "report.json")["tokens"] == 0
     config.write_text(json.dumps({**json.loads(config.read_text()), "max_tokens": 100000}))

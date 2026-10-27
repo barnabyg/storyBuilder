@@ -360,6 +360,15 @@ def candidate_cost(
 ) -> tuple[int, int]:
     if not math.isfinite(guidance_scale) or not 0 <= guidance_scale <= MAX_GUIDANCE:
         raise ValueError("guidance scale must be finite and between 0 and 8")
+    if checkpoint["step"] < 1 or (
+        checkpoint["parameter_sha256"] == checkpoint["binding"]["initial_parameter_sha256"]
+    ):
+        raise ValueError("conditional sampling requires actual trained parameter updates")
+    modes = set(checkpoint["conditioning_modes"])
+    if "conditional" not in modes:
+        raise ValueError("conditional sampling requires recorded conditional training exposure")
+    if guidance_scale != 1 and "unconditional" not in modes:
+        raise ValueError("dropped/guided sampling requires unconditional training exposure")
     config = TrainingConfig.model_validate(checkpoint["binding"]["config"])
     _context(config, Conditions.model_validate(conditions))
     passes = 1 if guidance_scale in {0.0, 1.0} else 2
