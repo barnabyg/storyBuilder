@@ -1,8 +1,50 @@
 # Narrative Diffusion Engine — Implementation Plan
 
-**Status:** Draft v1, for review
-**Date:** 18 October 2026
+**Status:** Working plan v3; tooling through Phase 6 on `main`; later scientific gates not yet recorded here
+**Created:** 18 October 2026
+**Updated:** 27 October 2026, reconciling implementation, issue status and scientific evidence
 **Source:** [Narrative_Diffusion_Writing_Engine_Proposal.md](../Narrative_Diffusion_Writing_Engine_Proposal.md)
+
+## Current position
+
+- **Phase 0 complete:** G0 passed on 18 October; the gateway, cache, budgets,
+  experiment registry and canonical verification are implemented.
+- **Phase 1 complete:** G-instr closed on 20 October through its pre-registered
+  fail action. The owner's coherence scoring is the validated structural
+  instrument; the LLM judge is diagnostic only. The 10 dev briefs and 30 frozen
+  test briefs are in place.
+- **Phases 2–5 tooling implemented:** the schema/annotation workflow, C and D
+  planners, registered evaluations, extraction pilot and G2 export/scaling
+  controls are on `main`. Their implementation issues are closed.
+- **Phase 6 tooling is also on `main`:** structural encoding, protected
+  datasets, local denoising/matched AR training, scoring, audits, sweeps, G3
+  reporting and the optional augmentation workflow. Issues #66–75 remain open
+  as of this update; reconcile their acceptance/closure separately from code
+  availability. This plan update does not close them.
+- **Implementation is not a scientific pass.** No genuine G-schema, G1, G-D,
+  G2 or G3 outcome is recorded in this plan. Synthetic fixture criteria can
+  pass while the scientific outcome remains pending. Closed implementation
+  tickets and green verification do not authorise later research phases.
+- **Next research work:** complete/replay the real G-schema owner evidence,
+  make the dev tier selection and commit a G1 protocol before generation and
+  blind reading. Real D/corpus experiments require G1; real reconstruction
+  requires G1 and G2. Phase 7 remains conditional on G3. Phases 7–8 are not
+  implemented.
+
+| Phase | Implementation status on `main` | Implementation issues | Operating guide |
+| --- | --- | --- | --- |
+| P2 | Schema, validators, tiers, cards, annotation/review and G-schema evidence | [#32–38](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP2%5D%22), closed | [Plans](narrative-plans.md), [annotations](annotations.md), [G-schema](schema-evidence.md) |
+| P3 | State ledger, C, equal budgets, realisation, tier selection, G1 admission/decision | [#39–47](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP3%5D%22), closed | [C](baseline-c.md), [G1 workflow](g1-workflow.md), [G1 decision](g1-decision.md) |
+| P4 | Masked revision, coarse-to-fine D, bounded critic, controls/diversity, G-D | [#48–55](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP4%5D%22), closed | [Revisions](revisions.md), [D](baseline-d.md), [G-D](gd.md) |
+| P5 | Provenance, splits, segmentation/features, independent extraction, pilot/review, exports and exemplars | [#56–65](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP5%5D%22), closed | [Corpus](corpus.md), [extraction](extraction.md), [G2](corpus-g2.md) |
+| P6 | Codec/tasks, datasets, CPU ML models, paired evaluation, audits/sweeps, G3 and augmentation | [#66–75](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP6%5D%22), open; tooling present | [Training](reconstruction-training.md), [experiments](reconstruction-experiments.md), [G3](reconstruction-evaluation.md) |
+
+Status above was checked against `main` at `47e25b6` and GitHub Issues on
+27 October 2026. The dated G0/G-instr results below remain historical records;
+the task tables retain their original plan IDs, which differ from GitHub issue
+numbers. Operating guides describe the implemented interfaces. Future changes
+to scientific criteria require a new committed protocol, not reinterpretation
+of a completed result.
 
 ## 1. Decisions taken for this plan
 
@@ -17,7 +59,7 @@
 
 - One developer, part-time. Effort is given in relative sizes, not dates.
 - Gate evaluations use stories of about **2,000 words with 5–8 scenes**. That is long enough for setup/payoff and arc shape to matter, and short enough to read about 30 pairs in roughly 10 hours.
-- No GPU decision is needed before Phase 6. A consumer GPU with 12–24 GB is assumed to be enough for the first denoiser prototypes. Rented cloud GPU is the fallback.
+- Implementation verification uses tiny local CPU models and needs no GPU or model downloads. Before real Phase 6 training, select compatible local pretrained weights and measure resource requirements; neither the current tests nor a nominal GPU memory size establishes feasibility. Other model architectures need an explicit adapter.
 - The corpus is public-domain only at first (Standard Ebooks, Project Gutenberg). Licensed modern fiction is out of scope until Phase 6 shows that data volume is the bottleneck.
 
 ## 2. Strategy: how this plan de-risks the build
@@ -26,8 +68,8 @@ The proposal's stages are sound, but run in their listed order they would spend 
 
 1. **Test the core thesis before building the corpus pipeline.** The proposal's recommended first experiment compares beat-only plans with multi-channel plans. It needs no extracted corpus, because both plans can be generated by prompting. If richer plans do not improve stories, the large annotated dataset is only useful for training, and training would no longer be justified. So the cheap thesis test (Phase 3) runs **before** extraction at scale (Phase 5).
 2. **Validate the measuring instrument before trusting it.** With a single human evaluator, the evaluation harness is the riskiest component. Phase 1 proves that it can detect a known, deliberately caused degradation before any real comparison is run.
-3. **Spend owner reading time only on gate decisions.** LLM judge panels screen ablations and variants. The owner reads blind only at the gates, and the judges are checked against the owner's verdicts at every gate.
-4. **Make the strongest non-diffusion baseline the bar diffusion must clear.** Iterative refinement (Candidate D) is built and tuned before any denoiser. A trained model is only worth pursuing if it beats D at equal budget (proposal §10.3).
+3. **Budget owner reading for development and gates.** Following G-instr, deterministic checks and small owner-reviewed dev samples screen ablations and variants. LLM judges provide diagnosis only until validated for the intended task against the owner's verdicts. Allow for that additional owner reading before scheduling a gate.
+4. **Make the strongest non-diffusion baseline the bar diffusion must clear.** Iterative refinement (Candidate D) is built and tuned before any denoiser. A trained model is only worth pursuing if it beats the reference baseline at equal budget: D if G-D passes, otherwise C (proposal §10.3).
 
 Every phase ends in a **gate** with a pre-registered pass criterion and an explicit **fail action**. Stopping after any gate still leaves usable outputs: a benchmark, a schema, a planner, a dataset.
 
@@ -49,6 +91,10 @@ P0 Foundations ─► P1 Benchmark + instrument check ─► P2 Schema v0 ─►
 
 Phases 4 and 5 are independent and can run in parallel, for example on separate branches or worktrees.
 
+This diagram describes scientific prerequisites. Fixture-based software has
+been implemented through Phase 6 ahead of those decisions; real workflows
+retain evidence checks and do not infer permission from code availability.
+
 ## 3. Cross-cutting foundations
 
 These pieces are built once in Phase 0 and used by every later phase.
@@ -60,7 +106,7 @@ These pieces are built once in Phase 0 and used by every later phase.
 - **Response cache.** Calls are content-addressed by (provider, model, params, prompt-template version, rendered prompt, seed) and stored in SQLite. This makes re-runs free and reproducible, and lets an analysis be re-run without new spend.
 - **Cost ledger and hard budget caps** per run and per day. A run aborts cleanly when it exceeds its cap.
 - **Structured output.** Requests use JSON-schema mode where the provider supports it. Each response is validated against Pydantic, followed by at most N repair attempts. Schema-validity rate and repair rate are logged **per model**, because this is the most likely failure point for low-cost models.
-- **Family separation rule.** The judge and critic must come from a different model family than the planner and prose generator being judged, to reduce self-preference bias.
+- **Family separation rule.** The judge and critic must come from a different model family than the planner and prose generator being judged, to reduce self-preference bias. Any waiver must be explicit in config and reported with the result; the G-instr waiver was specific to that experiment and is not automatic permission for later comparisons. Critic suggestions are bounded by validators and owner review, not treated as validated evaluation scores.
 
 ### 3.2 Experiment registry (`nde.runs`)
 
@@ -85,24 +131,35 @@ These pieces are built once in Phase 0 and used by every later phase.
   5. tests (`pytest`)
   6. dependency audit (`pip-audit`) and a secret scan
   7. build check (`uv build`)
-- A localhost live verification dashboard, required by the global verification guidance, is part of the Phase 0 tooling.
-- CI runs the same command headless. No git remote exists yet, so setting one up is a Phase 0 task.
+- An optional localhost live verification dashboard is implemented; headless verification uses the same gates.
+- GitHub hosts `barnabyg/storyBuilder`, with `main` as the default branch. GitHub Actions runs the same command headless on pushes and pull requests; remote and CI setup are complete.
+- CI has a second CPU ML job: `uv sync --locked --group ml`, then
+  `NDE_REQUIRE_ML=1 uv run --locked --group ml nde-verify` (set the environment
+  variable separately in PowerShell). It runs actual parameter updates,
+  checkpoint recovery and paired inference without downloading weights. The
+  ordinary dependency set stays lightweight; optional ML tests may skip there.
 - LLM calls are never made in unit tests. Tests use recorded cache fixtures. A separate opt-in `live` test marker exercises the real providers.
+- Automated command/file/report tests are the primary implementation acceptance
+  evidence. Browser tests cover critical reader flows when the documented
+  installed-browser prerequisite is enabled. Remaining owner work is literary
+  evidence and scientific interpretation, not routine regression testing.
 - Each phase is developed on its own feature branch, with one commit per ticket.
 
 ### 3.5 Repository layout
 
 ```text
 src/nde/
-  schema/     Pydantic models, JSON Schema export, deterministic validators
+  schema/     released brief, benchmark and response models
+  narrative/  versioned plans, validators, tiers, ledger and scene cards
   llm/        gateway, cache, cost ledger, structured-output repair
   runs/       experiment registry, manifests, report generation
-  plan/       planners (beats, structured, refine), state ledger
+  plan/       B/C/D planning, imports, masked revision and critic refinement
   prose/      scene-level prose realisation
-  eval/       judges, blind reader app, statistics
-  corpus/     acquisition, provenance, segmentation, deterministic features   (P5)
-  extract/    LLM annotation passes, agreement analysis                      (P5)
-  denoise/    tokenisation, denoisers, AR comparison model                   (P6+)
+  eval/       judges, blind reader, strict readiness, G1/G-D protocols
+  annotations/ source-linked draft/correction sessions and owner review
+  evidence/   reproducible G-schema evidence and mutation registry
+  corpus/     acquisition, splits, segmentation/features, extraction, G2/export
+  reconstruction/ codec, datasets, native ML, scoring, audits, sweeps and G3
 prompts/      versioned prompt templates
 configs/      experiment configs
 benchmark/    briefs (dev/test), rubric, pre-registrations, gold annotations
@@ -113,27 +170,82 @@ tests/
 
 ## 4. Evaluation protocol with a single evaluator
 
-This protocol applies to every gate and is designed in Phase 1.
+This protocol applies to future gates and incorporates the Phase 1 decisions.
 
 - **Splits.** About 40 briefs are split into 10 **dev** briefs, used freely during development, and 30 **test** briefs. Outputs for test briefs are generated only for gate runs and read only blind.
   - **The test split is frozen (20 October 2026):** `brief-11` to `brief-40`, checksums in `benchmark/frozen.json`. The briefs were LLM-drafted through `configs/draft-briefs.yaml` (run `20261020T195417Z-draft-briefs-7b48ae`, 40 drafts), given a first curation pass by Claude (10 rejected, light edits) and reviewed and accepted by the owner. Drafts 2, 7, 8, 11, 20, 22, 23, 26, 28 and 37 were rejected; the rest became `brief-11` to `brief-40` in draft order. The run directory and drafts are local only (`runs/` and `benchmark/drafts/` are gitignored).
-- **Statistical power.** Each gate uses paired forced-choice preferences with a two-sided exact binomial test:
-  - 30 pairs detect a **≥75% win rate** with about 80% power at α = 0.05. This is enough for a pilot gate to catch a large effect, but a null result does not rule out a moderate one.
-  - About 80 pairs are needed to detect a **65% win rate**. Use this for a final decision if a 30-pair pilot is promising but not significant.
+- **Sample unit and size.** A story-comparison gate uses one pair per distinct
+  brief at a fixed, pre-registered sample size. G1 defaults to the 30 frozen
+  test briefs. A null result at that size does not rule out a moderate effect.
+  About 80 distinct briefs is a planning target for a larger confirmation or
+  final comparison; calculate power for its primary metric, expected ties and
+  chosen threshold before committing that protocol. Additional seeds on one
+  brief do not create independent brief-level observations.
+- **No automatic extension.** Reading 30 pairs does not authorise topping up
+  the same significance test to 80. A larger follow-up requires a separate,
+  pre-registered fixed-size experiment on fresh held-out briefs, reported
+  separately. The existing frozen test split must remain unchanged; a new
+  benchmark version, checksums and tooling support are prerequisites. Any
+  sequential or pooled analysis needs its stopping rule and error control
+  specified before the first relevant batch is read.
 - **Reading cost.** At about 2,000 words per story, budget about 20 minutes per pair, so about 10 hours for a 30-pair gate.
 - **Leakage controls.**
   - All conditions use the same prose model and prose prompt template.
-  - Story length is held within ±10% of target; outputs outside that range are regenerated.
+  - Story length is held within ±10% of target. Regenerate outside that range
+    only within pre-registered attempt and cost caps. If either story remains
+    out of range or generation fails, the batch is not ready for gate reading:
+    resolve the problem before reading or record the gate as incomplete. Do
+    not silently drop the pair or reduce n. Current generation retains the
+    closest draft and flags it, and batch creation can omit failed stories;
+    the implemented strict readiness and registered gate workflows enforce
+    this policy; ordinary non-gate batch creation retains its old behaviour.
+    This does not retroactively alter G-instr's explicit allowance for short
+    stories.
   - Headers and markup are stripped.
   - Reading happens at least 48 hours after the owner last worked on the generating code.
   - If the owner's condition guesses are right in more than about 70% of pairs, the gate is flagged as possibly unblinded.
-- **LLM judge panel.** At least two model families, each judging every pair in both orders to cancel position bias. Judges are used for screening and diagnosis. Their agreement with the owner (percentage agreement and Cohen's κ) is reported at every gate. **Judges never pass a gate on their own.** After G-instr (20 October 2026) the LLM judge is not validated for structural judgement, so it is not used for screening; it is reported for diagnosis only, until a judge is validated against the owner's verdicts.
+- **LLM judge panel.** Judges are diagnostic only following G-instr. When run,
+  use at least two model families, with pairwise comparisons in both orders,
+  or explicitly record a family-rule waiver. Report agreement with the owner
+  (percentage agreement and Cohen's κ), ties and position consistency.
+  Screening can resume only after validation for the intended task against
+  owner scores under a pre-registered protocol on separate dev data.
+  Until then, small owner-reviewed dev samples and deterministic checks
+  select variants. Judges never pass a gate on their own, and revalidating
+  a judge is not a prerequisite for Phase 2 or G1.
 - **Structure as its own measure** (decided after G-instr attempt 1). The owner's
   natural "which is better" judgement weighs the quality of the writing, so it can
   miss structural differences when the prose is equally good. Gates that test
   structure therefore make a required structural score (the rubric's coherence)
   the primary metric, with the overall preference as a secondary signal.
-- **Pre-registration.** Before each gate run, `benchmark/prereg/<gate>.md` is committed with the hypothesis, primary metric, n, pass threshold and fail action. Thresholds suggested in this plan are defaults to confirm at that point.
+  For G1 and other registered win-count comparisons, count a win only when
+  the candidate scores strictly higher; ties count as non-wins and stay in
+  the denominator. Report the two-sided exact binomial
+  test against a win probability of 0.5, as the reader report does. Put the
+  candidate first in the batch's `--from` arguments, because the report tests
+  that first condition. A pass requires the pre-registered win threshold in
+  the candidate's favour; a small two-sided p-value alone is insufficient.
+  Report overall preference and originality separately, without substituting
+  them for coherence. G-D instead applies its separately registered mean
+  paired difference and margin; it does not reuse the G1 win threshold.
+- **Pre-registration.** Before each gate run, commit its supported
+  machine-readable protocol and a human-readable account of the hypothesis,
+  candidate and comparator, primary metric,
+  distinct brief IDs and checksums, n, tie treatment, pass threshold, required
+  rubric scores, reading mode, originality safeguard, length and budget
+  admission checks, stopping rule and fail action. Specify the margin and
+  analysis for any claim of "not worse" or "at least as good"; a
+  non-significant difference alone does not establish it. Thresholds in this
+  plan are defaults to confirm at that point. Preserve completed protocols and
+  results; amendments govern new runs, not results already read.
+  The historical G-instr protocol remains in `benchmark/prereg/g-instr.md`.
+  G1, G-D, G2 and G3 now have versioned JSON protocols and evidence bindings;
+  follow their operating guides rather than treating a prose checklist as
+  sufficient admission. G2 criteria are frozen before owner labels; G3 is
+  registered before held-out predictions, paired scores and owner meaning
+  labels. The supported G1 originality and G-D coherence/originality analysis
+  is a registered mean paired difference with a margin: a **descriptive**
+  safeguard, not inferential noninferiority. Unsupported analyses are rejected.
 - **Scope of claims.** Gate results describe the owner's taste. That is acceptable for research-first internal decisions. A small external panel is a prerequisite for any public claim.
 
 ## 5. Phases
@@ -208,7 +320,7 @@ schema simplification and no mid-tier model are needed.
 | P1.8 | **Instrument check:** B against **B-scrambled**, where scene order is shuffled and the prose regenerated, on 10 dev briefs. Read blind by the owner and scored by the judges. |
 | P1.9 | Calibration: the owner rates 3–5 public-domain human short stories and some Baseline A/B outputs, to anchor the rubric scale |
 
-**Exit gate:**
+**Original exit gate (historical; amended for attempt 2 below):**
 - The owner prefers intact B over scrambled in **≥9 of 10 pairs**.
 - Both judge families agree with the owner in ≥80% of those pairs (for
   G-instr: the single judge; see the judge decision below).
@@ -294,6 +406,12 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 
 ### Phase 2 — Narrative schema v0 (M) — proposal Stage 1
 
+**Implementation:** complete on `main`; issues #32–38 closed. The released
+plan schema is version `1` (the phase's "v0" is its original design label).
+G-schema reporting includes 44 registered semantic mutation categories and
+four valid controls. Actual gold corrections, timing and meaningful-trajectory
+review remain separate gate evidence. See [the evidence workflow](schema-evidence.md).
+
 **Goal:** the smallest inspectable representation that can express meaningful differences between scenes and stories.
 
 **Design decisions made here:**
@@ -304,12 +422,16 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 
 | Ticket | Work |
 | --- | --- |
-| P2.1 | Pydantic models: Story, Arc, Scene, Beat, CharacterState, Relationship, KnowledgeFact (with holders and reveal point), ReaderAffect, Tension, Theme, Motif, Discourse (observables), Subtext, Constraint, Edge. Export to JSON Schema. Schema version field and migration stub. |
+| P2.1 | Pydantic models: Story, Arc, Scene, Beat, CharacterState, Relationship, KnowledgeFact (with holders and reveal point), ReaderAffect, Tension, Theme, Motif, Discourse (observables), Subtext, Constraint, Edge. Export to JSON Schema. Schema version field and migration stub; preserve readable existing brief, outline and run formats. Include one complete example plan. |
 | P2.2 | Deterministic validators: referential integrity; causes point backwards in time; setups precede payoffs; unpaid setups are flagged; no character uses knowledge before its reveal; character presence is consistent; hard constraints hold |
 | P2.3 | Validator **mutation tests**: inject at least 20 known violation types into valid plans and require that **≥95%** are caught |
 | P2.4 | **Representation tiers** for later ablation. **S:** beats only. **M:** beats plus goals/beliefs, causality and information state. **L:** all channels. Generated as projections of one schema. |
 | P2.5 | Gold annotations: 3–5 public-domain short stories annotated to tier L. An LLM drafts each one and the owner corrects it; the owner's correction time per story is recorded. |
 | P2.6 | Plan renderer: schema to readable Markdown/HTML "scene cards", needed for reviewing gold annotations and generated plans |
+
+**Implementation order:** P2.1 first; then P2.2–P2.3 and P2.4. Build P2.6
+before owner correction in P2.5, so the schema's usability is tested through
+the renderer. Keep the ticket IDs stable even though P2.6 precedes P2.5.
 
 **Exit gate:**
 - The gold annotations show visibly different state trajectories between stories, so the schema is not flattening them.
@@ -320,33 +442,63 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 
 ### Phase 3 — Core thesis test: structured planning (M–L) — proposal Stage 3, moved earlier
 
+**Implementation:** complete on `main`; issues #39–47 closed, including
+P3.0 strict readiness. Generated/imported C plans retain planning provenance
+and costs; all tiers use B's shared prose contract. Real G1 additionally
+requires a passed owner G-schema packet, current dev selection and committed
+protocol. No real G1 result is added by this status update.
+
 **Goal:** answer the first real question. **Do multi-channel plans produce better stories than beat-only plans at equal budget?**
 
 | Ticket | Work |
 | --- | --- |
+| P3.0 | Gate readiness: check the exact expected brief pairs, successful generation, final story lengths and equal-budget tolerance before opening a gate batch. Reject incomplete batches for gate use and report every unresolved pair. Preserve existing non-gate run and batch formats. |
 | P3.1 | **State ledger:** canon, knowledge holders, open setups, motif registry and character states, updated after each scene and summarised compactly for the prose step |
 | P3.2 | **Baseline C planner:** prompted generation of a tier-L plan. A whole-plan skeleton (arcs, scene functions, ending) comes first, then channels per scene. The plan is validated against the schema, and validator failures are fed back for bounded repair. |
 | P3.3 | Plan-conditioned prose: each scene is realised from its scene record plus the ledger summary, using the same prose model and template as Baseline B |
-| P3.4 | **Realisation check:** for each scene, judge whether the prose realises the planned deltas (belief change, trust change, information reveal, tension shape). Report a realisation rate, and the owner spot-checks a sample. This separates planner failure from prose failure. |
-| P3.5 | Tier ablation (S/M/L) on dev briefs, screened by judges only. This answers proposal §13 decision 1, the smallest useful representation. |
-| P3.6 | **Gate run:** B against C (the best tier) on the 30 test briefs at equal budget, read blind by the owner, with the judges run in parallel |
+| P3.4 | **Realisation check:** review whether prose realises planned deltas (belief change, trust change, information reveal, tension shape). Report owner-reviewed realisation on a specified dev sample; any LLM estimate is diagnostic and reported separately. This separates planner failure from prose failure. |
+| P3.5 | Tier ablation (S/M/L) on dev briefs, screened with validators and a budgeted owner-reviewed sample. LLM judgements are diagnostic only unless separately validated under §4. Freeze the chosen tier before the test run. This answers proposal §13 decision 1, the smallest useful representation. |
+| P3.6 | **Gate run:** C (the chosen tier, first in the batch sources) against B on the 30 frozen test briefs at equal budget, admitted through P3.0. Owner blind reading requires coherence and originality scores for both stories, plus overall preference. Judges, if run, are diagnostic only. |
 
 **Exit gate (Gate 1, the thesis):**
-- C is preferred in **≥21 of 30 pairs** (p < 0.05). This is the default threshold, to be confirmed in the pre-registration.
-- C is not worse on the "originality" rubric dimension.
+- C scores strictly higher than B on **coherence in ≥21 of 30 pairs**; ties
+  count as non-wins (two-sided exact binomial p ≈ 0.043 at 21 wins). This is
+  the default positive-direction threshold, to be confirmed in the
+  pre-registration. Overall preference is secondary.
+- C meets the pre-registered "not worse" safeguard on **originality**, with
+  required scores for both stories and an explicit margin and analysis.
 
-**Promising but inconclusive** (about 17–20 of 30): run the remaining test-brief pairs up to about 80 before deciding.
+**Promising but inconclusive** (for example, 17–20 coherence wins of 30): G1
+has not passed. At most one follow-up is allowed: either a larger unchanged
+comparison on fresh held-out briefs under §4, or the diagnostic retry below.
+Do not add pairs to the completed test or tune against its revealed stories.
 
 **Fail action:**
-- First diagnose. If the realisation rate is low, the prose model is diluting the plans, so retry once with a stronger prose model in **both** conditions. If realisation is fine but stories are not better, the richer plan itself is not helping.
-- If the gate still fails after one diagnostic iteration, **stop the diffusion track**. Ship the schema, benchmark, harness and planner as the result (proposal §14).
+- First diagnose using dev briefs. If owner-reviewed realisation is low, retry
+  once with a stronger prose model in **both** conditions. Pre-register the
+  changed comparison and use fresh held-out briefs; preserve and report the
+  first result separately. If realisation is fine but coherence does not
+  improve, the richer plan itself is not helping.
+- If the gate still fails after the single allowed follow-up, or no follow-up
+  is justified or feasible, **stop the diffusion track**. Ship the schema,
+  benchmark, harness and planner as the result (proposal §14).
 
-**Manual test:**
-- `uv run nde plan --brief benchmark/dev/brief-03.yaml --tier L` writes a plan and its scene-card HTML.
-- `uv run nde story --plan <run-dir>` writes the story.
-- Inspect whether the plan's locked constraints appear in the prose.
+**Implemented workflows:** `uv run nde plan generate configs/plans-c.yaml`
+writes a dev plan and cards. To realise a saved plan, configure
+`baseline_c` with the paired saved-plan/provenance inputs and run
+`uv run nde run <config>`, as documented in [Baseline C](baseline-c.md).
+Use the [realisation packet](realisation.md) to assess actual prose adherence;
+a valid plan or planned-state ledger alone does not establish it. These paid
+dev commands are not required for routine implementation acceptance.
 
-### Phase 4 — Iterative refinement planner, Candidate D (M) — runs only if Gate 1 passes
+### Phase 4 — Iterative refinement planner, Candidate D (M) — real experiments require Gate 1
+
+**Implementation:** complete on `main`; issues #48–55 closed. Channel/span
+operators, global-intention planning, bounded critic refinement, control and
+diversity reports, equal-budget C/D comparisons and G-D admission/decisions
+are implemented. See [D](baseline-d.md) and [G-D](gd.md). A real G1 pass is
+recomputed before registered G-D generation; implementation fixtures cannot
+promote D as the scientific reference baseline.
 
 **Goal:** the strongest non-trained planner. It is diffusion-inspired, uses existing LLMs, and doubles as the first version of structural editing.
 
@@ -355,14 +507,29 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 | P4.1 | Coarse-to-fine generation: story-level arc and affect curve → scene skeleton → full scene channels, each level conditioned on the one above |
 | P4.2 | **Mask-and-regenerate operators:** regenerate a span of scenes or selected channels while locked scenes, edges and constraints stay fixed. This gives structural inpainting and constraint locking (proposal §8). |
 | P4.3 | Critic loop: a critic from a different model family plus the deterministic validators propose targeted issues, and only the affected units are regenerated. The number of iterations is a budget parameter. |
-| P4.4 | **Controllability metrics:** locked elements stay byte-stable across revisions; requested changes such as "two episodes of renewed hope in the middle third" are present (judge plus validator); diversity across seeds is measured structurally, as edit distance over scene functions and edge sets, not over prose |
+| P4.4 | **Controllability metrics:** locked elements stay byte-stable across revisions; requested changes such as "two episodes of renewed hope in the middle third" are checked by validators where expressible and owner review on a specified dev sample; judges are diagnostic only. Diversity across seeds is measured structurally, as edit distance over scene functions and edge sets, not over prose |
 | P4.5 | Gate run: C against D at equal budget on the test briefs, owner blind |
 
-**Exit gate:** D is at least as good as C, and controllability metrics meet their pre-registered targets. D becomes the **reference baseline** for any trained planner.
+**Exit gate:** D meets the pre-registered "at least as good" criterion against
+C on owner coherence scores, with overall preference secondary and the
+originality safeguard from §4, and controllability metrics meet their
+pre-registered targets. D becomes the **reference baseline** for any trained
+planner. Define the comparison margin and analysis before the run.
 
-**Fail action:** D is not required for Phase 6. If it does not beat C, C becomes the reference baseline instead. Either way, record why refinement did not help, since that informs the denoiser design.
+**Fail action:** D is not required for Phase 6. If it does not meet the exit
+criteria, C becomes the reference baseline instead. Either way, record why
+refinement did not help, since that informs the denoiser design. Later phases
+use "reference baseline" to mean D if G-D passes, otherwise C.
 
 ### Phase 5 — Extraction pilot and corpus (L) — proposal Stage 2; can run in parallel with Phase 4
+
+**Implementation:** complete on `main`; issues #56–65 closed, including
+optional exemplar comparisons. The pipeline supports source-linked corpus
+acquisition, author-disjoint frozen cohorts, segmentation/features, independent
+model-family extraction, a resumable pilot and bounded stratified review.
+The [G2 workflow](corpus-g2.md) gates real training exports and larger runs on
+replayed scientific evidence. Available software is not evidence that the
+50-story pilot, owner review or 300–1,000-story expansion has been completed.
 
 **Goal:** find out which channels can be extracted reliably from human fiction, and build the training dataset needed if diffusion is pursued.
 
@@ -374,16 +541,22 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 | P5.4 | LLM extraction to the schema in passes per channel group, with **at least two model families** per story on the pilot sample. Evidence spans are required, and disagreements are stored, not merged away. |
 | P5.5 | Reliability analysis per channel: inter-model agreement, agreement with the owner on a stratified review sample, and agreement with the P2.5 gold stories. Each channel is classified as **reliable**, **weak** (soft target only) or **unmeasurable** (dropped from training targets). |
 | P5.6 | Pilot on about 50 stories, then a cost-per-story estimate. Scale to about 300–1,000 stories only after P5.5 passes. |
-| P5.7 | Optional: use extracted human plans as few-shot exemplars for the C and D planners, and screen whether grounding in human structure reduces generic plans |
+| P5.7 | Optional: use extracted human plans as few-shot exemplars for the C and D planners, and screen on dev briefs with deterministic checks and owner review whether grounding in human structure reduces generic plans; judges are diagnostic only |
 
 **Exit gate (Gate 2):**
 - Core channels (plot events, causality, information state, character goals and beliefs) are rated **reliable**.
 - The owner judges at least about 80% of reviewed annotations "accurate or defensible".
 - Scaling cost fits the budget.
 
-**Fail action:** restrict the training representation to the reliable channels. If the core causal and knowledge channels are unreliable, a trained planner cannot learn them from this data, so stop before Phase 6 and keep D as the result.
+**Fail action:** restrict the training representation to the reliable channels. If the core causal and knowledge channels are unreliable, a trained planner cannot learn them from this data, so stop before Phase 6 and keep the reference baseline as the result.
 
 ### Phase 6 — Denoising feasibility (L) — proposal Stage 4; requires Gates 1 and 2
+
+**Implementation:** tooling present on `main`; issues #66–75 are still open
+and need acceptance/closure reconciliation. The codec, corruption tasks,
+author-safe datasets, CPU models, paired scoring, overlap audit, bounded
+sweeps, registered G3 and optional augmentation are documented below. No
+scientific G3 pass or real pretrained-model result is recorded here.
 
 **Goal:** show that plans survive corruption and recovery better than a matched autoregressive model, before any conditional generation is attempted.
 
@@ -400,8 +573,36 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 | P6.2 | Masking schedules: random fields, whole scenes, whole channels, contiguous spans (the middle act) |
 | P6.3 | Denoiser prototype, a fine-tuned small pretrained model with a masked-denoising objective |
 | P6.4 | **Matched AR comparison model:** same base model, same data, same parameter count, trained left to right with infilling. This is required to attribute any gain to denoising (proposal §9 item 8). |
-| P6.5 | Reconstruction metrics per masking rate (10–70%): field accuracy per channel, edge recovery F1, validator pass rate, and a judge-assessed "meaning preserved" score on a sample |
+| P6.5 | Reconstruction metrics per masking rate (10–70%): field accuracy per channel, edge recovery F1, validator pass rate, and an owner-reviewed "meaning preserved" assessment on a specified sample; any judge score is diagnostic only |
 | P6.6 | Memorisation check: nearest-neighbour similarity of reconstructions and samples against the training plans |
+
+**Implemented scope and limits:**
+
+- [Codec/tasks](reconstruction-codec.md): a fixed 260-token byte vocabulary,
+  canonical typed slots and references, explicit list lengths, and hard/soft/
+  excluded policies. Retained views are not complete tier-L annotations.
+  Masking supports fields, scenes, channels and contiguous canonical field
+  spans; requested and actual rates are recorded separately.
+- [Datasets](reconstruction-data.md): whole-story/window/scene examples and
+  separate evaluator-only author-disjoint views. Partial windows disable
+  graph-channel targets when external context is unavailable. They do not
+  teach omitted cross-window edges as negative facts.
+- [Local training](reconstruction-training.md): the supported native backbone
+  is a residual output-query attention/MLP block with byte/position embeddings.
+  Local pretrained weights can be registered with provenance; unrelated model
+  architectures need an adapter. Random initialization is test-only. Denoising
+  and causal AR use matched base identities, parameter counts and declared
+  resource caps; unequal actual inference work is reported, not called equal.
+- [Scoring/G3](reconstruction-evaluation.md) and
+  [sweeps](reconstruction-experiments.md): masked-field and long-range edge
+  recovery, full failure denominators, overlap audits, 25/50/100% author-grouped
+  subsets and durable training/inference token/time limits. One G3 protocol
+  covers one audited training population; owner meaning review is separate and
+  enforced when required by the registered protocol.
+- [Augmentation](reconstruction-augmentation.md): a separately reported local
+  training-label transformation ablation. It makes no provider calls and does
+  not claim new literary structure or independent human stories. Broader
+  LLM-generated-plan augmentation remains future experimental work.
 
 **Exit gate (Gate 3):**
 - At 30–50% masking, the denoiser's reconstructions pass the validators at a pre-registered rate.
@@ -411,6 +612,10 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 
 ### Phase 7 — Conditional diffusion planner, Candidate E (L) — proposal Stage 5
 
+**Implementation:** not started. Begin real conditional-generation work only
+after a genuine G3 pass; reconstruction software or synthetic criteria are
+insufficient. No E pipeline is currently available.
+
 **Goal:** generate new whole-story plans from briefs.
 
 | Ticket | Work |
@@ -419,15 +624,23 @@ diagnosis only. G-instr is closed, and so is Phase 1.
 | P7.2 | Generation from a fully masked plan with locked constraints; inference-time validator checks, with rejection or targeted re-masking of invalid units |
 | P7.3 | Hybrid decoding: E proposes the structure, and an LLM fills in the free-text fields (event descriptions, subtext prose) where the tokenised form is too coarse |
 | P7.4 | Inpainting and alternatives using the same operator interface as P4.2, so that D and E are interchangeable behind one API |
-| P7.5 | Diversity and conventionality: structural diversity across seeds; similarity to training plans and to D's outputs |
+| P7.5 | Diversity and conventionality: structural diversity across seeds; similarity to training plans and to the reference baseline's outputs |
 
-**Exit gate:** E's plans pass the validators at least as often as D's, and judge screening on the dev briefs shows E competitive with D. Only then are owner reading hours spent in Phase 8.
+**Exit gate:** E meets the pre-registered validator pass-rate comparison
+against the reference baseline, and a budgeted owner-reviewed dev sample
+shows E competitive on structure under a defined criterion. Judges are
+diagnostic only unless separately validated under §4. Only then commit to
+the larger owner reading workload in Phase 8. Allow at most one development
+iteration if this gate fails, then stop.
 
 ### Phase 8 — End-to-end evaluation and decision (M) — proposal Stage 6
 
+**Implementation:** not started. The existing reader and gate infrastructure
+are reusable foundations; the E comparison and final decision are future work.
+
 | Ticket | Work |
 | --- | --- |
-| P8.1 | Final comparison at equal budget: B, C, D and E with the same prose model. The owner reads the key pairs blind: E against D (primary) and D against B (context). Use about 80 pairs for the primary comparison if the pilot is promising. |
+| P8.1 | Final comparison at equal budget with the same prose model. The owner reads E against the reference baseline (D if G-D passed, otherwise C) as the primary comparison, and that baseline against B for context. Coherence is primary; overall preference is secondary and originality is a required safeguard. Plan a separately pre-registered, fixed-size comparison on about 80 fresh held-out briefs under §4; prepare and freeze that benchmark version before generation. |
 | P8.2 | Error analysis by failure tag; cost per story for each condition |
 | P8.3 | Decision report against proposal §10's core criterion: does E repeatably and meaningfully beat the strongest equal-budget structured baseline? |
 
@@ -435,17 +648,22 @@ Proposal Stage 7 (novel length, graph diffusion, tooling for revision) is **out 
 
 ## 6. Gate summary
 
+Only the dated G0 and G-instr outcomes are recorded scientific decisions in
+this plan. For the remaining rows, implemented gate tooling does not establish
+a result: retain pending status until genuine bound evidence is replayed and
+the outcome is recorded. Phase 6 implementation issues remain open separately.
+
 | Gate | Phase | Question | Default pass (confirm in pre-registration) | If it fails |
 | --- | --- | --- | --- | --- |
 | G0 (passed, 18 Oct 2026) | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
-| G-instr (closed, 20 Oct 2026) | P1 | Does the instrument detect known damage? | Owner ≥9/10, judges ≥80% agreement | Longer stories or excerpts; adjust the judges' role. Result: owner 9/10 on coherence (attempt 2); judge 70%, so it was dropped from screening |
-| G-schema | P2 | Is the schema expressive and practical? | Mutation catch ≥95%; correction under about 2 hours per story | Cut channels |
-| **G1** | P3 | **Do multi-channel plans help?** | C ≥21/30 against B | One diagnostic retry, then stop the diffusion track |
-| G-D | P4 | Does refinement help? | D ≥ C, controllability targets met | C becomes the reference baseline |
-| **G2** | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
-| **G3** | P6 | Does denoising beat AR on long-range structure? | Pre-registered margin over the matched AR model | Stop; D or C is the result |
-| G-E | P7 | Is E competitive enough to evaluate? | Validity and judge screening ≥ D | Iterate once, or stop |
-| **Final** | P8 | Does diffusion deliver a real gain? | E beats D, significant at the planned n | A valid negative result; publish the internal report |
+| G-instr (closed, 20 Oct 2026) | P1 | Does the instrument detect known damage? | Historical: owner ≥9/10 coherence wins, judge ≥80% agreement | Owner 9/10; judge 70%. Closed through the fail action: owner coherence is the instrument, judges diagnostic only |
+| G-schema (not recorded) | P2 | Is the schema expressive and practical? | Mutation catch ≥95%; correction under about 2 hours per story | Cut channels |
+| **G1** (not recorded) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in ≥21/30 pairs; ties are non-wins; originality safeguard met | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
+| G-D (not recorded) | P4 | Does refinement help? | D meets pre-registered coherence comparison against C, originality safeguard and controllability targets | C becomes the reference baseline |
+| **G2** (not recorded) | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
+| **G3** (not recorded) | P6 | Does denoising beat AR on long-range structure? | Pre-registered validator target and positive long-range margin over matched AR | Stop; D or C is the result |
+| G-E (future) | P7 | Is E competitive enough to evaluate? | Pre-registered validity comparison and owner-reviewed dev structure criterion against the reference baseline | Iterate once, then stop if still below criteria |
+| **Final** (future) | P8 | Does diffusion deliver a real gain? | E beats the reference baseline on owner coherence at the fixed planned n; originality safeguard met | A valid negative result; publish the internal report |
 
 ## 7. Risk register
 
@@ -455,7 +673,9 @@ Mapped to the uncertainties in proposal §9.
 | --- | --- | --- | --- |
 | Low-cost models are unreliable on nested structured output | — | P0.7 | Per-model validity metrics; smaller sub-schemas; a mid-tier fallback for one role only |
 | Single-evaluator bias or broken blinding | §9.10 | P1.8, every gate | Condition-guess tracking, 48-hour delay, sealed keys, pre-registration |
-| The prose model dilutes the plans | §9.7 | P3.4 | Realisation rate reported separately from preference |
+| The prose model dilutes the plans | §9.7 | P3.4 | Owner-reviewed realisation reported separately from coherence and overall preference |
+| Unvalidated judges steer variant selection | §9.10 | P3.5, P7 | Deterministic checks and owner-reviewed dev samples; judges diagnostic until separately validated |
+| Gate inputs or sample size change after results are known | §9.10 | P3.0, every gate | Exact pair, length and budget checks before reading; fixed n, explicit tie rules and fresh held-out follow-ups |
 | Annotator clichés and bias | §5.3 | P5.4–P5.5 | Two or more model families, retained disagreements, owner review, gold stories |
 | Labels that cannot be measured | §9.1 | P5.5 | Reliable/weak/unmeasurable classification; weak channels used as soft targets only |
 | Too little data for diffusion | §9.9 | P6 | Pretrained initialisation, window-level samples, augmentation tested as an ablation |
@@ -481,9 +701,31 @@ Mapped to the uncertainties in proposal §9.
 
 ## 9. Still open
 
-These do not block Phase 0.
+Implementation through Phase 6 does not resolve the following scientific and
+operational work. Keep missing evidence pending rather than repeating fixture
+checks as a substitute for owner judgement.
 
-1. **GPU access** for Phase 6: a local card (which one?) or rented. This is needed before P6 to size the base model.
-2. **Git remote and CI host**, needed in P0.1. GitHub Actions is assumed.
-3. **Brief authorship** in P1.1: **resolved.** Briefs are drafted by an LLM through `configs/draft-briefs.yaml` and curated by the owner (see `docs/briefs.md`). Owner-written briefs would carry less model bias; drafted ones are faster.
-4. **External panel:** whether and when to add other readers before any result leaves the project.
+1. **Research gates:** complete/replay G-schema gold correction, timing and
+   trajectory evidence; then dev realisation review/tier selection, committed
+   G1 registration and blind reading. Follow with independently registered
+   G-D/G2 work and genuine G1/G2 prerequisites for G3. Record each actual
+   outcome; existing gate commands already enforce admission.
+2. **Phase 6 issue close-out:** reconcile #66–75 against current code, focused
+   tests and CPU ML verification, recording remaining gaps before closing.
+   Tooling on `main` is not a reason to manufacture a scientific result.
+3. **Fresh held-out briefs, before a G1 follow-up or Phase 8:** plan authorship,
+   owner curation, benchmark versioning and independent freezing without
+   changing the current test split. Decide the fixed sample size and stopping
+   rule before generating or reading those outputs.
+4. **Real model and compute selection:** choose compatible local pretrained
+   weights (or scope a new adapter), establish measured memory/time capacity
+   and register matched budgets before substantive training. CPU fixture
+   success does not determine a useful model size or GPU requirement.
+5. **External panel, before public claims:** decide whether and when to add
+   readers. Current results describe the owner's judgement only.
+
+**Resolved:** GitHub remote and Actions CI are established. Brief authorship
+is LLM drafting followed by owner curation (see [docs/briefs.md](briefs.md));
+the initial 30 test briefs are frozen. LLM judge screening is suspended under
+the G-instr fail action; separate validation is needed only if screening is
+to resume.
