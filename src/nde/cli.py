@@ -19,6 +19,8 @@ from nde import (
 )
 from nde.annotations import cli as annotation_cli
 from nde.conditional import data as conditional_data
+from nde.conditional import layout as conditional_layout
+from nde.conditional import training as conditional_train
 from nde.corpus import cli as corpus_cli
 from nde.corpus import exemplars, extraction_cli, provenance
 from nde.corpus import export as corpus_export
@@ -69,6 +71,16 @@ def build_parser() -> argparse.ArgumentParser:
             "conditional-data",
             conditional_data.configure,
             "prepare traceable condition-to-plan examples",
+        ),
+        (
+            "conditional-layout",
+            conditional_layout.configure,
+            "encode learned variable layout targets",
+        ),
+        (
+            "conditional-train",
+            conditional_train.configure,
+            "train and sample conditional layout models",
         ),
         ("exemplars", exemplars.configure, "compare approved plan exemplars on dev briefs"),
         (
@@ -328,6 +340,8 @@ def _briefs(args: argparse.Namespace) -> int:
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "conditional-data": conditional_data.run,
+    "conditional-layout": conditional_layout.run,
+    "conditional-train": conditional_train.run,
     "exemplars": exemplars.run,
     "extract": extraction_cli.run,
     "corpus-review": corpus_review.run,
