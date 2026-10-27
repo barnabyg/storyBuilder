@@ -1,15 +1,17 @@
 """Local full-layout denoising, separate from Phase 6 reconstruction contracts."""
 
 import argparse
+import hashlib
 import json
+import math
 import sys
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import Field
 
-from nde.conditional.data import load_dataset
+from nde.conditional.data import CONDITION_ID, Conditions, load_dataset
 from nde.conditional.layout import LAYOUT_ID, Capacity, decode_layout, encode_target
 from nde.corpus.records_io import (
     check_snapshot,
@@ -28,7 +30,9 @@ from nde.reconstruction.model import build, pack, runtime, unpack
 from nde.reconstruction.resources import TimeAllowance
 from nde.reconstruction.training import inspect_model
 
-REPRESENTATION = "nde-layout-denoising-v1"
+REPRESENTATION = "nde-conditional-denoising-v1"
+GUIDANCE_POLICY = "classifier-free-logit-interpolation-v1"
+MAX_GUIDANCE = 8
 
 
 class TrainingConfig(Strict):
@@ -37,6 +41,9 @@ class TrainingConfig(Strict):
     base_model: Path
     capacity: Capacity = Field(default_factory=Capacity)
     adaptation: Literal["native-full-finetune"] = "native-full-finetune"
+    condition_drop_probability: float = Field(default=0.5, gt=0, lt=1, allow_inf_nan=False)
+    max_condition_tokens: int = Field(default=1024, ge=64, le=8192)
+    sampling_temperature: float = Field(default=0.0, ge=0, le=2, allow_inf_nan=False)
     seed: int = 7
     learning_rate: float = Field(default=0.001, gt=0, allow_inf_nan=False)
     max_steps: int = Field(default=10, ge=1, le=100000)
@@ -54,8 +61,17 @@ def _dataset(path: Path) -> dict[str, Any]:
     return load_dataset(path, optimizer=True)
 
 
-def _context(capacity: Capacity) -> list[int]:
-    return tokenize({"representation": REPRESENTATION, "capacity": capacity.model_dump()})
+def _context(config: TrainingConfig, conditions: Conditions | None) -> list[int]:
+    tokens = tokenize(
+        {
+            "representation": REPRESENTATION,
+            "capacity": config.capacity.model_dump(),
+            "conditions": conditions.model_dump(mode="json") if conditions is not None else None,
+        }
+    )
+    if len(tokens) > config.max_condition_tokens:
+        raise ValueError("conditions exceed registered context capacity; truncation forbidden")
+    return tokens + [PAD] * (config.max_condition_tokens - len(tokens))
 
 
 def _scientific(config: TrainingConfig) -> dict[str, Any]:
@@ -78,11 +94,18 @@ def preflight(config_path: Path) -> dict[str, Any]:
     layouts = [encode_target(row["target"], config.capacity) for row in dataset["examples"]]
     if not layouts:
         raise ValueError("conditional dataset has no eligible training examples")
-    if len(_context(config.capacity)) + config.capacity.max_tokens > base["max_positions"]:
+    for example in dataset["examples"]:
+        _context(config, Conditions.model_validate(example["conditions"]))
+    if config.max_condition_tokens + config.capacity.max_tokens > base["max_positions"]:
         raise ValueError("registered layout capacity exceeds base positions; truncation forbidden")
     path = config.dataset / "dataset.json" if config.dataset.is_dir() else config.dataset
     return {
         "representation": REPRESENTATION,
+        "condition_id": CONDITION_ID,
+        "guidance_policy": GUIDANCE_POLICY,
+        "training_condition_policy": (
+            "Bernoulli dropout of entire condition block; all output masked"
+        ),
         "layout_id": LAYOUT_ID,
         "dataset_id": dataset["id"],
         "target_set_id": identity({"layouts": [row["id"] for row in layouts]}),
@@ -119,7 +142,12 @@ def inspect_checkpoint(path: Path, *, validate_inputs: bool = False) -> dict[str
         or binding.get("adaptation") != "native-full-finetune"
     ):
         raise ValueError("unsupported conditional checkpoint architecture/adaptation")
-    if binding.get("representation") != REPRESENTATION or binding.get("layout_id") != LAYOUT_ID:
+    if (
+        binding.get("representation") != REPRESENTATION
+        or binding.get("layout_id") != LAYOUT_ID
+        or binding.get("condition_id") != CONDITION_ID
+        or binding.get("guidance_policy") != GUIDANCE_POLICY
+    ):
         raise ValueError("unsupported conditional representation")
     TrainingConfig.model_validate(binding["config"])
     if validate_inputs:
@@ -176,6 +204,7 @@ def _restore(
             "attention_cells": 0,
             "elapsed_seconds": 0.0,
             "losses": [],
+            "conditioning_modes": [],
             "optimizer_state": None,
             "rng_state": None,
             "reserved_failed_tokens": 0,
@@ -220,7 +249,11 @@ def _update(
     optimizer.zero_grad()
     logits = model.forward(context + [MASK] * width, causal=False, context_length=len(context))
     labels = torch.tensor(target + [PAD] * (width - len(target)), dtype=torch.long)
-    loss = torch.nn.functional.cross_entropy(logits, labels)
+    weights = torch.tensor(batch["weights"] + [1.0] * (width - len(target)), dtype=torch.float32)
+    losses = torch.nn.functional.cross_entropy(logits, labels, reduction="none")
+    loss = (losses * weights).sum() / weights.sum()
+    if not bool(torch.isfinite(loss)):
+        raise ValueError("nonfinite conditional objective; interrupted work reservation retained")
     loss.backward()
     optimizer.step()
     state["step"] += 1
@@ -228,6 +261,7 @@ def _update(
     state["tokens"] += batch["length"]
     state["attention_cells"] += batch["cells"]
     state["losses"].append(float(loss.item()))
+    state["conditioning_modes"].append(batch["conditioning_mode"])
     state["elapsed_seconds"] = timer.elapsed()
     state["model_state"] = model.state()
     state["parameter_sha256"] = identity(state["model_state"])
@@ -259,8 +293,11 @@ def train(
     state["status"] = "complete" if state["step"] == config.max_steps else "partial"
     while state["step"] < stop:
         example = dataset["examples"][state["sampler_position"] % len(dataset["examples"])]
-        target = encode_target(example["target"], config.capacity)["tokens"]
-        context = _context(config.capacity)
+        layout = encode_target(example["target"], config.capacity)
+        target = layout["tokens"]
+        drop = float(torch.rand(1).item()) < config.condition_drop_probability
+        conditions = None if drop else Conditions.model_validate(example["conditions"])
+        context = _context(config, conditions)
         width = config.capacity.max_tokens
         length = len(context) + width
         cells = width * length
@@ -293,9 +330,11 @@ def train(
             {
                 "context": context,
                 "target": target,
+                "weights": layout["loss_weights"],
                 "width": width,
                 "length": length,
                 "cells": cells,
+                "conditioning_mode": "unconditional" if drop else "conditional",
             },
             timer,
         )
@@ -316,18 +355,73 @@ def train(
     return report
 
 
+def candidate_cost(
+    checkpoint: dict[str, Any], conditions: Conditions, guidance_scale: float = 1.0
+) -> tuple[int, int]:
+    if not math.isfinite(guidance_scale) or not 0 <= guidance_scale <= MAX_GUIDANCE:
+        raise ValueError("guidance scale must be finite and between 0 and 8")
+    config = TrainingConfig.model_validate(checkpoint["binding"]["config"])
+    _context(config, Conditions.model_validate(conditions))
+    passes = 1 if guidance_scale in {0.0, 1.0} else 2
+    length = config.max_condition_tokens + config.capacity.max_tokens
+    return length * passes, config.capacity.max_tokens * length * passes
+
+
+def _guided_logits(
+    model: Any,
+    config: TrainingConfig,
+    conditions: Conditions,
+    guidance_scale: float,
+    deadline: float,
+) -> tuple[Any, int, dict[str, str]]:
+    conditional: Any = None
+    unconditional: Any = None
+    passes = 0
+    fingerprints: dict[str, str] = {}
+    modes = [True] if guidance_scale == 1 else [False] if guidance_scale == 0 else [False, True]
+    for conditioned in modes:
+        if time.monotonic() >= deadline:
+            break
+        context = _context(config, conditions if conditioned else None)
+        logits = model.forward(
+            context + [MASK] * config.capacity.max_tokens, causal=False, context_length=len(context)
+        )
+        passes += 1
+        fingerprints["conditional" if conditioned else "unconditional"] = hashlib.sha256(
+            logits.detach().cpu().numpy().tobytes()
+        ).hexdigest()
+        if conditioned:
+            conditional = logits
+        else:
+            unconditional = logits
+    if passes != len(modes):
+        return None, passes, fingerprints
+    if guidance_scale == 0:
+        return unconditional, passes, fingerprints
+    if guidance_scale == 1:
+        return conditional, passes, fingerprints
+    return unconditional + guidance_scale * (conditional - unconditional), passes, fingerprints
+
+
 def sample_candidate(
-    checkpoint_path: Path, conditions: Any = None, *, seed: int = 7, guidance_scale: float = 1.0
+    checkpoint_path: Path,
+    conditions: Conditions | None = None,
+    *,
+    seed: int = 7,
+    guidance_scale: float = 1.0,
+    deadline: float | None = None,
 ) -> dict[str, Any]:
-    if conditions is not None or guidance_scale != 1.0:
-        raise ValueError("layout-only checkpoint does not support literary conditions/guidance")
+    started = time.monotonic()
+    conditions = Conditions.model_validate(conditions or {})
     checkpoint = inspect_checkpoint(checkpoint_path)
     config = TrainingConfig.model_validate(checkpoint["binding"]["config"])
     binding = checkpoint["binding"]
-    model = build(binding["width"], binding["max_positions"], seed, checkpoint["model_state"])
-    context = _context(config.capacity)
+    tokens_required, cells_required = candidate_cost(checkpoint, conditions, guidance_scale)
+    deadline = min(
+        deadline if deadline is not None else float("inf"), started + config.inference_max_seconds
+    )
     width = config.capacity.max_tokens
-    length, cells = len(context) + width, width * (len(context) + width)
+    length = config.max_condition_tokens + width
     result: dict[str, Any] = {
         "status": "invalid",
         "view": None,
@@ -335,41 +429,124 @@ def sample_candidate(
         "diagnostics": [],
         "checkpoint_id": checkpoint["id"],
         "layout_id": LAYOUT_ID,
+        "condition_id": CONDITION_ID,
+        "conditions": conditions.model_dump(mode="json"),
+        "guidance_scale": guidance_scale,
+        "guidance_policy": GUIDANCE_POLICY,
+        "seed": seed,
         "work": {"tokens": 0, "attention_cells": 0, "passes": 0, "elapsed_seconds": 0.0},
     }
-    if length > config.inference_max_tokens or cells > config.inference_max_attention_cells:
+    if (
+        time.monotonic() >= deadline
+        or tokens_required > config.inference_max_tokens
+        or cells_required > config.inference_max_attention_cells
+    ):
         result.update(
             status="resource-stop", diagnostics=["registered inference work cap exceeded"]
         )
         return result
     torch = runtime()
-    started = time.monotonic()
+    torch.set_num_threads(1)
+    model = build(binding["width"], binding["max_positions"], seed, checkpoint["model_state"])
     with torch.no_grad():
-        logits = model.forward(context + [MASK] * width, causal=False, context_length=len(context))
-        tokens = logits.argmax(dim=-1).tolist()
+        logits, passes, fingerprints = _guided_logits(
+            model, config, conditions, guidance_scale, deadline
+        )
+        tokens: list[int]
+        if logits is None:
+            tokens = []
+        elif config.sampling_temperature:
+            probabilities = torch.softmax(logits / config.sampling_temperature, dim=-1)
+            tokens = cast(list[int], torch.multinomial(probabilities, 1).squeeze(-1).tolist())
+        else:
+            tokens = cast(list[int], logits.argmax(dim=-1).tolist())
     elapsed = time.monotonic() - started
     result["generated_tokens"] = tokens
+    result["pass_logit_sha256"] = fingerprints
     result["work"] = {
-        "tokens": length,
-        "attention_cells": cells,
-        "passes": 1,
+        "tokens": length * passes,
+        "attention_cells": width * length * passes,
+        "passes": passes,
         "elapsed_seconds": elapsed,
     }
     try:
-        if elapsed >= config.inference_max_seconds:
+        if time.monotonic() >= deadline or logits is None:
             result["status"] = "resource-stop"
             raise ValueError("registered inference time cap exceeded")
         if EOS not in tokens:
             raise ValueError("layout generation did not terminate with EOS")
         view = decode_layout(tokens[: tokens.index(EOS) + 1], config.capacity)
+        if conditions.scene_range is not None and not (
+            conditions.scene_range[0] <= len(view["scenes"]) <= conditions.scene_range[1]
+        ):
+            raise ValueError("sampled scene count falls outside caller-permitted range")
         result.update(status="complete", view=view)
     except (ValueError, UnicodeDecodeError, TypeError) as error:
         result["diagnostics"] = [str(error)]
     return result
 
 
-def sample(checkpoint_path: Path, out: Path, *, seed: int = 7) -> dict[str, Any]:
-    result = create_record(out / "sample.json", sample_candidate(checkpoint_path, seed=seed))
+def sample(
+    checkpoint_path: Path,
+    out: Path,
+    *,
+    conditions: Conditions | None = None,
+    seed: int = 7,
+    guidance_scale: float = 1.0,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    if (out / "sample.json").exists():
+        raise ValueError("immutable sample already exists; choose a new output directory")
+    conditions = Conditions.model_validate(conditions or {})
+    checkpoint = inspect_checkpoint(checkpoint_path)
+    config = TrainingConfig.model_validate(checkpoint["binding"]["config"])
+    tokens, cells = candidate_cost(checkpoint, conditions, guidance_scale)
+    timer = TimeAllowance(
+        out / "inference-time.json",
+        identity(
+            {
+                "checkpoint_id": checkpoint["id"],
+                "conditions": conditions.model_dump(mode="json"),
+                "seed": seed,
+                "guidance_scale": guidance_scale,
+            }
+        ),
+        config.inference_max_seconds,
+        started,
+    )
+    before_tokens, before_cells = timer.tokens_before, timer.cells_before
+    if (
+        before_tokens + tokens > config.inference_max_tokens
+        or before_cells + cells > config.inference_max_attention_cells
+    ):
+        result = {
+            "status": "resource-stop",
+            "view": None,
+            "generated_tokens": [],
+            "diagnostics": ["durable inference work allowance exhausted"],
+            "work": {
+                "tokens": before_tokens,
+                "attention_cells": before_cells,
+                "elapsed_seconds": timer.elapsed(),
+                "passes": 0,
+            },
+        }
+    else:
+        # Reservation survives an interrupted forward pass; recovery retains the allowance.
+        timer.save(tokens=before_tokens + tokens, cells=before_cells + cells)
+        result = sample_candidate(
+            checkpoint_path,
+            conditions,
+            seed=seed,
+            guidance_scale=guidance_scale,
+            deadline=timer.deadline,
+        )
+        result["work"]["tokens"] += before_tokens
+        result["work"]["attention_cells"] += before_cells
+    result = create_record(out / "sample.json", result)
+    timer.save(
+        tokens=result["work"]["tokens"], cells=result["work"]["attention_cells"], status="complete"
+    )
     report_files(out, "Conditional learned layout proposal", result)
     return result
 
@@ -388,6 +565,8 @@ def configure(parser: argparse.ArgumentParser) -> None:
     sampling.add_argument("checkpoint", type=Path)
     sampling.add_argument("--out", type=Path, required=True)
     sampling.add_argument("--seed", type=int, default=7)
+    sampling.add_argument("--conditions", type=Path)
+    sampling.add_argument("--guidance-scale", type=float, default=1.0)
 
 
 def run(args: argparse.Namespace) -> int:
@@ -402,7 +581,16 @@ def run(args: argparse.Namespace) -> int:
                 max_steps_this_call=args.steps_this_call,
             )
         elif args.conditional_training_command == "sample":
-            result = sample(args.checkpoint, args.out, seed=args.seed)
+            conditions = (
+                Conditions.model_validate(read_json(args.conditions)) if args.conditions else None
+            )
+            result = sample(
+                args.checkpoint,
+                args.out,
+                conditions=conditions,
+                seed=args.seed,
+                guidance_scale=args.guidance_scale,
+            )
         else:
             result = inspect_checkpoint(args.checkpoint)
         print(json.dumps(result, indent=2, sort_keys=True))

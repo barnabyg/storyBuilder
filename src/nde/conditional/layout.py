@@ -10,6 +10,7 @@ from typing import Any, cast
 from pydantic import Field
 
 from nde.conditional.data import load_dataset
+from nde.corpus.channels import CHANNEL_FIELDS
 from nde.corpus.records_io import (
     check_snapshot,
     create_record,
@@ -22,7 +23,8 @@ from nde.corpus.records_io import (
 from nde.llm.config import Strict
 from nde.narrative.models import NarrativePlan
 from nde.narrative.validation import validate_plan
-from nde.reconstruction.codec import detokenize, seal, tokenize
+from nde.reconstruction.codec import canonical_json, detokenize, seal, tokenize
+from nde.reconstruction.tasks import SOFT_WEIGHT
 
 SPECIFICATION = {
     "name": "nde-conditional-layout",
@@ -121,6 +123,52 @@ def validate_layout(view: dict[str, Any], capacity: Capacity) -> NarrativePlan:
     return plan
 
 
+def _loss_weights(view: dict[str, Any], policy: dict[str, str]) -> list[float]:
+    weights = [1.0]
+
+    def emit(text: str, weight: float) -> None:
+        weights.extend([weight] * len(text.encode("utf-8")))
+
+    def channel_weight(name: str) -> float:
+        return {"hard": 1.0, "soft": SOFT_WEIGHT, "excluded": 0.0}[policy.get(name, "excluded")]
+
+    def visit(value: Any, weight: float, *, collection: str = "", root: bool = False) -> None:
+        if isinstance(value, dict):
+            row = cast(dict[str, Any], value)
+            if collection == "states" and "kind" in row:
+                weight = channel_weight(row["kind"])
+            emit("{", weight)
+            for index, (key, item) in enumerate(sorted(row.items())):
+                emit(("," if index else "") + canonical_json(key) + ":", weight)
+                selected = weight
+                if root:
+                    channel = next(
+                        (name for name, fields in CHANNEL_FIELDS.items() if key in fields), "plot"
+                    )
+                    selected = channel_weight(channel)
+                if (
+                    row.get("status") in {"unknown", "ambiguous"}
+                    and key in {"value", "alternatives", "confidence"}
+                    and item is not None
+                    and item != []
+                ):
+                    selected = 0.0
+                visit(item, selected, collection=key if root else collection)
+            emit("}", weight)
+        elif isinstance(value, list):
+            emit("[", weight)
+            for index, item in enumerate(cast(list[Any], value)):
+                if index:
+                    emit(",", weight)
+                visit(item, weight, collection=collection)
+            emit("]", weight)
+        else:
+            emit(canonical_json(value), weight)
+
+    visit(view, 1.0, root=True)
+    return [*weights, 1.0]
+
+
 def encode_target(target: dict[str, Any], capacity: Capacity) -> dict[str, Any]:
     """Only approved, filtered target views enter this training-only conversion."""
     if target["target_policy"].get("plot", "excluded") == "excluded":
@@ -138,6 +186,10 @@ def encode_target(target: dict[str, Any], capacity: Capacity) -> dict[str, Any]:
             "target_policy": target["target_policy"],
             "view": view,
             "tokens": tokenize(view),
+            "loss_weights": _loss_weights(view, target["target_policy"]),
+            "loss_policy": (
+                "hard=1; soft=0.25; uncertain asserted values=0; explicit null/syntax retained"
+            ),
             "counts": {
                 key: len(cast(list[Any], value))
                 for key, value in view.items()
@@ -207,12 +259,22 @@ def run(args: argparse.Namespace) -> int:
             )
         else:
             result = read_sealed(args.path)
-            if result.get("layout_id") != LAYOUT_ID:
+            if (
+                result.get("layout_id") != LAYOUT_ID
+                or result.get("kind") != "conditional-layout-dataset"
+            ):
                 raise ValueError("unsupported conditional layout identity")
             check_snapshot(result["inputs"])
-            if load_dataset(Path(result["dataset_path"]))["id"] != result["dataset_id"]:
+            dataset = load_dataset(Path(result["dataset_path"]))
+            if dataset["id"] != result["dataset_id"]:
                 raise ValueError("conditional layout dataset changed")
             capacity = Capacity.model_validate(result["capacity"])
+            expected = [
+                {"example_id": row["id"], "layout": encode_target(row["target"], capacity)}
+                for row in dataset["examples"]
+            ]
+            if result["examples"] != expected:
+                raise ValueError("layout targets/counts/policies differ from authorized parent")
             for row in result["examples"]:
                 decoded = decode_layout(row["layout"]["tokens"], capacity)
                 if decoded != row["layout"]["view"]:

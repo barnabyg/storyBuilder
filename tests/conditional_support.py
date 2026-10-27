@@ -67,3 +67,22 @@ def training_config(directory: Path, dataset: Path, **options: Any) -> Path:
         )
     )
     return config
+
+
+def trained_checkpoint(directory: Path, fake: FakeOpenAI, **options: Any) -> Path:
+    dataset = tiny_conditional_dataset(directory / "data", fake)
+    config = training_config(
+        directory,
+        dataset,
+        **{
+            "max_steps": 100,
+            "max_condition_tokens": 512,
+            "learning_rate": 0.03,
+            "max_tokens": 2000000,
+            "max_attention_cells": 2000000000,
+            **options,
+        },
+    )
+    assert training_command(["train", str(config), "--out", str(directory / "trained")]) == 0
+    settings = json.loads(config.read_text())
+    return directory / "trained/checkpoints" / f"step-{settings['max_steps']:08d}.json"

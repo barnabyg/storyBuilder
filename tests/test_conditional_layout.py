@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from nde.conditional import layout
+from nde.corpus.records_io import identity, read_sealed
 from nde.narrative.models import NarrativePlan
 from nde.reconstruction.codec import encode_plan, tokenize
 from tests.conditional_support import tiny_conditional_dataset
@@ -26,6 +27,12 @@ def test_saved_layout_encoding_rejects_stale_approved_training_inputs(
     out = tmp_path / "layouts"
     assert command(["encode", str(dataset), str(capacity), "--out", str(out)]) == 0
     assert command(["inspect", str(out / "layouts.json")]) == 0
+    saved = read_sealed(out / "layouts.json")
+    saved["examples"][0]["layout"]["counts"]["scenes"] = 99
+    saved["id"] = identity(saved)
+    attack = tmp_path / "resealed-layout.json"
+    attack.write_text(json.dumps(saved))
+    assert command(["inspect", str(attack)]) == 2
     capacity.write_text(json.dumps({"max_tokens": 4096}))
     assert command(["inspect", str(out / "layouts.json")]) == 2
 
@@ -83,3 +90,30 @@ def test_context_scaffolding_cannot_be_promoted_to_unapproved_layout_targets() -
     target = encode_plan(plan, {"plot": "excluded"}, {})
     with pytest.raises(ValueError, match="approved plot/count"):
         layout.encode_target(target, layout.Capacity())
+
+
+def test_conditional_layout_loss_preserves_soft_and_unknown_target_policies() -> None:
+    plan = NarrativePlan.model_validate(
+        {
+            "id": "p",
+            "title": "P",
+            "characters": [{"id": "c", "name": "C"}],
+            "scenes": [{"id": "a", "title": "A", "character_ids": ["c"]}],
+            "states": [
+                {
+                    "id": "state",
+                    "scene_id": "a",
+                    "character_id": "c",
+                    "kind": "goal",
+                    "key": "lamp",
+                    "before": {"status": "ambiguous", "value": "maybe", "confidence": 0.5},
+                    "after": {"value": "light"},
+                }
+            ],
+        }
+    )
+    target = layout.encode_target(
+        encode_plan(plan, {"plot": "hard", "goal": "soft"}, {}), layout.Capacity(max_tokens=2048)
+    )
+    assert len(target["loss_weights"]) == len(target["tokens"])
+    assert set(target["loss_weights"]) == {0.0, 0.25, 1.0}
