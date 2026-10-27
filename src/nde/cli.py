@@ -19,6 +19,7 @@ from nde import (
 )
 from nde.annotations import cli as annotation_cli
 from nde.conditional import data as conditional_data
+from nde.conditional import generation as conditional_generate
 from nde.conditional import layout as conditional_layout
 from nde.conditional import training as conditional_train
 from nde.corpus import cli as corpus_cli
@@ -81,6 +82,11 @@ def build_parser() -> argparse.ArgumentParser:
             "conditional-train",
             conditional_train.configure,
             "train and sample conditional layout models",
+        ),
+        (
+            "conditional-generate",
+            conditional_generate.configure,
+            "generate bounded structural proposals",
         ),
         ("exemplars", exemplars.configure, "compare approved plan exemplars on dev briefs"),
         (
@@ -342,6 +348,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "conditional-data": conditional_data.run,
     "conditional-layout": conditional_layout.run,
     "conditional-train": conditional_train.run,
+    "conditional-generate": conditional_generate.run,
     "exemplars": exemplars.run,
     "extract": extraction_cli.run,
     "corpus-review": corpus_review.run,
