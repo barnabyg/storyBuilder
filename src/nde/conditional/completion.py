@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-from pydantic import Field, JsonValue, TypeAdapter, field_validator
+from pydantic import Field, field_validator
 
 from nde.conditional.generation import read_proposal
 from nde.corpus.records_io import (
@@ -28,11 +28,10 @@ from nde.llm.errors import ProviderError
 from nde.llm.gateway import Completion, Gateway, Prompt
 from nde.llm.ledger import BudgetExceededError, CostLedger, Price, Pricing
 from nde.llm.structured import parse, repair_messages, response_format, with_schema_instruction
-from nde.narrative.interpretation import iter_annotations
 from nde.narrative.models import NarrativePlan
 from nde.narrative.validation import validate_plan
 from nde.narrative.workflow import rendered_files
-from nde.plan.revision import canonical, changed_units, selector_value
+from nde.plan.revision import changed_units, selector_value
 
 PROMPT = (
     "Complete only the requested text fields of this generated fictional plan. "
@@ -73,42 +72,6 @@ class TextCompletion(Strict):
         return fields
 
 
-def _overlap(left: str, right: str) -> bool:
-    return left == right or left.startswith(right + "/") or right.startswith(left + "/")
-
-
-def text_fields(plan: NarrativePlan) -> dict[str, str]:
-    """Exact free-text leaves; symbolic states and uncertainty cannot be completed."""
-    result = {"title": plan.title}
-    result.update({f"characters/{item.id}/name": item.name for item in plan.characters})
-    for scene in plan.scenes:
-        result[f"scenes/{scene.id}/title"] = scene.title
-        result[f"scenes/{scene.id}/summary"] = scene.summary
-        result.update({f"scenes/{scene.id}/beats/{b.id}/summary": b.summary for b in scene.beats})
-    for channel in ("setups", "knowledge_facts"):
-        result.update(
-            {
-                f"{channel}/{item.id}/description": item.description
-                for item in getattr(plan, channel)
-            }
-        )
-    result.update(
-        {
-            f"{channel}/{item.id}/reading/value": item.reading.value
-            for channel, item in iter_annotations(plan)
-            if isinstance(item.reading.value, str)
-        }
-    )
-    result.update(
-        {
-            f"{channel}/{item.id}/reading/alternatives/{index}": value
-            for channel, item in iter_annotations(plan)
-            for index, value in enumerate(item.reading.alternatives)
-        }
-    )
-    return result
-
-
 def _has_evidence(value: Any) -> bool:
     if isinstance(value, dict):
         content = cast(dict[str, Any], value)
@@ -116,43 +79,6 @@ def _has_evidence(value: Any) -> bool:
     if isinstance(value, list):
         return any(_has_evidence(v) for v in cast(list[Any], value))
     return False
-
-
-def _proposal(path: Path) -> tuple[dict[str, Any], NarrativePlan]:
-    path = path / "proposal.json" if path.is_dir() else path
-    proposal = read_proposal(path)
-    if (
-        proposal.get("kind") != "conditional-structural-proposal"
-        or proposal.get("status") != "structural-proposal"
-    ):
-        raise ValueError("completion requires an accepted conditional structural proposal")
-    check_snapshot(proposal["inputs"])
-    plan = NarrativePlan.model_validate(proposal["plan"])
-    if plan.sources or _has_evidence(proposal["plan"]) or not validate_plan(plan).valid:
-        raise ValueError("generated proposal must be valid and cannot assert source evidence")
-    allowed = text_fields(plan)
-    manifest = TypeAdapter(list[str]).validate_python(
-        proposal.get("completion_fields", []), strict=True
-    )
-    locks = TypeAdapter(dict[str, JsonValue]).validate_python(
-        proposal.get("locks", {}), strict=True
-    )
-    if len(set(manifest)) != len(manifest) or not set(manifest) <= set(allowed):
-        raise ValueError("completion manifest contains duplicate or unauthorized selectors")
-    for selector, expected in locks.items():
-        if canonical(selector_value(plan, selector)) != canonical(expected):
-            raise ValueError(f"proposal violates caller lock: {selector}")
-    if any(_overlap(field, lock) for field in manifest for lock in locks):
-        raise ValueError("completion manifest conflicts with caller locks")
-    required = {
-        field
-        for field, value in allowed.items()
-        if (not value.strip() or value == PLACEHOLDER)
-        and not any(_overlap(field, lock) for lock in locks)
-    }
-    if not required <= set(manifest):
-        raise ValueError("completion manifest omits unfilled generated text")
-    return proposal, plan
 
 
 def _replace(content: dict[str, Any], selector: str, value: str) -> None:
@@ -340,7 +266,8 @@ def complete(config_path: Path, out: Path) -> dict[str, Any]:
     proposal_path = (
         config.proposal / "proposal.json" if config.proposal.is_dir() else config.proposal
     )
-    proposal, before = _proposal(proposal_path)
+    proposal = read_proposal(proposal_path)
+    before = NarrativePlan.model_validate(proposal["plan"])
     if len(set(config.fields)) != len(config.fields) or not set(config.fields) <= set(
         proposal["completion_fields"]
     ):
