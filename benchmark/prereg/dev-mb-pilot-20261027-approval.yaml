@@ -1,0 +1,26 @@
+schema_version: '1'
+decision: approved_for_freezing_and_commit
+protocol_id: dev-M-B-pilot-20261027-v1
+approved_at: '2026-10-27T20:13:23.266627+00:00'
+owner: Project owner (guided review in this chat)
+owner_words_verbatim: Yes, please freeze and commit this pilot protocol.
+source: Explicit owner message after the exact final pilot summary was presented in
+  this chat
+approved_files_sha256:
+  benchmark/prereg/dev-mb-pilot-20261027.json: 20bcc292e4d078eda4e8ed86b3c7820af7f91fb61bc7abf70dc65b0c3ed0a905 # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  benchmark/prereg/dev-mb-pilot-20261027.txt: ebf3d3aa4ad2a958681ff63dbfeab9752f16e2ec1999cc176f5bdd84725687bf # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  configs/dev-mb-pilot-20261027.yaml: dc00ee46714406df938ac12f5d23da493b321e12650071bedc8e9b80ed51cf77 # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  benchmark/prereg/dev-mb-pilot-20261027-cohort.json: 81f0aa0f65be98145e635077044189801e27e49adb907066fbfeb972cba6d5c3 # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  benchmark/pilots/mb-20261027/frozen.json: 74825f9da0b5a1578a4e014f7c75d57d37a84defaec6f1f370f3e05474e4479e # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  benchmark/pilots/mb-20261027/dev/brief-03.yaml: dc7ac56016e8106577633effa6bc4d5e4ac43095d5176885703de9f5066269ed # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  benchmark/pilots/mb-20261027/dev/brief-04.yaml: 80bc830bc6358e0ee44e071528284ec4428e398e3fa04551e1985b489c94f686 # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  benchmark/pilots/mb-20261027/dev/brief-05.yaml: 7976ddc08baf7fc8437dfa5f16fb1d678a3ce869d43f86169a1bad4810db56fb # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+  benchmark/pilots/mb-20261027/dev/brief-06.yaml: d0fa18fad6deb66f86eb1243e176deb851c7e9f8db4e4b509d294478990cb15b # pragma: allowlist secret - public SHA-256 of the exact owner-approved file
+owner_time_cap_minutes: 120
+total_generation_budget_usd: 1.5
+fixed_pairs: 4
+formal_G1_status: unresolved; development pilot only
+generation_status: not_started
+approval_scope: Freeze and commit the exact prepared pilot protocol and its necessary
+  supporting files. Reading and generation have not started. Protocol approval is
+  recorded here without rewriting the approved files.

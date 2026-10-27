@@ -1,0 +1,83 @@
+{
+  "schema_version": "1",
+  "kind": "development_pilot",
+  "id": "dev-M-B-pilot-20261027-v1",
+  "status": "prepared_for_final_owner_approval",
+  "formal_G1_status": "not_run_unresolved",
+  "tier": "M",
+  "cohort": {
+    "schema_version": "1",
+    "id": "dev-M-B-pilot-20261027-v1",
+    "brief_checksums": {
+      "brief-03": "dc7ac56016e8106577633effa6bc4d5e4ac43095d5176885703de9f5066269ed",
+      "brief-04": "80bc830bc6358e0ee44e071528284ec4428e398e3fa04551e1985b489c94f686",
+      "brief-05": "7976ddc08baf7fc8437dfa5f16fb1d678a3ce869d43f86169a1bad4810db56fb",
+      "brief-06": "d0fa18fad6deb66f86eb1243e176deb851c7e9f8db4e4b509d294478990cb15b"
+    },
+    "split_checksums": {
+      "dev": "0db83f09f9ebe8d7a4f4ca508ae9cb9dec9c40678f1e6ea75d9b42ce5f787c87"
+    },
+    "conditions": [
+      "C",
+      "B"
+    ],
+    "repeat": 1,
+    "length_tolerance": 0.1,
+    "budget_measure": "generation_tokens",
+    "budget_tolerance": 0.1
+  },
+  "config": "configs/dev-mb-pilot-20261027.yaml",
+  "config_sha256": "f4ef56cc1b6ba1c3c8aca6ec64e230510d091fc6f25a7f248a1bf6d4385c69a6",
+  "selection": "docs/evidence/dev-tier-selection-2026-10-27/selection.json",
+  "selection_sha256": "34a3722dd30ea7d89e6a450c7865393c5782cca38f33342e43fc95604c5bce03",
+  "primary": "coherence",
+  "originality": {
+    "analysis": "mean_paired_difference",
+    "margin": 0,
+    "source": "Owner confirmed no average loss; included as the pilot descriptive safeguard for final protocol approval."
+  },
+  "analysis": "Report individual paired scores, C coherence wins/ties/losses and mean paired originality. Describe the owner’s development sample; no formal gate pass, population claim or permission to bypass later gate prerequisites.",
+  "reading": {
+    "full_stories": true,
+    "required_dimensions": [
+      "coherence",
+      "originality"
+    ],
+    "other_required_fields": [
+      "overall_A_or_B_preference",
+      "preference_strength_1_to_3"
+    ],
+    "one_question_per_turn": true,
+    "maximum_owner_minutes": 120,
+    "owner_ceiling_confirmed_at": "2026-10-27T19:54:13.032512+00:00",
+    "scope_of_cap": "Owner reading and answers; exclude agent work and voluntary breaks. Stop at the cap, including mid-pair if needed; preserve the fixed four-pair denominator and any missing scores. Do not ask for extra reading beyond the cap.",
+    "planned_pair_minutes": 20,
+    "buffer_minutes": 40,
+    "extra_realisation_questions": 0,
+    "condition_map": "Sealed until the fixed sample is fully scored and the batch closed. No intermediate condition results or model explanations. Exact anonymous source context only.",
+    "code_work_delay_hours": 48,
+    "owner_code_work_time": "Obtain actual information before opening the batch; unknown stays unknown."
+  },
+  "generation": {
+    "status": "budget_approved_execution_not_started",
+    "max_invocations": 1,
+    "per_run_usd": 1.5,
+    "per_day_usd": 3,
+    "max_repairs": 3,
+    "max_length_attempts": 8,
+    "max_revision_passes": 48,
+    "matching": "All attributable input/output tokens, including repairs/regeneration/revisions/cache hits; tolerance 10%.",
+    "admission": "Every fixed pair must have successful generation, validated C plan, final selected prose within 10% of target and matched B/C budget before any owner reading.",
+    "stopping": "No extra seeds or literary rewrites; stop as incomplete if the fixed limits are exhausted. Any later attempt requires a separately recorded proposal, not an automatic budget increase.",
+    "projected_cost_usd": 0.4591254,
+    "estimate_caveat": "Projection from two dev pairs at configured prices; completion within cap is uncertain, and this is not a provider invoice.",
+    "total_budget_usd": 1.5,
+    "budget_owner_approval_verbatim": "Yes, US$1.50 is fine for the pilot.",
+    "budget_owner_approval_at": "2026-10-27T20:09:54.387601+00:00"
+  },
+  "frozen_heldout_test_cohort": "Untouched. No test generation or test tuning.",
+  "automated_judges": "Cannot replace missing owner judgements.",
+  "fixed_sample_rule": "Four specified development pairs; no top-up, dropping, substitution or result-dependent sample selection.",
+  "owner_time_approval_verbatim": "Yes, two hours total is the right cap for my part.",
+  "approval_record": "Owner final approval will be recorded separately against the exact file checksums; this document alone does not authorise generation."
+}

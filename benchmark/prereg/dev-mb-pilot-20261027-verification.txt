@@ -1,0 +1,23 @@
+Pilot preregistration verification — 27 October 2026
+
+Canonical command:
+  uv --no-config tool run --from uv==0.8.14 uv run --no-sync nde-verify --no-dashboard
+
+Environment: NDE_BROWSER=1, OMP_NUM_THREADS=1, MKL_NUM_THREADS=1.
+Result: exit 0; all seven gates passed. 834 tests passed, no skips, 2 paid live-provider tests deselected under the repository default. Both installed-Chrome acceptance tests passed. Type checking produced zero errors and zero warnings. Dependency audit and package build passed. The host uv installation was left unchanged; the repository-pinned uv 0.8.14 ran in an isolated tool environment.
+
+Narrow false-positive exceptions added, with detector names, justifications and review conditions beside the rules:
+- data/manifest.gschema-20261027.yaml: exact immutable public source hashes
+- docs/evidence/g-schema-2026-10-27/decision.json: exact public evidence hashes
+- docs/evidence/dev-tier-selection-2026-10-27/decision.json: exact public evidence hashes
+- docs/evidence/dev-tier-selection-2026-10-27/selection.json: public hashes and environment-variable name only
+- benchmark/pilots/mb-20261027/frozen.json: public brief hashes
+- benchmark/prereg/dev-mb-pilot-20261027-cohort.json: public cohort hashes
+- benchmark/prereg/dev-mb-pilot-20261027.json: public configuration/evidence hashes
+- configs/dev-mb-pilot-20261027.yaml: inline public environment-variable name exception
+
+The approval receipt also annotates individual public SHA-256 lines inline; these are exact approved-file identities, not credentials. No broad directory exclusion or secret value was introduced. Immutable prior evidence bytes were preserved. Revisit the exact exceptions when their documents are regenerated, binding formats change or credential-bearing fields are introduced.
+
+Post-approval checks: approved proposal file bytes, config identity, selected M settings, frozen four-brief cohort and original held-out benchmark identity. The final protocol is a development pilot. Formal G1 remains unresolved. No paid generation or owner pilot reading has occurred.
+
+Git byte preservation: two exact .gitattributes entries disable text normalization for the owner-approved pilot protocol JSON and frozen cohort JSON. Their CRLF bytes are part of the recorded approval hashes. Verify staged and committed bytes against every approved SHA-256; review these attributes if either document is superseded. Registered prompt identities and parsed prompt text remain unchanged after LF normalization of the repository prompt copies.

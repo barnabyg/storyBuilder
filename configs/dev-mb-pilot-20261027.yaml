@@ -1,0 +1,73 @@
+# DRAFT: four-pair development pilot; cost and final protocol approval pending.
+name: dev-M-B-pilot-20261027-v1
+seed: 1700
+prompts_dir: ../prompts
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY # pragma: allowlist secret - environment-variable name, no key value
+    json_schema: false
+    timeout_s: 300
+    retry:
+      max_retries: 1
+      base_delay_s: 1
+      max_delay_s: 10
+roles:
+  planner:
+    provider: deepseek
+    model: deepseek-flash
+    family: deepseek
+    params:
+      thinking:
+        type: disabled
+      temperature: 0.7
+      max_tokens: 16000
+  prose:
+    provider: deepseek
+    model: deepseek-flash
+    family: deepseek
+    params:
+      thinking:
+        type: disabled
+      temperature: 0.8
+      max_tokens: 5000
+stories:
+  briefs_dir: ../benchmark/pilots/mb-20261027
+  briefs:
+    ids:
+    - brief-03
+    - brief-04
+    - brief-05
+    - brief-06
+  repeat: 1
+  length:
+    tolerance: 0.1
+    max_attempts: 8
+  conditions:
+  - name: C
+    pipeline: baseline_c
+    params:
+      tier: M
+      skeleton_prompt:
+        template: plan_skeleton
+        version: 2
+      channels_prompt:
+        template: plan_channels
+        version: 2
+  - name: B
+    pipeline: baseline_b
+  equal_budget:
+    conditions:
+    - C
+    - B
+    tolerance: 0.1
+    max_revision_passes: 48
+structured:
+  max_repairs: 3
+prices:
+  deepseek/deepseek-flash:
+    input_per_mtok: 0.3
+    output_per_mtok: 1.2
+budget:
+  per_run_usd: 1.5
+  per_day_usd: 3.0
