@@ -18,6 +18,7 @@ from nde import (
     tiers,
 )
 from nde.annotations import cli as annotation_cli
+from nde.conditional import data as conditional_data
 from nde.corpus import cli as corpus_cli
 from nde.corpus import exemplars, extraction_cli, provenance
 from nde.corpus import export as corpus_export
@@ -64,6 +65,11 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command")
     corpus_cli.configure(commands.add_parser("corpus", help="acquire and inspect corpus works"))
     for name, configure, description in (
+        (
+            "conditional-data",
+            conditional_data.configure,
+            "prepare traceable condition-to-plan examples",
+        ),
         ("exemplars", exemplars.configure, "compare approved plan exemplars on dev briefs"),
         (
             "extract",
@@ -321,6 +327,7 @@ def _briefs(args: argparse.Namespace) -> int:
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "conditional-data": conditional_data.run,
     "exemplars": exemplars.run,
     "extract": extraction_cli.run,
     "corpus-review": corpus_review.run,
