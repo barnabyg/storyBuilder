@@ -116,17 +116,19 @@ def test_self_contained_checkpoint_rejects_unsupported_architecture(
         inspect_checkpoint(checkpoint)
 
 
+@pytest.mark.parametrize("scene_count", [2, 3], ids=["two-scenes", "three-scenes"])
 def test_cpu_conditional_denoising_learns_valid_layout_and_accounts_guidance_passes(
-    tmp_path: Path, fake_llm: FakeOpenAI
+    tmp_path: Path, fake_llm: FakeOpenAI, scene_count: int
 ) -> None:
-    checkpoint = trained_checkpoint(tmp_path, fake_llm)
+    checkpoint = trained_checkpoint(tmp_path, fake_llm, scene_count=scene_count)
     state = inspect_checkpoint(checkpoint)
     assert set(state["conditioning_modes"]) == {"conditional", "unconditional"}
     assert state["parameter_sha256"] != state["binding"]["initial_parameter_sha256"]
+    (tmp_path / "data").rename(tmp_path / "unavailable-layout-targets")
     conditions = Conditions(genre="parable", scene_range=(1, 4))
     candidate = sample_candidate(checkpoint, conditions, seed=41)
     assert candidate["status"] == "complete", candidate["diagnostics"]
-    assert len(candidate["view"]["scenes"]) == 2
+    assert len(candidate["view"]["scenes"]) == scene_count
     assert candidate["work"]["passes"] == 1
     same = sample_candidate(checkpoint, conditions, seed=41)
     assert candidate["generated_tokens"] == same["generated_tokens"]
