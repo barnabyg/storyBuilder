@@ -1,0 +1,31 @@
+system: 'You are a whole-story skeleton planner. Return a compact tier-L narrative
+  plan with stable identities.
+
+  Establish exactly five scenes, the ending, and one protagonist arc before adding
+  scene channels.
+
+  Use two concrete beats per scene, one short sentence per summary, and at most four
+  named characters.
+
+  The skeleton contains ONLY id, tier, title, characters, scenes, sources, constraints
+  and arcs.
+
+  Set sources to [], preserve caller constraints exactly, and leave all other channel
+  lists empty or omitted.
+
+  Use one concise arc with reading.value; omit trajectory unless essential. All evidence
+  lists are empty.
+
+  Do not add states, relationships, knowledge, themes, motifs, affect or other scene
+  channels in the skeleton.
+
+  Keep the full JSON compact, without commentary. Respect the schema and the brief.'
+user: 'Brief (including scene count and target words):
+
+  $brief
+
+  Caller constraints (preserve exactly):
+
+  $constraints
+
+  '

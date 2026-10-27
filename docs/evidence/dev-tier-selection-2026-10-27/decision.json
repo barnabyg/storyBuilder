@@ -1,0 +1,132 @@
+{
+  "decision": "M selected by owner",
+  "decision_date": "2026-10-27",
+  "finalised_at": "2026-10-27T19:18:21.099966+00:00",
+  "owner": "Project owner (guided review in this chat)",
+  "owner_choice_verbatim": "Yes, let’s select M for the next stage.",
+  "owner_rationale_verbatim": "Yes, Story 1 felt meaningfully better. It was more coherent and felt less contrived than the other two.",
+  "selection_id": "d2c5a65088e23c2bde350db85d910a6943fb35d0dad2a14fae8cc4feef1b5203",
+  "selection_sha256": "34a3722dd30ea7d89e6a450c7865393c5782cca38f33342e43fc95604c5bce03",
+  "comparison_sha256": "01ab1954a964a53185764d1db2963e03077ad990ab5a566074c09c7a84f59557",
+  "code_revision": "3f29d9cd83e11b038a6dd963b6f7f168c93ed48e",
+  "test_only": false,
+  "settings_sha256": "111b11fe2d4bb5ea0f798b35d9df318f11df80a3abebd22b0ddd91fb0d4b543f",
+  "schema_sha256": "890577b4d8f9b6eb75c18df5500f3f702af917b02fcc1626b9be715a45e8f147",
+  "prompt_sha256": {
+    "beat_outline@1": "a73e82a57365ea365368e3645c77cd39d3f294c41e51642cf22012d59c16ef13",
+    "plan_channels@2": "01ada4fa319c564a28d0635e43cd2053c56f1153abf5f39f5b8571e6531a3a05",
+    "plan_skeleton@2": "0da31dbfa52de49ef8ec5e8163cbbdf392527ec545e828a72c6e2bf28e544982",
+    "scene_prose@1": "85c4412933793b898ee85e324ec79ba20a2ae247a805a21de23575723f1e1170",
+    "story_revision@1": "778ffb95c765b54770d6e12a077d1c5447892f3be5abbc8cebcc9c5c0e7c9a4b"
+  },
+  "models_sha256": "a503d1770d593be0b1d13edc62658766d65d333ed6610c4822c3baa99ee42fa4",
+  "owner_reviewed_briefs": [
+    "brief-01"
+  ],
+  "generated_briefs": {
+    "brief-01": "322ce3fc4a54268cdea61ba3dc6484b4221a2d6c5112b14f689df3302726d915",
+    "brief-02": "dfac4e659b046dc1ce3e2c49664b9145699cddca59a5e64822c6fc3f0dd75e5e"
+  },
+  "quality_scores": [
+    {
+      "public_label": "Story 1",
+      "coherence": 4,
+      "originality": 5,
+      "coherence_open_response": "The events and characters’ choices made sense to me. I didn’t find anything particularly confusing or hard to believe.",
+      "coherence_clarification": null,
+      "originality_open_response": "It felt fresh. I would have had trouble predicting how it panned out."
+    },
+    {
+      "public_label": "Story 2",
+      "coherence": 3,
+      "originality": 4,
+      "coherence_open_response": "There were a few confusing moments, but overall it made sense.",
+      "coherence_clarification": "The bit where Ada is talking to June and June says she doesn't know what the plan is, but that is after showing Ada all the bills. Why would she show her all the bills if she didn't know how she was involved in the plan?",
+      "originality_open_response": "Similar to story 1, although it felt slightly more contrived."
+    },
+    {
+      "public_label": "Story 3",
+      "coherence": 3,
+      "originality": 4,
+      "coherence_open_response": "Similar to the last one. The overall story was coherent, but there were odd bits that didn't make sense.",
+      "coherence_clarification": "Ada is in the lighthouse when it says \"and let the light fall on nothing\" when we know there is no light. The part where Ada is leaving the shop and she can't hear what the boy says and the commentary says \"and did not need to\".",
+      "originality_open_response": "It felt similarly fresh to the other two, but some of the details felt contrived."
+    }
+  ],
+  "realisation_sample": [
+    {
+      "story": "Story 1",
+      "tier": "M",
+      "denominator": 4,
+      "assessed": 2,
+      "realised": 2,
+      "missing": 2,
+      "unknown": 0,
+      "native_owner_status": "pending"
+    },
+    {
+      "story": "Story 2",
+      "tier": "L",
+      "denominator": 15,
+      "assessed": 4,
+      "realised": 4,
+      "missing": 11,
+      "unknown": 0,
+      "native_owner_status": "pending"
+    },
+    {
+      "story": "Story 3",
+      "tier": "S",
+      "denominator": 0,
+      "assessed": 0,
+      "realised": 0,
+      "missing": 0,
+      "unknown": 0,
+      "native_owner_status": "pending"
+    }
+  ],
+  "limitations": [
+    "Only the fixed earliest-per-available-channel sample was assessed: Story 1 2/4, Story 2 4/15; Story 3 represents none of these channels, so it has a zero denominator, not a successful realisation score.",
+    "All other intentions remain unreviewed; this is not exhaustive plan validation by the owner.",
+    "Sequential reading of variants of the same brief may create familiarity and order effects.",
+    "Story 2 coherence rating followed an agent’s explicitly tentative source interpretation; owner acceptance of that explanation was not supplied.",
+    "Belief-change questions assessed the stated transition, without separate judgement of exact scene timing.",
+    "Every tier incurs the full-L planning process before projection; no cheaper-planning conclusion follows."
+  ],
+  "total_recorded_generation_cost_usd_including_failed_attempts": 0.8561396999999998,
+  "cost_basis": "Configured conservative token rates; not a provider invoice. $3 study cap.",
+  "verification": {
+    "native_selection_check": "passed",
+    "native_comparison_status": "complete",
+    "report_json_reproduced_byte_identically": true,
+    "report_md_reproduced_byte_identically": true,
+    "report_json_sha256": "46a76bec6587947942bf94d8f11f1df6ff53d85ea638c8e72a513ec7f98491be",
+    "report_md_sha256": "26f32d54e2c941fc021104cf1e4702195e47f898d509b1e5bb232f3bac12c88a",
+    "owner_quality_judgements": 3,
+    "selection_id": "d2c5a65088e23c2bde350db85d910a6943fb35d0dad2a14fae8cc4feef1b5203",
+    "selected_tier": "M",
+    "archive_crc_check": "passed",
+    "all_archive_inventory_sha256_checks": "passed",
+    "archived_selection_byte_identical": true
+  },
+  "archive": {
+    "file": "evidence.zip",
+    "sha256": "ab34ac5994bb2d07690642b4e5f82d341d867e1e861855d657cbfffcd5345af7",
+    "entries": 1781,
+    "bytes": 6037742,
+    "workspace_layout": "C:\\docs\\git\\storyBuilder",
+    "native_paths": "Original absolute identities are preserved. Native checks use the recorded workspace layout; the inventory permits independent byte-integrity verification elsewhere."
+  },
+  "remaining_owner_work_for_this_step": "none",
+  "next_project_stage": "Prepare and commit G1 preregistration and review required protocol choices before held-out generation. G1 has not run.",
+  "retained_resources": [
+    {
+      "resource": "127.0.0.1:18764, session 89139",
+      "reason": "Keep the owner-reviewed reading pages available for reference."
+    },
+    {
+      "resource": "C:\\docs\\git\\storyBuilder\\.nde\\dev-tier-selection-20261027",
+      "reason": "Preserve immutable comparison paths, prompts, native reviews, response cache and cost history for later G1 compatibility checks."
+    }
+  ]
+}
