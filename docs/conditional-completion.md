@@ -10,6 +10,10 @@ adherence.
 The configuration names a `proposal`, `fields` containing exact ID-keyed leaf
 selectors, a gateway `provider`, a `model` binding, and an explicit token `price`.
 The selected fields must come from the proposal's `completion_fields` manifest.
+Ambiguous readings can retain their ambiguity while their permitted text is
+completed. Scalar alternatives use selectors such as
+`subtext/subtext.0/reading/alternatives/0`; completion preserves the alternatives'
+count, order and unselected text, as well as reading status and confidence.
 Completing a subset saves a partial result; publication of a final plan requires
 the whole manifest. Caller locks take precedence over the manifest.
 

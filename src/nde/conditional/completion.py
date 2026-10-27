@@ -99,6 +99,13 @@ def text_fields(plan: NarrativePlan) -> dict[str, str]:
             if isinstance(item.reading.value, str)
         }
     )
+    result.update(
+        {
+            f"{channel}/{item.id}/reading/alternatives/{index}": value
+            for channel, item in iter_annotations(plan)
+            for index, value in enumerate(item.reading.alternatives)
+        }
+    )
     return result
 
 
@@ -158,7 +165,28 @@ def _replace(content: dict[str, Any], selector: str, value: str) -> None:
             container = next(
                 row for row in cast(list[dict[str, Any]], container) if row["id"] == part
             )
-    container[parts[-1]] = value
+    if isinstance(container, list):
+        cast(list[str], container)[int(parts[-1])] = value
+    else:
+        container[parts[-1]] = value
+
+
+def _unauthorized_changes(
+    before: NarrativePlan, after: NarrativePlan, fields: list[str]
+) -> set[str]:
+    unauthorized = set(changed_units(before, after)) - set(fields)
+    alternative_lists = {
+        field.rsplit("/", 1)[0] for field in fields if "/reading/alternatives/" in field
+    }
+    for parent in alternative_lists:
+        previous = cast(list[str], selector_value(before, parent))
+        current = cast(list[str], selector_value(after, parent))
+        if len(previous) == len(current) and all(
+            original == changed or f"{parent}/{index}" in fields
+            for index, (original, changed) in enumerate(zip(previous, current, strict=True))
+        ):
+            unauthorized.discard(parent)
+    return unauthorized
 
 
 def _candidate(
@@ -171,7 +199,7 @@ def _candidate(
     for selector, value in completed.fields.items():
         _replace(content, selector, value)
     candidate = NarrativePlan.model_validate(content)
-    unauthorized = set(changed_units(before, candidate)) - set(config.fields)
+    unauthorized = _unauthorized_changes(before, candidate, config.fields)
     if unauthorized or candidate.sources or _has_evidence(content):
         raise ValueError(
             f"completion changed unauthorized structure/evidence: {sorted(unauthorized)}"

@@ -130,8 +130,13 @@ def completion_fields(plan: NarrativePlan, locks: dict[str, Any]) -> list[str]:
             if row.description in {"", PLACEHOLDER}:
                 fields.append(f"{root}/{row.id}/description")
     for channel, row in iter_annotations(plan):
-        if row.reading.status == "known" and row.reading.value == PLACEHOLDER:
+        if row.reading.value in {"", PLACEHOLDER}:
             fields.append(f"{channel}/{row.id}/reading/value")
+        fields.extend(
+            f"{channel}/{row.id}/reading/alternatives/{index}"
+            for index, value in enumerate(row.reading.alternatives)
+            if value in {"", PLACEHOLDER}
+        )
     return sorted(
         field
         for field in fields

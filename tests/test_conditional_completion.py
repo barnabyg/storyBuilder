@@ -98,6 +98,37 @@ def command(config: Path, out: Path) -> int:
     return workflow.run(parser.parse_args(["run", str(config), "--out", str(out)]))
 
 
+def test_ambiguous_subtext_and_alternative_text_complete_without_changing_uncertainty(
+    tmp_path: Path, fake_llm: FakeOpenAI
+) -> None:
+    source = proposal(tmp_path / "initial")
+    saved = read_sealed(source)
+    saved["plan"]["subtext"][0]["reading"] = {
+        "status": "ambiguous",
+        "value": "Unfilled generated text",
+        "confidence": 0.4,
+        "alternatives": ["Unfilled generated text", "The letter is an ordinary invitation."],
+    }
+    alternative = "subtext/subtext-1/reading/alternatives/0"
+    saved["completion_fields"].append(alternative)
+    saved["locks"]["subtext/subtext-1/reading/status"] = "ambiguous"
+    source = tmp_path / "ambiguous.json"
+    create_record(source, saved)
+    selected = {**fields(), alternative: "The letter offers reconciliation."}
+    fake_llm.queue(completion(json.dumps({"fields": selected})))
+    config = configuration(tmp_path, fake_llm, source, fields=list(selected))
+    out = tmp_path / "completed"
+    assert command(config, out) == 0
+    reading = load_plan(out / "plan.json").subtext[0].reading
+    assert reading.status == "ambiguous"
+    assert reading.confidence == 0.4
+    assert reading.value == "The letter conceals an old debt."
+    assert reading.alternatives == [
+        "The letter offers reconciliation.",
+        "The letter is an ordinary invitation.",
+    ]
+
+
 def test_public_completion_publishes_cards_and_preserves_learned_structure(
     tmp_path: Path, fake_llm: FakeOpenAI
 ) -> None:
