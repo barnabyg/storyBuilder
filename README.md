@@ -67,6 +67,20 @@ weights automatically. Tiny CPU fixtures establish software mechanics. Scientifi
 G3 requires genuine passed G1/G2 evidence, registered budgets, identified models,
 and any registered owner meaning review. Synthetic success remains pending.
 
+## Phase 7 conditional planning
+
+Prepare [traceable conditions and plan targets](docs/conditional-data.md),
+then [train and sample variable layouts](docs/conditional-layouts.md) using the
+local CPU runtime. The conditional denoiser learns structural layouts from fully
+masked output, with classifier-free guidance and bounded work accounting.
+
+[Full generation](docs/conditional-generation.md) accepts conditions and explicit
+locks without a target annotation. It saves rejected attempts and validated
+structural proposals. The [restricted text-completion workflow](docs/conditional-completion.md)
+fills authorised names, descriptions and subtext through the gateway, preserving
+structure and saving validated plans and cards. Real E experiments require
+genuine passed G3 evidence; tiny fixtures establish software mechanics only.
+
 ## Verification
 
 One canonical, non-mutating command runs every gate in order:

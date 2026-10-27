@@ -13,7 +13,7 @@ from nde.conditional.generation import completion_fields
 from nde.corpus.records_io import create_record, read_json, read_sealed
 from nde.narrative.models import NarrativePlan
 from tests.conditional_support import trained_checkpoint
-from tests.fake_openai import FakeOpenAI
+from tests.fake_openai import FakeOpenAI, completion
 
 
 def proposal_file(directory: Path, **updates: Any) -> Path:
@@ -241,3 +241,42 @@ def test_bounded_rejection_recovers_without_discarding_invalid_learned_candidate
     assert report["work"]["tokens"] == sum(
         row["candidate"]["work"]["tokens"] for row in report["attempts"]
     )
+
+
+@pytest.mark.ml
+def test_generated_structure_completes_through_gateway_into_validated_plan_and_cards(
+    tmp_path: Path, learned_checkpoint: Path, fake_llm: FakeOpenAI
+) -> None:
+    request = generation_request(tmp_path, learned_checkpoint, conditions={"genre": "parable"})
+    proposals = tmp_path / "proposals"
+    assert generate_command(request, proposals) == 0
+    source = proposals / "proposal.json"
+    original_bytes = source.read_bytes()
+    proposal = read_sealed(source)
+    fields = dict.fromkeys(proposal["completion_fields"], "A promise is kept.")
+    fake_llm.queue(completion(json.dumps({"fields": fields})))
+    config = tmp_path / "completion.json"
+    config.write_text(
+        json.dumps(
+            {
+                "proposal": str(source),
+                "fields": list(fields),
+                "provider": {"base_url": fake_llm.base_url, "retry": {"max_retries": 0}},
+                "model": {"provider": "fake", "model": "completion-model"},
+                "price": {"input_per_mtok": 1, "output_per_mtok": 2},
+            }
+        )
+    )
+    out = tmp_path / "completed"
+    assert main(["conditional-complete", "run", str(config), "--out", str(out)]) == 0
+    assert main(["conditional-complete", "inspect", str(out)]) == 0
+    completed = json.loads((out / "plan.json").read_text())
+    assert completed["title"] == "A promise is kept."
+    assert completed["causal_links"] == proposal["plan"]["causal_links"]
+    assert completed["states"] == proposal["plan"]["states"]
+    assert [scene["id"] for scene in completed["scenes"]] == ["scenes.0", "scenes.1"]
+    assert completed["sources"] == []
+    assert json.loads((out / "validation.json").read_text())["diagnostics"] == []
+    assert "A promise is kept." in (out / "cards.html").read_text()
+    assert source.read_bytes() == original_bytes
+    assert (out / "source-proposal.json").read_bytes() == original_bytes
