@@ -241,20 +241,21 @@ def test_complete_synthetic_evidence_meets_inclusive_boundaries_settles_and_stay
     assert ge_decision.SYNTHETIC in record["pending"]
     structural = record["structural"]
     assert (structural["competitive"], structural["not_competitive"]) == (1, 1)
-    assert structural["share"] == structural["minimum_share"] == 0.5
-    assert structural["status"] == "passed"
+    assert (structural["share"], structural["minimum_share"], structural["status"]) == (
+        0.5,
+        0.5,
+        "passed",
+    )
     assert record["owner_review"]["evidence"] == "synthetic"
     assert [r["classification"] for r in record["owner_review"]["reviews"]] == ["synthetic"]
-    assert record["action"]["result"] == "none"
-    assert record["action"]["phase_8"] == "not_eligible"
+    assert (record["action"]["result"], record["action"]["phase_8"]) == ("none", "not_eligible")
     assert record["action"]["reference_planner"] == {
         "condition": "C",
         "identification": "owner C selection",
         "status": "retained",
     }
     preserved(record, protocol, run)
-    assert record["g3"]["status"] == "test-only"
-    assert record["history"]["first_attempt"] is None
+    assert (record["g3"]["status"], record["history"]["first_attempt"]) == ("test-only", None)
     markdown = (out / "decision.md").read_text()
     assert markdown.startswith("# G-E decision: pending (test-only)")
     assert "## Validator comparison (E minus reference)" in markdown
@@ -264,8 +265,7 @@ def test_complete_synthetic_evidence_meets_inclusive_boundaries_settles_and_stay
     assert tmp_path.as_posix() not in text
     # The complete criteria result settles the protocol; it replays and is never replaced.
     settlement = read_sealed(ge_decision.settlement_path(protocol))
-    assert settlement["decision_id"] == record["id"]
-    assert settlement["criteria_outcome"] == "passed"
+    assert (settlement["decision_id"], settlement["criteria_outcome"]) == (record["id"], "passed")
     # The owner ratings it applied are frozen beside the protocol, to be committed.
     frozen = read_sealed(ge_decision.ratings_path(protocol))
     assert frozen["reviews"] == {
@@ -281,7 +281,12 @@ def test_complete_synthetic_evidence_meets_inclusive_boundaries_settles_and_stay
     assert not (repo / "again").exists()
     # A later superseding review is never applied; a changed plan makes the decision stale.
     review(folder, "C")
+    review(folder, "C", diagnostic_provenance={"model": "judge-model", "prompt": "structure@1"})
+    capsys.readouterr()
     assert ge_command("replay", out) == 0
+    printed = capsys.readouterr().out
+    assert all(f"review not applied: review-00{n}.json" in printed for n in (2, 3))
+
     plan = run / "stories/E/brief-01/r1/plan.json"
     with restored(plan):
         plan.write_text(plan.read_text() + " ")
@@ -536,7 +541,10 @@ def test_the_single_iteration_is_bound_to_the_settled_first_attempt_and_history_
         "first/protocol.review-claim.json",
         "first-decision",
     )
+    # A model judge's later review is reported, never applied: the first decision holds.
+    review(first_packet, "E", diagnostic_provenance={"model": "judge-model", "prompt": "s@1"})
     out = repo / "second-decision"
+
     code, record = decide(second, second_run, out, second_packet)
     assert code == 1
     assert record["problems"] == []

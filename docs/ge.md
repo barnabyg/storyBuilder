@@ -354,7 +354,10 @@ folder.
 and packet, and lists every section that differs and every new problem. A settled
 decision must also be its protocol's only settled decision. A changed plan, story
 or frozen review, or a history violation, makes a decision stale, and replay
-exits 1. Reviews saved after the ratings were frozen do not.
+exits 1. Reviews saved after the ratings were frozen do not: replay lists each one
+as not applied and stays current, so a later model-judge review or re-rating
+cannot disturb a settled decision or the development iteration bound to it.
+
 
 ### Development iteration history
 

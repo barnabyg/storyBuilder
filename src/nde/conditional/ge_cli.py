@@ -102,6 +102,8 @@ def _replay(args: argparse.Namespace) -> int:
     saved, reasons = ge_decision.replay(args.decision)
     if reasons:
         return _stale(reasons, "G-E decision")
+    for name in ge_decision.unapplied_reviews(args.decision):
+        print(f"later review not applied: {name} (the owner ratings are frozen)")
     print(f"G-E decision {saved['outcome']} current: {args.decision}")
     return 0
 

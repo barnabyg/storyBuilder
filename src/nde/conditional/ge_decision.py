@@ -797,6 +797,22 @@ def replay(folder: Path) -> tuple[Record, list[str]]:
     return saved, reasons
 
 
+def unapplied_reviews(folder: Path) -> list[str]:
+    """Reviews a decision's packet saved beyond its frozen ratings: reported, never applied.
+
+    They do not make a decision stale, so a later model judge or re-rating cannot
+    disturb a settled decision or the iteration bound to it.
+    """
+    saved = read_decision(folder)
+    protocol, _, packet = _inputs(folder, saved)
+    claim = ratings_path(protocol)
+    if packet is None or not claim.is_file():
+        return []
+    frozen: dict[str, str] = read_sealed(claim)["reviews"]
+    names = sorted(path.name for path in (packet / ge_review.REVIEWS).glob("review-*.json"))
+    return [name for name in names if name not in frozen]
+
+
 def decide(path: Path, run: Path, packet: Path | None, out: Path) -> Record:
     """Write a new sealed decision; a complete one settles its protocol for good."""
     if out.exists():
