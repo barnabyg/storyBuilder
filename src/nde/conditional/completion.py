@@ -5,6 +5,7 @@ import copy
 import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -41,19 +42,32 @@ PROMPT = (
     "This is generated fiction, not a source annotation or an owner-approved reading."
 )
 PLACEHOLDER = "Unfilled generated text"
+PROMPT_ID = identity({"template": PROMPT, "version": 1})
+# The template name and version that call records give completion requests.
+PROMPT_NAME = "conditional_text_completion"
+PROMPT_VERSION = 1
 MAX_TEXT_CHARACTERS = 16000
 MAX_PROVIDER_RETRIES = 3
+# Repair requests a completion may make after an invalid first response.
+MAX_REPAIRS = 8
 
 
-class CompletionConfig(Strict):
+class CompletionRequest(Strict):
+    """What to complete and on which model; the caller supplies the gateway and its caps."""
+
     proposal: Path
     fields: list[str] = Field(min_length=1)
-    provider: ProviderConfig
     model: ModelBinding
-    price: Price
-    max_repairs: int = Field(default=2, ge=0, le=8)
+    max_repairs: int = Field(default=2, ge=0, le=MAX_REPAIRS)
     seed: int = 7
     max_tokens: int = Field(default=1024, ge=1, le=8192)
+
+
+class CompletionConfig(CompletionRequest):
+    """A standalone completion with its own provider, price, spending cap, cache and ledger."""
+
+    provider: ProviderConfig
+    price: Price
     max_cost_usd: float = Field(default=1.0, ge=0, allow_inf_nan=False)
     cache: Path | None = None
     ledger: Path | None = None
@@ -81,7 +95,7 @@ def _has_evidence(value: Any) -> bool:
     return False
 
 
-def _replace(content: dict[str, Any], selector: str, value: str) -> None:
+def replace_text(content: dict[str, Any], selector: str, value: str) -> None:
     container: Any = content
     parts = selector.split("/")
     for part in parts[:-1]:
@@ -115,17 +129,13 @@ def _unauthorized_changes(
     return unauthorized
 
 
-def _candidate(
-    text: str, before: NarrativePlan, config: CompletionConfig
-) -> tuple[NarrativePlan, TextCompletion]:
-    completed = parse(text, TextCompletion)
-    if set(completed.fields) != set(config.fields):
-        raise ValueError("response fields must exactly match authorized selectors")
+def apply_fields(before: NarrativePlan, fields: dict[str, str]) -> NarrativePlan:
+    """The validated plan with exactly these authorised text fields filled; raises ValueError."""
     content = copy.deepcopy(before.model_dump(mode="json"))
-    for selector, value in completed.fields.items():
-        _replace(content, selector, value)
+    for selector, value in fields.items():
+        replace_text(content, selector, value)
     candidate = NarrativePlan.model_validate(content)
-    unauthorized = _unauthorized_changes(before, candidate, config.fields)
+    unauthorized = _unauthorized_changes(before, candidate, list(fields))
     if unauthorized or candidate.sources or _has_evidence(content):
         raise ValueError(
             f"completion changed unauthorized structure/evidence: {sorted(unauthorized)}"
@@ -133,7 +143,16 @@ def _candidate(
     validation = validate_plan(candidate)
     if not validation.valid:
         raise ValueError(validation.model_dump_json())
-    return candidate, completed
+    return candidate
+
+
+def _candidate(
+    text: str, before: NarrativePlan, config: CompletionRequest
+) -> tuple[NarrativePlan, TextCompletion]:
+    completed = parse(text, TextCompletion)
+    if set(completed.fields) != set(config.fields):
+        raise ValueError("response fields must exactly match authorized selectors")
+    return apply_fields(before, completed.fields), completed
 
 
 def _call_record(call: Completion) -> dict[str, Any]:
@@ -179,7 +198,7 @@ def _save_artifacts(plan: NarrativePlan, directory: Path) -> None:
 
 
 def _messages(
-    proposal: dict[str, Any], plan: NarrativePlan, config: CompletionConfig
+    proposal: dict[str, Any], plan: NarrativePlan, config: CompletionRequest
 ) -> tuple[Message, ...]:
     return (
         {"role": "system", "content": PROMPT},
@@ -198,14 +217,24 @@ def _messages(
     )
 
 
+@dataclass(frozen=True)
+class _Limits:
+    """Where records go, the standalone spending cap, and whether interruptions propagate."""
+
+    out: Path
+    max_cost_usd: float | None
+    propagate: bool
+
+
 def _attempts(
     gateway: Gateway,
-    config: CompletionConfig,
+    config: CompletionRequest,
     source: tuple[dict[str, Any], NarrativePlan],
-    out: Path,
     progress: dict[str, Any],
+    limits: _Limits,
 ) -> NarrativePlan | None:
     proposal, before = source
+    out = limits.out
     messages = _messages(proposal, before, config)
     response = (
         response_format(TextCompletion) if gateway.supports_json_schema(config.model) else None
@@ -219,7 +248,7 @@ def _attempts(
     for index in range(config.max_repairs + 1):
         attempt: dict[str, Any] = {"number": index + 1, "status": "pending", "diagnostics": []}
         progress["attempts"].append(attempt)
-        prompt = Prompt("conditional_text_completion", 1, messages)
+        prompt = Prompt(PROMPT_NAME, PROMPT_VERSION, messages)
         attempt["prompt_id"] = identity({"messages": messages})
         save_json(out / f"attempt-{index + 1:02d}.json", {**attempt, "messages": messages})
         save_json(out / "progress.json", progress)
@@ -231,10 +260,17 @@ def _attempts(
                 "budget-stop" if isinstance(error, BudgetExceededError) else "provider-failed"
             )
             save_json(out / f"attempt-{index + 1:02d}.json", attempt)
+            if limits.propagate:
+                # A run's own budget and provider failures stop the run, as for any step.
+                raise
             return None
         write_text_lf(out / f"response-{index + 1:02d}.txt", call.text)
         attempt.update(call=_call_record(call), response=call.text)
-        if gateway.ledger is not None and gateway.ledger.run_spent > config.max_cost_usd:
+        if (
+            limits.max_cost_usd is not None
+            and gateway.ledger is not None
+            and gateway.ledger.run_spent > limits.max_cost_usd
+        ):
             attempt.update(
                 status="rejected", diagnostics=["actual cost exceeded completion budget"]
             )
@@ -261,19 +297,29 @@ def _attempts(
     return None
 
 
-def complete(config_path: Path, out: Path) -> dict[str, Any]:
-    config = CompletionConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
+def _source(request: CompletionRequest) -> tuple[Path, dict[str, Any], NarrativePlan]:
     proposal_path = (
-        config.proposal / "proposal.json" if config.proposal.is_dir() else config.proposal
+        request.proposal / "proposal.json" if request.proposal.is_dir() else request.proposal
     )
     proposal = read_proposal(proposal_path)
     before = NarrativePlan.model_validate(proposal["plan"])
-    if len(set(config.fields)) != len(config.fields) or not set(config.fields) <= set(
+    if len(set(request.fields)) != len(request.fields) or not set(request.fields) <= set(
         proposal["completion_fields"]
     ):
         raise ValueError("selected fields must be distinct members of the completion manifest")
-    out.mkdir(parents=True, exist_ok=False)
-    gateway = _gateway(config, out)
+    return proposal_path, proposal, before
+
+
+def _complete(
+    gateway: Gateway,
+    config: CompletionRequest,
+    inputs: tuple[Path, str | None],
+    limits: _Limits,
+) -> dict[str, Any]:
+    config_path, resolved_provider = inputs
+    out = limits.out
+    proposal_path, proposal, before = _source(config)
+    first = len(gateway.history)
     progress: dict[str, Any] = {
         "kind": "conditional-text-completion",
         "status": "interrupted",
@@ -282,10 +328,10 @@ def complete(config_path: Path, out: Path) -> dict[str, Any]:
         "test_only": proposal.get("test_only", False),
         "config": config.model_dump(mode="json"),
         "config_id": identity(config.model_dump(mode="json")),
-        "prompt_id": identity({"template": PROMPT, "version": 1}),
+        "prompt_id": PROMPT_ID,
         "response_schema_id": identity(TextCompletion.model_json_schema()),
         "plan_schema_id": identity(NarrativePlan.model_json_schema()),
-        "resolved_provider": config.provider.resolved_base_url(os.environ),
+        "resolved_provider": resolved_provider,
         "origin": (
             "generated-fiction; learned structure with LLM-filled text; "
             "no source evidence or owner approval"
@@ -297,7 +343,7 @@ def complete(config_path: Path, out: Path) -> dict[str, Any]:
     try:
         (out / "source-proposal.json").write_bytes(proposal_path.read_bytes())
         _save_artifacts(before, out / "last-valid")
-        candidate = _attempts(gateway, config, (proposal, before), out, progress)
+        candidate = _attempts(gateway, config, (proposal, before), progress, limits)
         if candidate is not None:
             check_snapshot(progress["inputs"])
             check_snapshot(proposal["inputs"])
@@ -310,14 +356,17 @@ def complete(config_path: Path, out: Path) -> dict[str, Any]:
             if progress["status"] == "complete":
                 _save_artifacts(candidate, out)
     except Exception as error:
-        progress.update(status="failed", diagnostics=[str(error)])
+        # A run's budget/provider stop keeps the precise status its attempt recorded.
+        if not (limits.propagate and isinstance(error, (ProviderError, BudgetExceededError))):
+            progress.update(status="failed", diagnostics=[str(error)])
         raise
     finally:
-        progress["calls"] = [_call_record(call) for call in gateway.history]
+        history = gateway.history[first:]
+        progress["calls"] = [_call_record(call) for call in history]
         progress["tokens"] = sum(
-            call.result.input_tokens + call.result.output_tokens for call in gateway.history
+            call.result.input_tokens + call.result.output_tokens for call in history
         )
-        progress["cost_usd"] = sum(call.cost_usd for call in gateway.history)
+        progress["cost_usd"] = sum(call.cost_usd for call in history)
         progress["pending_call_usage"] = (
             "unknown; durable intent/cache retained"
             if any(a["status"] == "pending" for a in progress["attempts"])
@@ -333,8 +382,43 @@ def complete(config_path: Path, out: Path) -> dict[str, Any]:
         )
         create_record(out / "completion.json", progress)
         report_files(out, "Conditional text completion", progress)
-        gateway.close()
     return progress
+
+
+def complete(config_path: Path, out: Path) -> dict[str, Any]:
+    config = CompletionConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
+    _source(config)
+    out.mkdir(parents=True, exist_ok=False)
+    gateway = _gateway(config, out)
+    try:
+        return _complete(
+            gateway,
+            config,
+            (config_path, config.provider.resolved_base_url(os.environ)),
+            _Limits(out=out, max_cost_usd=config.max_cost_usd, propagate=False),
+        )
+    finally:
+        gateway.close()
+
+
+def complete_with_gateway(
+    gateway: Gateway, request_path: Path, out: Path, *, resolved_provider: str | None
+) -> dict[str, Any]:
+    """Run the same completion on a caller's gateway, such as an experiment run's.
+
+    The caller's cache, pricing, cost ledger and caps apply. Its provider and
+    budget failures propagate once the attempt is recorded, so a run stops as it
+    does for any other step; the completion record is still written.
+    """
+    request = CompletionRequest.model_validate_json(request_path.read_text(encoding="utf-8"))
+    _source(request)
+    out.mkdir(parents=True, exist_ok=False)
+    return _complete(
+        gateway,
+        request,
+        (request_path, resolved_provider),
+        _Limits(out=out, max_cost_usd=None, propagate=True),
+    )
 
 
 def configure(parser: argparse.ArgumentParser) -> None:

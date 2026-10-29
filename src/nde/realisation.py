@@ -215,6 +215,20 @@ def assess(folder: Path, review: Review) -> None:
 
 
 def report(folder: Path) -> dict[str, Any]:
+    """Summarise the packet's current evidence and save it as report.json and report.md."""
+    result = summarise(folder)
+    write_text_lf(folder / "report.json", json.dumps(result, indent=2) + "\n")
+    write_text_lf(
+        folder / "report.md",
+        "# Realisation evidence\n\n"
+        + "\n\n".join(f"{key}: {value}" for key, value in result.items())
+        + "\n",
+    )
+    return result
+
+
+def summarise(folder: Path) -> dict[str, Any]:
+    """The packet's current evidence, without writing anything; stale reviews never count."""
     packet = read_packet(folder)
     stale = stale_reasons(packet)
     actual: dict[str, Assessment] = {}
@@ -256,13 +270,6 @@ def report(folder: Path) -> dict[str, Any]:
         "diagnostic_only_estimates": diagnostics,
         "unresolved_diagnostic_estimates": unresolved_diagnostics,
     }
-    write_text_lf(folder / "report.json", json.dumps(result, indent=2) + "\n")
-    write_text_lf(
-        folder / "report.md",
-        "# Realisation evidence\n\n"
-        + "\n\n".join(f"{key}: {value}" for key, value in result.items())
-        + "\n",
-    )
     return result
 
 

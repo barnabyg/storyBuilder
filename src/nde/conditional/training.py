@@ -6,6 +6,7 @@ import json
 import math
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -378,10 +379,10 @@ def candidate_cost(
 
 def _guided_logits(
     model: Any,
-    config: TrainingConfig,
-    conditions: Conditions,
+    context_for: Callable[[bool], list[int]],
     guidance_scale: float,
     deadline: float,
+    output: list[int],
 ) -> tuple[Any, int, dict[str, str]]:
     conditional: Any = None
     unconditional: Any = None
@@ -391,10 +392,8 @@ def _guided_logits(
     for conditioned in modes:
         if time.monotonic() >= deadline:
             break
-        context = _context(config, conditions if conditioned else None)
-        logits = model.forward(
-            context + [MASK] * config.capacity.max_tokens, causal=False, context_length=len(context)
-        )
+        context = context_for(conditioned)
+        logits = model.forward(context + output, causal=False, context_length=len(context))
         passes += 1
         fingerprints["conditional" if conditioned else "unconditional"] = hashlib.sha256(
             logits.detach().cpu().numpy().tobytes()
@@ -412,14 +411,17 @@ def _guided_logits(
     return unconditional + guidance_scale * (conditional - unconditional), passes, fingerprints
 
 
-def sample_candidate(
+# PLR0913: keyword-only sampling controls shared by full generation and inpainting.
+def sample_candidate(  # noqa: PLR0913
     checkpoint_path: Path,
     conditions: Conditions | None = None,
     *,
     seed: int = 7,
     guidance_scale: float = 1.0,
     deadline: float | None = None,
+    observed: list[int] | None = None,
 ) -> dict[str, Any]:
+    """Denoise MASK positions; `observed` output tokens are clamped for inpainting."""
     started = time.monotonic()
     conditions = Conditions.model_validate(conditions or {})
     checkpoint = inspect_checkpoint(checkpoint_path)
@@ -431,6 +433,9 @@ def sample_candidate(
     )
     width = config.capacity.max_tokens
     length = config.max_condition_tokens + width
+    output = [MASK] * width if observed is None else observed
+    if len(output) != width:
+        raise ValueError("observed output must fill the registered capacity exactly")
     result: dict[str, Any] = {
         "status": "invalid",
         "view": None,
@@ -459,7 +464,11 @@ def sample_candidate(
     model = build(binding["width"], binding["max_positions"], seed, checkpoint["model_state"])
     with torch.no_grad():
         logits, passes, fingerprints = _guided_logits(
-            model, config, conditions, guidance_scale, deadline
+            model,
+            lambda conditioned: _context(config, conditions if conditioned else None),
+            guidance_scale,
+            deadline,
+            output,
         )
         tokens: list[int]
         if logits is None:
@@ -469,6 +478,10 @@ def sample_candidate(
             tokens = cast(list[int], torch.multinomial(probabilities, 1).squeeze(-1).tolist())
         else:
             tokens = cast(list[int], logits.argmax(dim=-1).tolist())
+    if tokens:
+        tokens = [
+            token if known == MASK else known for token, known in zip(tokens, output, strict=True)
+        ]
     elapsed = time.monotonic() - started
     result["generated_tokens"] = tokens
     result["pass_logit_sha256"] = fingerprints

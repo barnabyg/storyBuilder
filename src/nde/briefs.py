@@ -82,23 +82,36 @@ def _load(root: Path, path: Path) -> tuple[BriefFile | None, str | None]:
     return BriefFile(path, checksum_lf(data), brief), None
 
 
-def check(root: Path) -> CheckResult:
-    """Validate every brief and every frozen split under `root`, without writing anything."""
+def check(root: Path, splits: tuple[Split, ...] = SPLITS) -> CheckResult:
+    """Validate the briefs and frozen records of `splits` (by default every split).
+
+    Files of unchecked splits are never opened: IDs shared with them are found from
+    their file names alone. Writes nothing.
+    """
     result = CheckResult(briefs={split: [] for split in SPLITS}, problems=[])
-    for split in SPLITS:
+    for split in splits:
         for path in sorted((root / split).glob("*.yaml")):
             loaded, problem = _load(root, path)
             if problem is not None:
                 result.problems.append(problem)
             if loaded is not None:
                 result.briefs[split].append(loaded)
-    dev_ids = {file.brief.id for file in result.briefs["dev"]}
+    dev_ids = (
+        {file.brief.id for file in result.briefs["dev"]}
+        if "dev" in splits
+        else {path.stem for path in (root / "dev").glob("*.yaml")}
+    )
+    test_ids = (
+        [file.brief.id for file in result.briefs["test"]]
+        if "test" in splits
+        else sorted(path.stem for path in (root / "test").glob("*.yaml"))
+    )
     result.problems += [
-        f"{file.brief.id} appears in both dev and test"
-        for file in result.briefs["test"]
-        if file.brief.id in dev_ids
+        f"{brief_id} appears in both dev and test" for brief_id in test_ids if brief_id in dev_ids
     ]
     for split, recorded in read_frozen(root).items():
+        if split not in splits:
+            continue
         found = {
             path.stem: checksum_lf(path.read_bytes()) for path in (root / split).glob("*.yaml")
         }
@@ -145,9 +158,9 @@ def split_checksum(root: Path, split: Split) -> str | None:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def load_briefs(root: Path) -> dict[str, Brief]:
-    """Every valid brief by ID; raises BriefError if the check fails."""
-    result = check(root)
+def load_briefs(root: Path, splits: tuple[Split, ...] = SPLITS) -> dict[str, Brief]:
+    """Every valid brief of `splits` by ID; raises BriefError if their check fails."""
+    result = check(root, splits)
     if result.problems:
         raise BriefError(f"briefs under {root} fail the check:\n" + "\n".join(result.problems))
     return {file.brief.id: file.brief for files in result.briefs.values() for file in files}

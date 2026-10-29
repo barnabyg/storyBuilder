@@ -124,6 +124,23 @@ class LengthConfig(Strict):
     max_attempts: int = Field(default=3, ge=1)
 
 
+class ResourcePolicy(Strict):
+    """How a comparison treats work measured in units other than provider tokens.
+
+    Required when a compared condition runs a local conditional model. Matching
+    still uses provider generation tokens; local model work is reported beside
+    them and never converted, summed or called an equal total budget.
+    """
+
+    version: Literal["1"] = "1"
+    provider_measure: Literal["generation_tokens"] = "generation_tokens"
+    local_compute: Literal["report-separately"] = "report-separately"
+
+
+def _unset(value: object) -> bool:
+    return value is None
+
+
 class EqualBudgetConfig(Strict):
     """Compare two conditions at equal generation-token budget, per brief and repetition."""
 
@@ -136,6 +153,8 @@ class EqualBudgetConfig(Strict):
     revision_prompt: PromptRef = Field(
         default_factory=lambda: PromptRef(template="story_revision", version=1)
     )
+    # Omitted from the config identity while unset, so existing config hashes are unchanged.
+    resource_policy: ResourcePolicy | None = Field(default=None, exclude_if=_unset)
 
     @model_validator(mode="after")
     def _two_different_conditions(self) -> Self:

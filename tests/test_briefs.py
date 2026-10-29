@@ -8,7 +8,9 @@ import yaml
 from pydantic import ValidationError
 
 from nde.cli import main
+from nde.runs.config import BriefSelection, ConfigError
 from nde.schema.brief import Brief, BriefContent
+from nde.stories.execute import select_briefs
 from tests.conftest import REPO, base_config, write_config
 from tests.fake_openai import FakeOpenAI, completion
 
@@ -233,3 +235,20 @@ def test_the_committed_frozen_fixture_split_passes_the_check() -> None:
     assert (
         main(["briefs", "check", "--dir", str(REPO / "tests" / "fixtures" / "frozen-split")]) == 0
     )
+
+
+def test_a_split_selection_never_opens_another_splits_briefs(tmp_path: Path) -> None:
+    _briefs(tmp_path, "dev", 2)
+    assert main(["briefs", "freeze", "dev", "--dir", str(tmp_path)]) == 0
+    (tmp_path / "test").mkdir()
+    (tmp_path / "test/brief-09.yaml").write_text("{not: [valid", encoding="utf-8")
+    dev = BriefSelection(split="dev")
+    assert [brief.id for brief in select_briefs(dev, tmp_path)] == ["brief-01", "brief-02"]
+    # Only the selected split's frozen record is checked; IDs listed without a split
+    # still check every split, as before.
+    with pytest.raises(ConfigError, match="brief-09"):
+        select_briefs(BriefSelection(ids=["brief-01"]), tmp_path)
+    # A dev/test ID collision is still found from the other split's file name.
+    (tmp_path / "test/brief-02.yaml").write_text("{unread", encoding="utf-8")
+    with pytest.raises(ConfigError, match="brief-02 appears in both dev and test"):
+        select_briefs(dev, tmp_path)

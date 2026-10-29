@@ -7,7 +7,9 @@
 - `stories.jsonl` and `stories/`: for story runs, one `StoryRecord` per story,
   and each story's files under `stories/<condition>/<brief>/r<repetition>/`.
   Deterministic, like `outputs.jsonl`.
-- `report.md`: generated from the three files above, never edited by hand.
+- `local-work.jsonl`: for story runs with a local conditional model, one
+  `LocalWorkRecord` per local model operation. It is never mixed with provider calls.
+- `report.md`: generated from the files above, never edited by hand.
 """
 
 from pathlib import Path
@@ -23,6 +25,7 @@ CALLS = "calls.jsonl"
 REPORT = "report.md"
 STORIES = "stories.jsonl"
 STORY_DIR = "stories"
+LOCAL_WORK = "local-work.jsonl"
 # A story's normalised text, in its folder under STORY_DIR.
 STORY_FILE = "story.md"
 
@@ -31,6 +34,11 @@ type RunStatus = Literal["running", "succeeded", "failed", "aborted"]
 
 class _Record(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+def absent(value: object) -> bool:
+    """For additive fields omitted while unset, so earlier records keep their exact form."""
+    return value is None
 
 
 class ModelUse(_Record):
@@ -122,6 +130,20 @@ class ConditionUse(_Record):
     params: dict[str, JsonValue]
 
 
+class LocalTotals(_Record):
+    """Local conditional-model work: model tokens, attention cells, passes and seconds.
+
+    These units differ from provider tokens; they are reported beside them and never
+    converted into or summed with a provider budget.
+    """
+
+    operations: int = 0
+    passes: int = 0
+    tokens: int = 0
+    attention_cells: int = 0
+    elapsed_seconds: float = 0.0
+
+
 class BudgetMatch(_Record):
     """Budget matching for one brief and repetition in equal-budget mode."""
 
@@ -136,6 +158,9 @@ class BudgetMatch(_Record):
     matched: bool
     # Why matching failed.
     reason: str | None = None
+    # Under a registered resource policy: each condition's local model work, unmatched.
+    # Omitted otherwise, so earlier provider-only records keep their exact form.
+    local_work: dict[str, LocalTotals] | None = Field(default=None, exclude_if=absent)
 
 
 class EqualBudgetSummary(_Record):
@@ -143,6 +168,8 @@ class EqualBudgetSummary(_Record):
     tolerance: float
     max_revision_passes: int
     matches: list[BudgetMatch] = Field(default_factory=list[BudgetMatch])
+    # The registered resource comparison policy (`EqualBudgetConfig.resource_policy`).
+    resource_policy: dict[str, str] | None = Field(default=None, exclude_if=absent)
 
 
 class StoriesSummary(_Record):
@@ -268,6 +295,46 @@ class CallRecord(_Record):
     imported_from: str | None = None
 
 
+class LocalAttempt(_Record):
+    """One bounded local model attempt: its seed, outcome and actual or reserved work."""
+
+    attempt: int
+    seed: int
+    status: str
+    # The forward passes actually run, such as ["unconditional", "conditional"].
+    pass_modes: list[str]
+    tokens: int
+    attention_cells: int
+    elapsed_seconds: float
+
+
+class LocalWorkRecord(_Record):
+    """Local conditional-model work a story used. It is never a provider call."""
+
+    call: str
+    repetition: int
+    brief: str
+    condition: str
+    step: str
+    operation: Literal["full-generation"]
+    # The operation's outcome, such as "structural-proposal" or "attempt-limit".
+    status: str
+    checkpoint_id: str
+    test_only: bool
+    guidance_scale: float
+    guidance_policy: str
+    seed: int
+    attempts: list[LocalAttempt]
+    passes: int
+    tokens: int
+    attention_cells: int
+    # Wall time of the whole operation, validation and bookkeeping included.
+    elapsed_seconds: float
+    proposal_id: str | None = None
+    # A reused plan's original local work, attributed here without being run again.
+    imported_from: str | None = None
+
+
 type StoryStatus = Literal["ok", "failed"]
 
 
@@ -335,7 +402,8 @@ class StoryRecord(_Record):
 
 
 def write_jsonl(
-    path: Path, records: list[OutputRecord] | list[CallRecord] | list[StoryRecord]
+    path: Path,
+    records: list[OutputRecord] | list[CallRecord] | list[StoryRecord] | list[LocalWorkRecord],
 ) -> None:
     write_text_lf(path, "".join(record.model_dump_json() + "\n" for record in records))
 
@@ -350,6 +418,10 @@ def read_calls(run_dir: Path) -> list[CallRecord]:
 
 def read_stories(run_dir: Path) -> list[StoryRecord]:
     return [StoryRecord.model_validate_json(line) for line in _lines(run_dir / STORIES)]
+
+
+def read_local_work(run_dir: Path) -> list[LocalWorkRecord]:
+    return [LocalWorkRecord.model_validate_json(line) for line in _lines(run_dir / LOCAL_WORK)]
 
 
 def read_manifest(run_dir: Path) -> Manifest:

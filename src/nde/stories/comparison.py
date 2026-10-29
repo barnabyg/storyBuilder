@@ -4,10 +4,26 @@ from pathlib import Path
 from typing import Any
 
 from nde.annotations.records import digest
-from nde.runs.records import STORY_FILE, CallRecord, Manifest, StoryRecord
+from nde.runs.records import (
+    STORY_FILE,
+    BudgetMatch,
+    CallRecord,
+    EqualBudgetSummary,
+    LocalWorkRecord,
+    Manifest,
+    StoryRecord,
+    read_local_work,
+)
 from nde.stories.budget import story_budget, within
 from nde.stories.normalise import word_count
+from nde.stories.resources import story_resources
 from nde.stories.selected import selected_text
+
+# Under a registered resource policy, what a matched pair's budget does and does not mean.
+BUDGET_BASIS = (
+    "provider generation tokens only; local conditional-model work is reported "
+    "separately and never equated"
+)
 
 
 def _selected(run: Path, record: StoryRecord, calls: list[CallRecord]) -> dict[str, Any]:
@@ -40,6 +56,38 @@ def _selected(run: Path, record: StoryRecord, calls: list[CallRecord]) -> dict[s
     return result
 
 
+def _local_compute(
+    spec: EqualBudgetSummary,
+    pair: dict[str, Any],
+    match: BudgetMatch | None,
+    usage: tuple[list[CallRecord], list[LocalWorkRecord]],
+    problems: list[str],
+) -> None:
+    """Disclose each side's local model work; it never joins the provider-token budget."""
+    if spec.resource_policy is None:
+        return
+    rows: dict[str, Any] = pair["conditions"]
+    for name, row in rows.items():
+        row["resources"] = story_resources(*usage, name, pair["brief"], pair["repetition"])
+    local = {name: row["resources"]["local"] for name, row in rows.items()}
+    units = {
+        name: (value["operations"], value["passes"], value["tokens"], value["attention_cells"])
+        for name, value in local.items()
+    }
+    pair["budget_basis"] = BUDGET_BASIS
+    pair["local_compute_equal"] = len(set(units.values())) <= 1
+    if any(row["tokens"] == 0 for row in rows.values()):
+        problems.append("zero attributable provider tokens cannot establish an equal budget")
+    recorded = None if match is None else match.local_work
+    if recorded is not None and any(
+        name in recorded
+        and recorded[name].model_dump(exclude={"elapsed_seconds"})
+        != {key: value for key, value in local[name].items() if key != "elapsed_seconds"}
+        for name in local
+    ):
+        problems.append("matching local work differs from recorded local work")
+
+
 def compare(
     run: Path, manifest: Manifest, records: list[StoryRecord], calls: list[CallRecord]
 ) -> dict[str, Any]:
@@ -47,6 +95,7 @@ def compare(
     if summary is None or summary.equal_budget is None:
         return {"pairs": []}
     spec = summary.equal_budget
+    work = [] if spec.resource_policy is None else read_local_work(run)
     pairs: list[dict[str, Any]] = []
     for brief in summary.brief_ids:
         for repetition in range(summary.repeat):
@@ -89,17 +138,15 @@ def compare(
                     match.after.get(name) != conditions[name]["tokens"] for name in spec.conditions
                 ):
                     problems.append("matching outcome differs from attributable calls")
-            pairs.append(
-                {
-                    "brief": brief,
-                    "repetition": repetition,
-                    "conditions": conditions,
-                    "matching": None if match is None else match.model_dump(mode="json"),
-                    "comparable": not problems,
-                    "problems": problems,
-                }
-            )
-    return {
+            pair: dict[str, Any] = {
+                "brief": brief,
+                "repetition": repetition,
+                "conditions": conditions,
+                "matching": None if match is None else match.model_dump(mode="json"),
+            }
+            _local_compute(spec, pair, match, (calls, work), problems)
+            pairs.append(pair | {"comparable": not problems, "problems": problems})
+    result: dict[str, Any] = {
         "version": "1",
         "run_status": manifest.status,
         "config_hash": manifest.config_hash,
@@ -109,6 +156,10 @@ def compare(
         "max_revision_passes": spec.max_revision_passes,
         "pairs": pairs,
     }
+    policy = spec.resource_policy
+    return result | (
+        {} if policy is None else {"resource_policy": policy, "budget_basis": BUDGET_BASIS}
+    )
 
 
 def lines(comparison: dict[str, Any]) -> list[str]:
@@ -131,6 +182,11 @@ def lines(comparison: dict[str, Any]) -> list[str]:
                 f"- {condition}: final `{row['path']}`, SHA-256 `{row['final_sha256']}`; "
                 f"{row['words']} words; {row['tokens']} tokens; "
                 f"new spend USD {row['new_spend_usd']:.6f}"
+            )
+        if "budget_basis" in pair:
+            result.append(
+                f"- Budget basis: {pair['budget_basis']}; local compute equal: "
+                f"{'yes' if pair['local_compute_equal'] else 'no'}"
             )
         result.extend(f"- Unresolved: {problem}" for problem in pair["problems"])
         result.append("")
