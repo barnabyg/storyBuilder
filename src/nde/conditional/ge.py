@@ -75,6 +75,7 @@ RUN_KIND = "ge-dev-run"
 RUN_VERSION = "1"
 RUN_RECORD = "ge-run.json"
 CLAIM_KIND = "ge-run-claim"
+SETTLEMENT_KIND = "ge-decision-claim"
 ALREADY_RUN = (
     "this protocol has already been run (its run claim exists): a fixed cohort is run "
     "once, with no top-up or substituted rerun"
@@ -742,7 +743,40 @@ def _iteration(
         )
     if _located(previous["frozen"]["candidate"]) == _located(frozen["candidate"]):
         raise ValueError("the development iteration must change E; an identical rerun is not one")
+    record["previous"]["decision_id"] = _first_result(path, previous, registration, result)
     return record
+
+
+def settlement_path(protocol: Path) -> Path:
+    """Where a protocol's settled G-E decision is claimed: beside the protocol."""
+    return protocol.with_name(f"{protocol.stem}.decision-claim.json")
+
+
+def _first_result(
+    path: Path, previous: Record, registration: GERegistration, result: Evaluation
+) -> str:
+    """The first attempt's settled, committed failure that an iteration is bound to."""
+    settlement = settlement_path(path)
+    if not settlement.is_file():
+        raise ValueError(
+            "the first attempt has no settled G-E decision: decide it before registering "
+            "its development iteration"
+        )
+    try:
+        committed(settlement)
+    except ValueError as error:
+        raise ValueError("the first attempt's settled G-E decision is not committed") from error
+    decision = read_sealed(settlement)
+    if decision.get("kind") != SETTLEMENT_KIND or decision.get("protocol_id") != previous["id"]:
+        raise ValueError(f"not the first attempt's G-E decision claim: {settlement}")
+    if decision["criteria_outcome"] == "passed":
+        raise ValueError("the first attempt passed; no development iteration follows a pass")
+    if decision["criteria_outcome"] != "failed":
+        raise ValueError("the first attempt's settled decision is not a complete failure")
+    if not registration.test_only and decision["outcome"] != "failed":
+        raise ValueError("a real development iteration follows only an actual failed first attempt")
+    result.files.add(settlement)
+    return str(decision["decision_id"])
 
 
 def _evaluate(registration: GERegistration, base: Path, result: Evaluation) -> None:

@@ -937,22 +937,7 @@ def test_the_single_development_iteration_is_bound_to_the_first_attempt(
     first = {"attempt": 2, "previous_protocol": "../protocol.json", "change": "Raise guidance."}
     registration(unrun / "next", registered, config="ge.yaml", iteration=first)
     assert "was never run" in rejected(unrun / "next", capsys)
-    path = registration(changed, registered, config="ge.yaml", iteration=iteration)
-    assert ge_command("register", path, "--out", changed / "protocol.json") == 0
-    second = read_sealed(changed / "protocol.json")
-    assert second["frozen"]["iteration"]["previous"]["id"] == read_sealed(registered.protocol)["id"]
-    assert (
-        second["frozen"]["owner_sample"]
-        == read_sealed(registered.protocol)["owner_review"]["sample"]
-    )
-    # A second iteration chained to the iteration is refused.
-    third = changed / "third"
-    third.mkdir()
-    shutil.copy2(changed / "ge.yaml", third / "ge.yaml")
-    registration(
-        third,
-        registered,
-        config="ge.yaml",
-        iteration={"attempt": 2, "previous_protocol": "../protocol.json", "change": "Again."},
-    )
-    assert "follow the first registered attempt" in rejected(third, capsys)
+    # A run first attempt is iterated on only after its settled, committed failure (see
+    # tests/test_ge_decision.py for the decided first attempt and the bound iteration).
+    registration(changed, registered, config="ge.yaml", iteration=iteration)
+    assert "has no settled G-E decision" in rejected(changed, capsys)

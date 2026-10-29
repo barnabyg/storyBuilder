@@ -42,7 +42,7 @@ type Record = dict[str, Any]
 DECISION_KIND = "ge-decision"
 DECISION_VERSION = "1"
 DECISION = "decision.json"
-SETTLEMENT_KIND = "ge-decision-claim"
+SETTLEMENT_KIND = ge.SETTLEMENT_KIND
 RATINGS_KIND = "ge-review-claim"
 WITHHELD = "withheld: the evidence is inconsistent, so no owner rating is unblinded"
 COMPLETE = ("passed", "failed")
@@ -306,9 +306,7 @@ def _sealed(text: str | None) -> Record | None:
     return record
 
 
-def settlement_path(protocol: Path) -> Path:
-    """Where a protocol's settled decision is claimed: beside the protocol."""
-    return protocol.with_name(f"{protocol.stem}.decision-claim.json")
+settlement_path = ge.settlement_path
 
 
 def ratings_path(protocol: Path) -> Path:
@@ -457,6 +455,11 @@ def _first_attempt(path: Path, protocol: Record, out: Path) -> tuple[Record | No
     except (OSError, ValueError, KeyError) as error:
         return None, [*problems, f"the first attempt's decision cannot be replayed: {error}"]
     problems += [f"first attempt decision: {reason}" for reason in reasons]
+    if saved["id"] != previous.get("decision_id"):
+        problems.append(
+            "the first attempt's decision is not the one the iteration was registered on"
+        )
+
     if saved["criteria_outcome"] == "passed":
         problems.append("the first attempt passed; no development iteration follows a pass")
     elif saved["criteria_outcome"] != "failed":

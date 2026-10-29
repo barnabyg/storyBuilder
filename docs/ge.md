@@ -131,11 +131,16 @@ This example registers nothing real; supply genuine identities and limits.
   validated for this task here, and their agreement cannot replace owner review.
 - `iteration`: attempt 1, or the single development iteration (attempt 2) with
   `previous_protocol` and a `change`. Registration binds attempt 2 to an attempt
-  1 that was run (its run claim exists) and records that protocol's and claim's
-  IDs. The iteration must keep the first attempt's whole frozen cohort (briefs
-  and checksums, split, repeat, run seed and slots), its reference identity, its
-  validator and structural criteria and its owner review, must change E, and
-  cannot point at another iteration. Registration checks one protocol and the
+  1 that was run (its run claim exists) and **decided**: the first attempt's
+  settled [decision claim](#settled-decisions-and-replay) must be committed and
+  record a `failed` criteria outcome, and, for a real iteration, an actual
+  `failed` outcome. No iteration follows a pass or a pending first attempt.
+  Registration records the first attempt's protocol, claim and decision IDs, and
+  `check` revalidates them. The iteration must keep the first attempt's whole
+  frozen cohort (briefs and checksums, split, repeat, run seed and slots), its
+  reference identity, its validator and structural criteria and its owner review,
+  must change E, and cannot point at another iteration. Registration checks one
+  protocol and the
   attempt it names; it cannot see other protocols, so it does not stop a fresh
   attempt 1 or a second attempt 2 naming the same first attempt. The
   [decision](#development-iteration-history) enforces that history across
@@ -382,13 +387,15 @@ pending.
 
 - It has at most one run development iteration, bound to that first attempt. A
   second one is inconsistent, as is an iteration of another first attempt.
-- An iteration is decided only against the first attempt's **settled, committed
-  decision**, found through the claim beside the first protocol. That decision
-  must still replay, and its `criteria_outcome` must be `failed`. No iteration
-  follows a pass. A real iteration also needs an actual failed first attempt,
-  not a synthetic one. The iteration's decision records the first attempt's
-  protocol, claim and decision IDs, so replaying it replays the first decision
-  too.
+- An iteration is registered, and later decided, only against the first
+  attempt's **settled, committed decision**, found through the claim beside the
+  first protocol. When the iteration is decided, that decision must still replay
+  and must be the one the iteration was registered on, and its
+  `criteria_outcome` must be `failed`. No iteration follows a pass. A real
+  iteration also needs an actual failed first attempt, not a synthetic one. The
+  iteration's decision records the first attempt's protocol, claim and decision
+  IDs, so replaying it replays the first decision too.
+
 - Another review packet committed for the same protocol is inconsistent: one
   packet per run.
 
