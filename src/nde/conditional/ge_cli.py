@@ -90,8 +90,11 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911 - one exit per 
         options = RunOptions(args.runs_dir, dict(os.environ), args.cache, ledger_path=args.ledger)
         folder = ge.run(args.protocol, options)
         status = read_manifest(folder).status
-        print(f"registered G-E run {status}: {folder}")
-        return 0 if status == "succeeded" else 1
+        evidence = ge.read_run(folder)["evidence"]
+        print(f"registered G-E run {status}, evidence {evidence['status']}: {folder}")
+        if evidence["status"] != "available":
+            print(f"evidence report unavailable: {evidence['error']}", file=sys.stderr)
+        return 0 if status == "succeeded" and evidence["status"] == "available" else 1
     if command == "verify":
         reasons = ge.verify(args.protocol, args.run)
         if reasons:

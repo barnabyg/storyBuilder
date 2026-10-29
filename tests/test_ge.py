@@ -24,6 +24,7 @@ from nde.cli import main
 from nde.conditional import ge, ge_review
 from nde.corpus.records_io import create_record, read_sealed
 from nde.runs.config import ConditionSpec, load_config
+from nde.runs.runner import RunOptions
 from nde.tiers import load_selection
 from tests.conditional_support import trained_checkpoint
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
@@ -287,10 +288,65 @@ def test_registered_run_records_denominators_failures_costs_and_evidence(
     markdown = (registered.run / "ge-run.md").read_text()
     assert "## Validator pass rate (measured, not judged)" in markdown
     assert ge_command("verify", registered.protocol, registered.run) == 0
-    # The fixed cohort is run once: no top-up or substituted rerun.
+    # The fixed cohort is run once: no top-up or substituted rerun, in any runs folder.
+    claim = read_sealed(ge.claim_path(registered.protocol))
+    assert claim["protocol_id"] == protocol["id"]
+    assert record["claim"]["id"] == claim["id"]
     runs = registered.run.parent
     assert ge_command("run", registered.protocol, "--runs-dir", runs) == 2
+    other = registered.root / "other-runs"
+    assert ge_command("run", registered.protocol, "--runs-dir", other) == 2
     assert list(runs.iterdir()) == [registered.run]
+    assert not other.exists()
+
+
+@pytest.mark.ml
+def test_a_run_whose_evidence_fails_is_still_recorded_and_cannot_be_rerun(
+    tmp_path: Path, registered: Fixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = registered.root / "evidence-failure"
+    path = registration(folder, registered, id="synthetic-test-only-ge-evidence-failure")
+    protocol = folder / "protocol.json"
+    assert ge_command("register", path, "--out", protocol) == 0
+    commit(registered.root, "evidence-failure/protocol.json")
+    generations: list[Path] = []
+
+    def generate(_: object, options: RunOptions) -> Path:
+        # The fixture's generated stories, without spending again.
+        run = options.runs_dir / f"generated-{len(generations)}"
+        ignored = shutil.ignore_patterns("ge-run.json", "ge-run.md", "ge-evidence")
+        shutil.copytree(registered.run, run, ignore=ignored)
+        generations.append(run)
+        return run
+
+    def fail(*_: object) -> dict[str, Any]:
+        raise ValueError("synthetic evidence failure")
+
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    monkeypatch.setattr(ge, "execute", generate)
+    monkeypatch.setattr(ge.evidence_report, "write", fail)
+    assert ge_command("run", protocol, "--runs-dir", tmp_path / "runs") == 1
+    [run] = generations
+    record = ge.read_run(run)
+    assert record["evidence"] == {"status": "unavailable", "error": "synthetic evidence failure"}
+    assert "evidence report unavailable: synthetic evidence failure" in record["problems"]
+    # Costs, failures and complete denominators are kept; E's plans stay unverified.
+    assert record["validator"]["candidate"]["counts"]["expected"] == 4
+    assert record["validator"]["candidate"]["counts"]["unknown"] == 2
+    assert record["validator"]["complete"] is False
+    assert {(f["condition"], f["slot"]) for f in record["failures"]} == {
+        ("E", "brief-02/r1"),
+        ("E", "brief-02/r2"),
+    }
+    assert record["costs"]["conditions"]["E"]["local"]["passes"] > 0
+    # It is never current evidence and cannot be replaced by regenerating elsewhere.
+    assert ge.verify(protocol, run)[-1:] == [
+        "evidence report unavailable: synthetic evidence failure"
+    ]
+    assert ge_command("packet", protocol, run, "--out", tmp_path / "packet") == 1
+    for runs in (tmp_path / "runs", tmp_path / "elsewhere"):
+        assert ge_command("run", protocol, "--runs-dir", runs) == 2
+    assert len(generations) == 1
 
 
 def relabelled(path: Path, checkpoint: Path, **evidence: Any) -> Path:

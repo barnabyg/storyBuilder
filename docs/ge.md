@@ -143,9 +143,11 @@ reason is listed in `ge-check.json`.
 
 ## Registered run
 
-`run` rechecks the protocol, then runs the bound configuration through the
-shared experiment machinery (`--runs-dir`, `--cache`, `--ledger` as for
-`nde run`). It builds the [evidence report](conditional-report.md) over E's
+`run` rechecks the protocol and validates the configuration without spending.
+It then claims the protocol's single run by creating the sealed
+`PROTOCOL.run-claim.json` (kind `ge-run-claim`) beside the protocol, and only
+then runs the bound configuration through the shared experiment machinery
+(`--runs-dir`, `--cache`, `--ledger` as for `nde run`). It builds the [evidence report](conditional-report.md) over E's
 stories and the reference outputs in `ge-evidence/`, then writes the sealed
 `ge-run.json` (kind `ge-dev-run`, `run_version` 1) and `ge-run.md` in the run
 folder:
@@ -163,13 +165,20 @@ folder:
   matching.
 - `evidence`: the report identity and its adherence, diversity, training
   similarity, protected overlap, reference, realisation and pending sections.
-- `owner_review: pending`, `judges: diagnostic_only`, `problems` and the
-  checksum of every run and evidence artifact.
+- `claim`: the run claim's path and ID; `owner_review: pending`, `judges:
+  diagnostic_only`, `problems` and the checksum of every run and evidence
+  artifact.
 
-The command exits 1 when the run did not succeed; failed stories remain in the
-denominators either way. A protocol is run once: `run` refuses when the runs
-folder already holds a run of the same protocol, and the decision binds a single
-run record, never pooling or substituting reruns. `verify` replays a recorded run: the protocol check,
+A protocol is run once, wherever its outputs go: `run` refuses whenever the
+claim exists, and `verify` requires the run to carry the claim's ID. Keep the
+claim with the protocol; deleting it to rerun is a protocol violation the
+decision must treat as such. If the evidence report cannot be built after
+generation, `ge-run.json` is still sealed with `evidence: {status:
+unavailable, error}`, the run's costs, failures and complete denominators, and
+E's saved plans counted `unknown` because they cannot be verified. Such a run
+is never current, so no packet can be built from it, and it cannot be replaced
+by regenerating. The command exits 1 when the run did not succeed or its
+evidence is unavailable; failed stories remain in the denominators either way. `verify` replays a recorded run: the protocol check,
 every artifact checksum, the evidence report's own replay and every measured
 section. Any changed or missing plan, story, record or input makes it stale.
 
@@ -220,8 +229,9 @@ The decision report consumes, without re-deciding anything here:
 - the committed protocol (`nde.conditional.ge.read_protocol`, `check`): its
   `criteria`, `frozen` identities, `owner_review.sample`, `iteration` and
   `test_only`;
-- the recorded run (`read_run`, `verify`): `validator`, `units`, `failures`,
-  `costs`, `evidence` and the artifact checksums;
+- the run claim (`read_claim`) and the one recorded run carrying its ID
+  (`read_run`, `verify`): `validator`, `units`, `failures`, `costs`, `evidence`
+  (including its `status`) and the artifact checksums;
 - the packet status (`nde.conditional.ge_review.status`): `status`, `evidence`
   and the unblinded per-item `outcomes` (`competitive`, `not_competitive`,
   `excluded` or `pending`), which are populated only once ratings cover every
@@ -232,9 +242,7 @@ The decision report consumes, without re-deciding anything here:
 The shared run machinery validates every brief file in the configured benchmark
 folder before a run, as it always has; G-E's own commands open only the `dev`
 split, and no command selects or generates other briefs. Keep Phase 8's
-held-out cohort in its own frozen benchmark version. If a run's evidence cannot
-be recorded, for example after an abort before its story index was saved, `run`
-exits 2 and leaves the run folder for inspection. Fixture runs use test-only checkpoints and selections and are
+held-out cohort in its own frozen benchmark version. Fixture runs use test-only checkpoints and selections and are
 software evidence only: they never establish G3, G-E, condition adherence or
 literary quality. Tests in `tests/test_ge.py` use a real tiny CPU checkpoint and
 fake-provider calls.

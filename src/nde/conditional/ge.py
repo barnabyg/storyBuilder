@@ -61,7 +61,7 @@ from nde.runs.records import (
     read_manifest,
     read_stories,
 )
-from nde.runs.runner import RunOptions, run_experiment
+from nde.runs.runner import RunOptions, execute, prepare
 from nde.schema.brief import Brief
 from nde.stories.execute import story_conditions, story_templates
 from nde.stories.resources import provider_categories
@@ -74,6 +74,11 @@ PROTOCOL_VERSION = "1"
 RUN_KIND = "ge-dev-run"
 RUN_VERSION = "1"
 RUN_RECORD = "ge-run.json"
+CLAIM_KIND = "ge-run-claim"
+ALREADY_RUN = (
+    "this protocol has already been run (its run claim exists): a fixed cohort is run "
+    "once, with no top-up or substituted rerun"
+)
 EVIDENCE = "ge-evidence"
 CANDIDATE = "E"
 CANDIDATE_LABEL = "e"
@@ -1008,10 +1013,11 @@ def _candidate_units(report: Record, slots: list[str]) -> list[Record]:
     return rows
 
 
-def _reference_unit(run: Path, condition: str, name: str, record: StoryRecord | None) -> Record:
+def _run_unit(run: Path, condition: str, name: str, record: StoryRecord | None) -> Record:
     row: Record = {
         "condition": condition,
         "slot": name,
+        "evidence_unit": None,
         "status": "missing" if record is None else record.status,
         "seed": None if record is None else record.seed,
         "path": None if record is None else record.path,
@@ -1128,6 +1134,7 @@ def _evidence(report: Record) -> Record:
     training = report["training_similarity"]
     reference = report["reference"]
     return {
+        "status": "available",
         "report": {
             "path": f"{EVIDENCE}/report",
             "id": report["id"],
@@ -1172,17 +1179,34 @@ def _evidence(report: Record) -> Record:
     }
 
 
-def measure(protocol: Record, run: Path, report: Record) -> Record:
-    """Everything a registered run measured, recomputable from the saved run and report."""
+def _unverified(row: Record) -> Record:
+    """An E unit without its evidence report: a saved plan cannot be verified, so unknown."""
+    return row | {"validity": "unknown"} if row["validity"] in {"success", "failure"} else row
+
+
+def measure(protocol: Record, run: Path, report: Record | None, error: str | None = None) -> Record:
+    """Everything a registered run measured, recomputable from the saved run and report.
+
+    Without a report (`error` says why) the run's costs, failures and denominators are
+    still recorded, E's plans stay unverified and the evidence section is unavailable.
+    """
     manifest = read_manifest(run)
     records = read_stories(run)
     reference = protocol["frozen"]["reference"]["condition"]
     slots: list[str] = protocol["frozen"]["cohort"]["slots"]
     saved = {(r.condition, slot(r.brief, r.repetition)): r for r in records}
-    units = _candidate_units(report, slots)
-    units += [_reference_unit(run, reference, name, saved.get((reference, name))) for name in slots]
+    if report is None:
+        units = [
+            _unverified(_run_unit(run, CANDIDATE, name, saved.get((CANDIDATE, name))))
+            for name in slots
+        ]
+    else:
+        units = _candidate_units(report, slots)
+    units += [_run_unit(run, reference, name, saved.get((reference, name))) for name in slots]
     errors = {(r.condition, slot(r.brief, r.repetition)): r.error for r in records}
-    problems = list(report["problems"])
+    problems = (
+        [f"evidence report unavailable: {error}"] if report is None else list(report["problems"])
+    )
     problems += [
         f"unregistered output: {r.condition}/{slot(r.brief, r.repetition)}"
         for r in records
@@ -1211,7 +1235,9 @@ def measure(protocol: Record, run: Path, report: Record) -> Record:
             if unit["status"] != "ok"
         ],
         "costs": _costs(manifest, read_calls(run), work, [CANDIDATE, reference]),
-        "evidence": _evidence(report),
+        "evidence": {"status": "unavailable", "error": error}
+        if report is None
+        else _evidence(report),
         "owner_review": {
             "status": "pending",
             "sample": protocol["owner_review"]["sample"],
@@ -1239,6 +1265,19 @@ def artifacts(run: Path) -> dict[str, str]:
     }
     names |= {path.relative_to(run).as_posix() for path in (run / EVIDENCE).rglob("*.*")}
     return {name: file_sha(run / name) for name in sorted(names) if (run / name).is_file()}
+
+
+def _evidence_lines(evidence: Record) -> list[str]:
+    if evidence["status"] != "available":
+        return [f"Evidence report unavailable: {evidence['error']}"]
+    return [
+        f"Evidence report `{evidence['report']['id']}`; reference "
+        f"{evidence['reference']['permitted']} identified: "
+        f"{evidence['reference']['identified']}; protected overlap: "
+        f"{evidence['overlap']['protected_overlap']}.",
+        "",
+        *(f"- {item}" for item in evidence["pending"]),
+    ]
 
 
 def _run_markdown(record: Record) -> str:
@@ -1290,12 +1329,7 @@ def _run_markdown(record: Record) -> str:
         "",
         "## Evidence",
         "",
-        f"Evidence report `{record['evidence']['report']['id']}`; reference "
-        f"{record['evidence']['reference']['permitted']} identified: "
-        f"{record['evidence']['reference']['identified']}; protected overlap: "
-        f"{record['evidence']['overlap']['protected_overlap']}.",
-        "",
-        *(f"- {item}" for item in record["evidence"]["pending"]),
+        *_evidence_lines(record["evidence"]),
         "",
         "## Owner structural review",
         "",
@@ -1309,25 +1343,68 @@ def _run_markdown(record: Record) -> str:
     return "\n".join(lines)
 
 
+def claim_path(protocol: Path) -> Path:
+    """Where a protocol's run claim is kept: beside the protocol, never in a runs folder."""
+    return protocol.with_name(f"{protocol.stem}.run-claim.json")
+
+
+def read_claim(protocol: Path) -> Record | None:
+    """The protocol's sealed run claim, or None when it has never been run."""
+    path = claim_path(protocol)
+    if not path.exists():
+        return None
+    claim = read_sealed(path)
+    if claim.get("kind") != CLAIM_KIND:
+        raise ValueError(f"not a G-E run claim: {path}")
+    return claim
+
+
+def _claim(path: Path, protocol: Record, options: RunOptions) -> Record:
+    """Claim the protocol's one run before generating; exclusive creation refuses reruns."""
+    try:
+        return create_record(
+            claim_path(path),
+            {
+                "kind": CLAIM_KIND,
+                "protocol_id": protocol["id"],
+                "runs_dir": str(options.runs_dir.resolve()),
+                "claimed_at": options.clock().isoformat(),
+            },
+        )
+    except FileExistsError as error:
+        raise ValueError(ALREADY_RUN) from error
+
+
 def run(path: Path, options: RunOptions) -> Path:
-    """Execute the bound dev workflow after a ready check and record its evidence."""
+    """Execute the bound dev workflow after a ready check and record its evidence.
+
+    The run is claimed beside the protocol before any generation, so it happens at
+    most once wherever its outputs go. Once generation has happened the G-E record
+    is always written, with the evidence marked unavailable if its report fails.
+    """
     checked = require(path)
     protocol = read_protocol(path)
-    for existing in sorted(options.runs_dir.glob(f"*/{RUN_RECORD}")):
-        # A fixed cohort is run once: no top-up, no substituted rerun.
-        if read_json(existing).get("protocol", {}).get("id") == protocol["id"]:
-            raise ValueError(f"this protocol already has a registered run: {existing.parent}")
+    if read_claim(path) is not None:
+        raise ValueError(ALREADY_RUN)
     config = (path.parent / protocol["registration"]["config"]).resolve()
-    folder = run_experiment(config, options)
-    request = _evidence_request(protocol, path, folder)
-    report = evidence_report.write(request, folder / EVIDENCE / "report")
+    # Validated without spending before the claim, so a configuration error burns nothing.
+    prepared = prepare(config, options.environ)
+    claim = _claim(path, protocol, options)
+    folder = execute(prepared, options)
+    report: Record | None = None
+    error: str | None = None
+    try:
+        request = _evidence_request(protocol, path, folder)
+        report = evidence_report.write(request, folder / EVIDENCE / "report")
+    except (OSError, ValueError, KeyError, TypeError) as failure:
+        error = str(failure) or type(failure).__name__
     record = create_record(
         folder / RUN_RECORD,
         {
             "kind": RUN_KIND,
             "run_version": RUN_VERSION,
             "name": protocol["name"],
-            "test_only": bool(protocol["test_only"] or report["test_only"]),
+            "test_only": bool(protocol["test_only"] or report is None or report["test_only"]),
             "statement": NOT_A_DECISION,
             "protocol": {
                 "path": relative(path.resolve(), folder),
@@ -1335,8 +1412,9 @@ def run(path: Path, options: RunOptions) -> Path:
                 "sha256": checked["protocol_sha256"],
                 "commit": checked["protocol_commit"],
             },
+            "claim": {"path": relative(claim_path(path).resolve(), folder), "id": claim["id"]},
             "judges": "diagnostic_only",
-            **measure(protocol, folder, report),
+            **measure(protocol, folder, report, error),
             "artifacts": artifacts(folder),
         },
     )
@@ -1371,12 +1449,21 @@ def verify(path: Path, run: Path) -> list[str]:
         return [*reasons, f"G-E run record missing or changed: {error}"]
     if record["protocol"]["id"] != protocol["id"]:
         reasons.append("run is bound to another G-E protocol")
+    claim = read_claim(path)
+    if claim is None or claim["id"] != record["claim"]["id"]:
+        reasons.append("run is not the protocol's claimed run")
     reasons += artifact_problems(run, record)
     folder = run / EVIDENCE / "report"
     try:
-        _, changed = evidence_report.check(folder)
-        reasons += [f"evidence report: {reason}" for reason in changed]
-        current = measure(protocol, run, read_sealed(folder / evidence_report.REPORT))
+        if record["evidence"]["status"] != "available":
+            # Never current: this run's evidence could not be recorded.
+            error = record["evidence"]["error"]
+            reasons.append(f"evidence report unavailable: {error}")
+            current = measure(protocol, run, None, error)
+        else:
+            _, changed = evidence_report.check(folder)
+            reasons += [f"evidence report: {reason}" for reason in changed]
+            current = measure(protocol, run, read_sealed(folder / evidence_report.REPORT))
     except (OSError, ValueError, KeyError) as error:
         return [*reasons, f"run evidence can no longer be measured: {error}"]
     reasons += [
