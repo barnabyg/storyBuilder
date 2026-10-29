@@ -7,6 +7,7 @@ from nde.files import write_text_lf
 from nde.runs.records import (
     REPORT,
     CallRecord,
+    LocalTotals,
     LocalWorkRecord,
     Manifest,
     OutputRecord,
@@ -380,17 +381,23 @@ def _equal_budget_section(manifest: Manifest) -> list[str]:
             "",
             *(
                 f"- {match.brief} #{match.repetition + 1} local work: "
-                + "; ".join(
-                    f"{name} {totals.passes} passes, {totals.tokens} model tokens, "
-                    f"{totals.attention_cells} attention cells, "
-                    f"{totals.elapsed_seconds:.2f} s"
-                    for name, totals in (match.local_work or {}).items()
-                )
+                + _match_local_work(match.local_work)
                 for match in equal.matches
             ),
             "",
         ]
     return lines
+
+
+def _match_local_work(local_work: dict[str, LocalTotals] | None) -> str:
+    if local_work is None:
+        # Matches recorded before local work was kept on every path.
+        return "not recorded"
+    return "; ".join(
+        f"{name} {totals.passes} passes, {totals.tokens} model tokens, "
+        f"{totals.attention_cells} attention cells, {totals.elapsed_seconds:.2f} s"
+        for name, totals in local_work.items()
+    )
 
 
 def _tokens(row: dict[str, int]) -> str:

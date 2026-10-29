@@ -357,6 +357,18 @@ def _passes(count: int) -> str:
     return f"{count} revision pass{'' if count == 1 else 'es'}"
 
 
+def _totals(
+    run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetConfig, match: BudgetMatch
+) -> None:
+    """Record the pair's spend so far, however the match ends."""
+    match.after = {name: jobs[name].tokens for name in spec.conditions}
+    if spec.resource_policy is not None:
+        match.local_work = {
+            name: local_totals(run.state.local_work, name, match.brief, match.repetition)
+            for name in spec.conditions
+        }
+
+
 def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetConfig) -> BudgetMatch:
     """Give the cheaper story revision passes until the two budgets are within tolerance."""
     first, second = (jobs[name] for name in spec.conditions)
@@ -380,7 +392,7 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
                 # Preserve both the previous selected story and partial revision artifacts.
                 save(run, cheaper)
                 match.reason = f"revision interrupted: {error}"
-                match.after = {name: jobs[name].tokens for name in spec.conditions}
+                _totals(run, jobs, spec, match)
                 run.state.budget_matches.append(match)
                 raise
             match.passes += 1
@@ -393,12 +405,7 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
                     f"{cheaper.tokens} tokens against {dearer.tokens}"
                 )
                 break
-    match.after = {name: jobs[name].tokens for name in spec.conditions}
-    if spec.resource_policy is not None:
-        match.local_work = {
-            name: local_totals(run.state.local_work, name, match.brief, match.repetition)
-            for name in spec.conditions
-        }
+    _totals(run, jobs, spec, match)
     match.matched = not failed and within(cheaper.tokens, dearer.tokens, spec.tolerance)
     if not match.matched and match.reason is None:
         match.reason = f"not within {spec.tolerance:.0%} after {_passes(match.passes)}"

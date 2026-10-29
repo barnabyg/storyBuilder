@@ -16,11 +16,12 @@ from nde.narrative.workflow import load_plan
 from nde.plan.revision import identity as canonical_identity
 from nde.runs.config import load_config
 from nde.runs.records import read_stories
+from nde.runs.report import render_report
 from nde.stories.resources import call_category
 from nde.stories.selected import selected_text
 from tests.conditional_support import trained_checkpoint
 from tests.conftest import REPO, write_config
-from tests.fake_openai import FakeOpenAI, Json, Reply, completion
+from tests.fake_openai import FakeOpenAI, Json, Reply, completion, error
 from tests.stories import (
     jsonl,
     last_user_message,
@@ -630,3 +631,36 @@ def test_unexpected_local_model_failure_is_a_recorded_failed_e_story(
     assert "planning-error.txt" in story["files"]
     [match] = manifest(result)["stories"]["equal_budget"]["matches"]
     assert match["reason"] == "no story to match: E failed"
+
+
+@pytest.mark.ml
+def test_interrupted_e_revision_still_discloses_local_work_in_the_match(
+    fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, checkpoint: Path
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    provider = Provider(e_scene_tokens=500)
+
+    def refusing(body: Json) -> Reply:
+        if "revising your own short story" in str(body["messages"][0]["content"]):
+            return error(400, "revision refused")
+        return provider(body)
+
+    fake_llm.default = refusing
+    config = e_config(
+        fake_llm,
+        [BASELINE_D, e_condition(checkpoint)],
+        equal_budget={"conditions": ["D", "E"], "resource_policy": POLICY},
+    )
+    result = run(tmp_path, config, expect=1)
+    [match] = manifest(result)["stories"]["equal_budget"]["matches"]
+    assert match["reason"].startswith("revision interrupted")
+    assert match["local_work"]["D"]["tokens"] == 0
+    assert match["local_work"]["E"]["tokens"] == jsonl(result / "local-work.jsonl")[0]["tokens"]
+    report = (result / "report.md").read_text()
+    [line] = [row for row in report.splitlines() if "local work:" in row]
+    assert "E 1 passes" in line
+    # A match saved before local work was kept on this path says so, not an empty line.
+    saved = manifest(result)
+    del saved["stories"]["equal_budget"]["matches"][0]["local_work"]
+    (result / "manifest.json").write_text(json.dumps(saved, indent=2))
+    assert "#1 local work: not recorded" in render_report(result)
