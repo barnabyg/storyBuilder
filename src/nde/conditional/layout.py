@@ -59,16 +59,16 @@ class Capacity(Strict):
     max_tokens: int = Field(default=4096, ge=16, le=65536)
 
 
-def _textless(value: Any, key: str = "", collection: str = "") -> Any:
+def textless(value: Any, key: str = "", collection: str = "") -> Any:
     if isinstance(value, dict):
         row = cast(dict[str, Any], value)
         return {
-            field: _textless(item, field, collection or field)
+            field: textless(item, field, collection or field)
             for field, item in row.items()
             if field not in {"evidence", "sources"}
         }
     if isinstance(value, list):
-        return [_textless(item, key, collection) for item in cast(list[Any], value)]
+        return [textless(item, key, collection) for item in cast(list[Any], value)]
     if isinstance(value, str) and (
         key in TEXT_FIELDS
         or (collection in INTERPRETIVE_FIELDS and key in {"value", "alternatives"})
@@ -175,7 +175,7 @@ def encode_target(target: dict[str, Any], capacity: Capacity) -> dict[str, Any]:
         raise ValueError(
             "layout learning requires approved plot/count targets, not context scaffolding"
         )
-    view = _textless(target["view"])
+    view = textless(target["view"])
     validate_layout(view, capacity)
     return seal(
         {

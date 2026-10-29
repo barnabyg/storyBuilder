@@ -78,8 +78,10 @@ masked output, with classifier-free guidance and bounded work accounting.
 locks without a target annotation. It saves rejected attempts and validated
 structural proposals. The [restricted text-completion workflow](docs/conditional-completion.md)
 fills authorised names, descriptions and subtext through the gateway, preserving
-structure and saving validated plans and cards. Real E experiments require
-genuine passed G3 evidence; tiny fixtures establish software mechanics only.
+structure and saving validated plans and cards. [Inpainting](docs/conditional-inpainting.md)
+offers E behind D's `nde plan revise` mask/lock contract, with honest reporting of
+duplicate alternatives. Real E experiments require genuine passed G3 evidence;
+tiny fixtures establish software mechanics only.
 
 ## Verification
 

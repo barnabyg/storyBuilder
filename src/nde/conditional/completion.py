@@ -81,7 +81,7 @@ def _has_evidence(value: Any) -> bool:
     return False
 
 
-def _replace(content: dict[str, Any], selector: str, value: str) -> None:
+def replace_text(content: dict[str, Any], selector: str, value: str) -> None:
     container: Any = content
     parts = selector.split("/")
     for part in parts[:-1]:
@@ -123,7 +123,7 @@ def _candidate(
         raise ValueError("response fields must exactly match authorized selectors")
     content = copy.deepcopy(before.model_dump(mode="json"))
     for selector, value in completed.fields.items():
-        _replace(content, selector, value)
+        replace_text(content, selector, value)
     candidate = NarrativePlan.model_validate(content)
     unauthorized = _unauthorized_changes(before, candidate, config.fields)
     if unauthorized or candidate.sources or _has_evidence(content):

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -13,6 +14,7 @@ from nde.narrative.models import NarrativePlan
 from nde.narrative.projection import CHANNELS, serialized_plan
 from nde.narrative.validation import validate_plan
 from nde.narrative.workflow import PlanError, rendered_files, schema_json
+from nde.plan.backends import DRevisionBackend, RevisionBackend
 from nde.plan.narrative import NarrativePlanningParams, request_plan
 from nde.runs.config import PromptRef
 from nde.stories.pipeline import Step, StoryContext, TemplateNeed
@@ -38,6 +40,8 @@ class RevisionSpec(Strict):
 class RevisionPlanningParams(NarrativePlanningParams):
     saved_plan: str
     revision: RevisionSpec
+    # None keeps the released D operator; see nde.plan.backends.
+    backend: RevisionBackend | None = None
 
 
 def canonical(value: Any) -> str:
@@ -79,7 +83,7 @@ def selector_value(plan: NarrativePlan, selector: str) -> Any:
     return current
 
 
-def _within(path: str, scope: str) -> bool:
+def within(path: str, scope: str) -> bool:
     return path == scope or path.startswith(scope + "/")
 
 
@@ -119,7 +123,7 @@ def validate_selection(plan: NarrativePlan, spec: RevisionSpec) -> None:
     for selector in [*selections, *spec.locks]:
         selector_value(plan, selector)
     for unit in selections:
-        if any(_within(unit, lock) for lock in spec.locks):
+        if any(within(unit, lock) for lock in spec.locks):
             raise PlanError(f"mask/lock conflict at {unit}")
 
 
@@ -174,9 +178,20 @@ def boundary_errors(before: NarrativePlan, after: NarrativePlan, spec: RevisionS
     errors.extend(
         f"revision_scope: unselected unit changed: {unit}"
         for unit in changed_units(before, after)
-        if not any(_within(unit, scope) for scope in scopes)
+        if not any(within(unit, scope) for scope in scopes)
     )
     return errors
+
+
+def candidate_errors(
+    before: NarrativePlan, candidate: NarrativePlan, spec: RevisionSpec
+) -> list[str]:
+    """The complete-candidate check shared by every backend: whole-plan validity plus scope."""
+    return [
+        f"{item.code} [{item.location}]: {item.message}"
+        for item in validate_plan(candidate).diagnostics
+        if item.severity == "error"
+    ] + boundary_errors(before, candidate, spec)
 
 
 def revision_templates(spec: RevisionSpec) -> list[TemplateNeed]:
@@ -220,27 +235,115 @@ def boundary_evidence(
     }
 
 
+@dataclass
+class RevisionRecord:
+    """One operator invocation; failed and rejected results keep the source selected."""
+
+    name: str
+    before: NarrativePlan
+    spec: RevisionSpec
+    first_call: int
+    prompt_sha256: str
+    model: dict[str, Any]
+    backend: dict[str, Any] | None = None
+    status: str = "failed"
+    selected: NarrativePlan | None = None
+    error: str | None = None
+
+    @property
+    def folder(self) -> str:
+        return f"revisions/{self.name}"
+
+
+def check_name(name: str) -> None:
+    if not name or any(part in {"", ".", ".."} for part in name.split("/")) or "\\" in name:
+        raise PlanError("invalid revision name")
+
+
+def keep_selected(ctx: StoryContext, record: RevisionRecord, selected: NarrativePlan) -> None:
+    record.selected = selected
+    record.status = "accepted" if identity(record.before) != identity(selected) else "noop"
+    _, files = rendered_files(selected)
+    for filename, content in files.items():
+        ctx.keep(f"{record.folder}/{filename}", content)
+        ctx.keep(filename, content)
+
+
+def record_revision(ctx: StoryContext, record: RevisionRecord) -> None:
+    """Shared boundary, last-accepted, provenance and change-summary artifacts."""
+    before, spec, folder = record.before, record.spec, record.folder
+    selected = before if record.selected is None else record.selected
+    ctx.keep(
+        f"{folder}/boundary.json",
+        json.dumps(boundary_evidence(before, selected, spec), indent=2) + "\n",
+    )
+    _, last = rendered_files(before if record.status == "failed" else selected)
+    for filename, content in last.items():
+        ctx.keep(f"{folder}/last-accepted/{filename}", content)
+    lock_ids = {
+        lock: {
+            "before": identity(selector_value(before, lock)),
+            "after": identity(selector_value(selected, lock)),
+        }
+        for lock in spec.locks
+    }
+    provenance = {
+        "version": "1",
+        "status": record.status,
+        "error": record.error,
+        "revision": spec.model_dump(mode="json"),
+        "before_sha256": identity(before),
+        "after_sha256": identity(selected),
+        "changed_units": changed_units(before, selected),
+        "lock_identities": lock_ids,
+        "schema_sha256": hashlib.sha256(schema_json().encode()).hexdigest(),
+        "git_sha": git(["rev-parse", "HEAD"], Path(__file__).parent) or "unknown",
+        "model": record.model,
+        "prompt_sha256": record.prompt_sha256,
+        "seed": ctx.seed,
+        "max_repairs": ctx.structured_config.max_repairs,
+        "brief": ctx.brief.model_dump(mode="json"),
+        "calls": [call.model_dump(mode="json") for call in ctx.state.calls[record.first_call :]],
+    }
+    if record.backend is not None:
+        # Additive, versioned backend metadata; released D provenance omits it.
+        provenance["backend"] = record.backend
+    ctx.keep(f"{folder}/provenance.json", json.dumps(provenance, indent=2) + "\n")
+    ctx.keep(
+        f"{folder}/change-summary.md",
+        "\n".join(
+            [
+                f"# Revision: {record.status}",
+                f"Before: {identity(before)}",
+                f"After: {identity(selected)}",
+                *(f"- {unit}" for unit in changed_units(before, selected)),
+            ]
+        )
+        + "\n",
+    )
+
+
 def revise_plan(
-    ctx: StoryContext, before: NarrativePlan, spec: RevisionSpec, *, name: str = "revision"
+    ctx: StoryContext,
+    before: NarrativePlan,
+    spec: RevisionSpec,
+    *,
+    name: str = "revision",
+    backend: DRevisionBackend | None = None,
 ) -> NarrativePlan:
     """Regenerate under an explicit mask; failures retain the source and every attempt."""
     validate_selection(before, spec)
-    if not name or any(part in {"", ".", ".."} for part in name.split("/")) or "\\" in name:
-        raise PlanError("invalid revision name")
-    folder = f"revisions/{name}"
-    first = len(ctx.state.calls)
-    status = "failed"
-    selected = before
-    error: str | None = None
-    ctx.keep(f"{folder}/source-plan.json", before.model_dump_json(indent=2) + "\n")
-
-    def check(candidate: NarrativePlan) -> list[str]:
-        return [
-            f"{item.code} [{item.location}]: {item.message}"
-            for item in validate_plan(candidate).diagnostics
-            if item.severity == "error"
-        ] + boundary_errors(before, candidate, spec)
-
+    check_name(name)
+    record = RevisionRecord(
+        name=name,
+        before=before,
+        spec=spec,
+        first_call=len(ctx.state.calls),
+        prompt_sha256=ctx.templates[spec.prompt.label].sha256,
+        model=ctx.roles["planner"].model_dump(mode="json"),
+        backend=None if backend is None else backend.model_dump(mode="json"),
+    )
+    ctx.keep(f"{record.folder}/source-plan.json", before.model_dump_json(indent=2) + "\n")
     try:
         selected = request_plan(
             ctx,
@@ -255,60 +358,12 @@ def revise_plan(
                 },
             ),
             NarrativePlan,
-            check,
+            lambda candidate: candidate_errors(before, candidate, spec),
         )
-        status = "accepted" if identity(before) != identity(selected) else "noop"
-        _, files = rendered_files(selected)
-        for filename, content in files.items():
-            ctx.keep(f"{folder}/{filename}", content)
-            ctx.keep(filename, content)
+        keep_selected(ctx, record, selected)
         return selected
     except Exception as failure:
-        error = str(failure)
+        record.error = str(failure)
         raise
     finally:
-        ctx.keep(
-            f"{folder}/boundary.json",
-            json.dumps(boundary_evidence(before, selected, spec), indent=2) + "\n",
-        )
-        _, last = rendered_files(before if status == "failed" else selected)
-        for filename, content in last.items():
-            ctx.keep(f"{folder}/last-accepted/{filename}", content)
-        lock_ids = {
-            lock: {
-                "before": identity(selector_value(before, lock)),
-                "after": identity(selector_value(selected, lock)),
-            }
-            for lock in spec.locks
-        }
-        provenance = {
-            "version": "1",
-            "status": status,
-            "error": error,
-            "revision": spec.model_dump(mode="json"),
-            "before_sha256": identity(before),
-            "after_sha256": identity(selected),
-            "changed_units": changed_units(before, selected),
-            "lock_identities": lock_ids,
-            "schema_sha256": hashlib.sha256(schema_json().encode()).hexdigest(),
-            "git_sha": git(["rev-parse", "HEAD"], Path(__file__).parent) or "unknown",
-            "model": ctx.roles["planner"].model_dump(mode="json"),
-            "prompt_sha256": ctx.templates[spec.prompt.label].sha256,
-            "seed": ctx.seed,
-            "max_repairs": ctx.structured_config.max_repairs,
-            "brief": ctx.brief.model_dump(mode="json"),
-            "calls": [call.model_dump(mode="json") for call in ctx.state.calls[first:]],
-        }
-        ctx.keep(f"{folder}/provenance.json", json.dumps(provenance, indent=2) + "\n")
-        ctx.keep(
-            f"{folder}/change-summary.md",
-            "\n".join(
-                [
-                    f"# Revision: {status}",
-                    f"Before: {identity(before)}",
-                    f"After: {identity(selected)}",
-                    *(f"- {unit}" for unit in changed_units(before, selected)),
-                ]
-            )
-            + "\n",
-        )
+        record_revision(ctx, record)
