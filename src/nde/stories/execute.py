@@ -172,6 +172,30 @@ def _check_resource_policy(conditions: list[Condition], spec: EqualBudgetConfig 
         )
 
 
+def story_conditions(loaded: LoadedConfig) -> list[Condition]:
+    """A story config's pipelines and roles, resolved without reading any brief."""
+    stories = loaded.config.stories
+    if stories is None:
+        return []
+    conditions = [_condition(loaded, spec) for spec in stories.conditions]
+    _check_resource_policy(conditions, stories.equal_budget)
+    return conditions
+
+
+def story_templates(
+    loaded: LoadedConfig, conditions: list[Condition], templates: dict[str, PromptTemplate]
+) -> None:
+    """Load every prompt template the conditions and equal-budget revisions need."""
+    stories = loaded.config.stories
+    needs = [need for condition in conditions for need in condition.pipeline.templates()]
+    if stories is not None and stories.equal_budget is not None:
+        needs.append(TemplateNeed(stories.equal_budget.revision_prompt, REVISION_VARIABLES))
+    for need in needs:
+        require_template(
+            templates, loaded.prompts_dir, need.prompt, dict.fromkeys(need.variables, "x")
+        )
+
+
 def prepare_stories(
     loaded: LoadedConfig, templates: dict[str, PromptTemplate]
 ) -> PreparedStories | None:
@@ -181,19 +205,12 @@ def prepare_stories(
     if stories is None or briefs_dir is None:
         return None
     briefs = select_briefs(stories.briefs, briefs_dir)
-    conditions = [_condition(loaded, spec) for spec in stories.conditions]
-    _check_resource_policy(conditions, stories.equal_budget)
+    conditions = story_conditions(loaded)
     if any(condition.spec.params.get("exemplars") for condition in conditions) and any(
         brief.split != "dev" for brief in briefs
     ):
         raise ConfigError("corpus exemplars may be used only on dev briefs")
-    needs = [need for condition in conditions for need in condition.pipeline.templates()]
-    if stories.equal_budget is not None:
-        needs.append(TemplateNeed(stories.equal_budget.revision_prompt, REVISION_VARIABLES))
-    for need in needs:
-        require_template(
-            templates, loaded.prompts_dir, need.prompt, dict.fromkeys(need.variables, "x")
-        )
+    story_templates(loaded, conditions, templates)
     checksums: dict[str, str] = {}
     for split in SPLITS:
         checksum = split_checksum(briefs_dir, split)
