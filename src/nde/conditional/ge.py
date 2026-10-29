@@ -361,28 +361,14 @@ def d_reference_problems(
     baseline: Record,
     prompts: dict[str, str],
 ) -> list[str]:
-    """How a dev D condition differs from the reference baseline an actual G-D pass named.
-
-    Dev outputs come from a different configuration than G-D's frozen test run, so
-    the configuration checksum necessarily differs; the planner contract must not.
-    """
-    problems = [
-        f"D {name} differs from the G-D reference baseline"
-        for name, current, recorded in (
-            ("pipeline", spec.pipeline, baseline.get("pipeline")),
-            ("params", spec.params, baseline.get("params")),
-            ("schema", digest(schema_json()), baseline.get("schema_sha256")),
-        )
-        if current != recorded
-    ]
-    for role, recorded in sorted(dict(baseline.get("models") or {}).items()):
-        current = roles.get(role)
-        if current is None or current.model_dump(mode="json") != recorded:
-            problems.append(f"D {role} model binding differs from the G-D reference baseline")
-    for label, checksum in sorted(dict(baseline.get("prompts") or {}).items()):
-        if label in prompts and prompts[label] != checksum:
-            problems.append(f"D prompt differs from the G-D reference baseline: {label}")
-    return problems
+    """The evidence report's planner contract applied to a configured D condition."""
+    return evidence_report.planner_contract_problems(
+        pipeline=spec.pipeline,
+        params=spec.params,
+        models={role: binding.model_dump(mode="json") for role, binding in roles.items()},
+        prompts=prompts,
+        baseline=baseline,
+    )
 
 
 def _workflow(

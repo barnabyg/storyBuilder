@@ -91,11 +91,13 @@ This example registers nothing real; supply genuine identities and limits.
   the owner's frozen C tier selection; the configuration's C condition must
   match that selection's reviewed contract (as `nde compare-cd` checks). D is
   permitted only by a `gd_decision` folder that replays from its `gd_batch` (and
-  `gd_realisation` packets) as an actual pass naming D; the D condition's
-  pipeline, parameters, schema, model bindings and shared prompts must equal that
-  reference baseline. Its configuration checksum is not compared, because dev
-  outputs necessarily come from another configuration than G-D's test run. A
-  registered C is refused when a replayed G-D decision permits D.
+  `gd_realisation` packets) as an actual pass naming D, and the D condition must
+  satisfy the evidence report's planner contract against that reference baseline:
+  pipeline, parameters, schema, the baseline's own role bindings and shared
+  prompts. Its configuration checksum is not compared, because dev outputs
+  necessarily come from another configuration than G-D's test run; the report
+  applies the same contract, so it identifies the same D. A registered C is
+  refused when a replayed G-D decision permits D.
 - `cohort` must equal the configuration's dev briefs, in order, and its `repeat`.
   The configuration must select `briefs: {split: dev}` (optionally with `ids`).
   Each brief must be in the frozen `dev` split, unchanged. Configurations that

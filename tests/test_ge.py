@@ -25,11 +25,13 @@ from nde.conditional import ge, ge_review
 from nde.corpus.records_io import create_record, read_sealed
 from nde.runs.config import ConditionSpec, load_config
 from nde.runs.runner import RunOptions
+from nde.stories.execute import story_conditions, story_templates
 from nde.tiers import load_selection
 from tests.conditional_support import trained_checkpoint
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
 from tests.stories import last_user_message, story_config
-from tests.test_candidate_e import e_condition
+from tests.test_baseline_d import BASELINE_D
+from tests.test_candidate_e import Provider, e_condition
 from tests.test_conditional_report import FIELDS, LOCK, Planner, tier_selection
 from tests.test_g1 import git_fixture
 from tests.test_reconstruction_g3 import complete, g3_inputs
@@ -559,6 +561,104 @@ def test_d_reference_identity_follows_the_g_d_baseline(registered: Fixture) -> N
     assert ge.d_reference_problems(spec, {}, baseline, {}) == [
         f"D {role} model binding differs from the G-D reference baseline" for role in sorted(roles)
     ]
+
+
+def _d_workflow(folder: Path, registered: Fixture, fake: FakeOpenAI) -> dict[str, Any]:
+    """An E-versus-D dev config, and the reference baseline an actual G-D pass would name."""
+    config = yaml.safe_load(registered.config.read_text())
+    config["providers"]["fake"]["base_url"] = fake.base_url
+    config["stories"]["conditions"][1] = BASELINE_D
+    config["stories"]["briefs"] = {"split": "dev", "ids": ["brief-01"]}
+    config["stories"]["repeat"] = 1
+    config["stories"]["equal_budget"]["conditions"] = ["E", "D"]
+    folder.mkdir()
+    (folder / "ge.yaml").write_text(yaml.safe_dump(config))
+    loaded = load_config(folder / "ge.yaml")
+    templates: dict[str, Any] = {}
+    story_templates(loaded, story_conditions(loaded), templates)
+    return {
+        "condition": "D",
+        "pipeline": "baseline_d",
+        "params": {},
+        "schema_sha256": ge.digest(ge.schema_json()),
+        # The baseline's own roles; G-D's test configuration had no E and other briefs.
+        "models": {
+            role: binding.model_dump(mode="json")
+            for role, binding in loaded.config.roles.items()
+            if role in {"planner", "prose"}
+        },
+        "prompts": {label: template.sha256 for label, template in templates.items()},
+        "config_sha256": "0" * 64,
+        "planning_artifacts": {},
+    }
+
+
+@pytest.mark.ml
+def test_an_actual_g_d_pass_identifies_d_in_the_protocol_and_the_report(
+    registered: Fixture,
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = registered.root / "d-reference"
+    baseline = _d_workflow(folder, registered, fake_llm)
+    # Fixtures hold no actual G-D pass: the real decision folder layout is promoted in
+    # memory only, by replaying the saved decision as `gd-report` would rebuild it.
+    decision: dict[str, Any] = {"id": "promoted-in-test", "outcome": "passed", "test_only": False}
+    decision["reference_baseline"] = baseline
+    (folder / "gd").mkdir()
+    (folder / "gd/decision.json").write_text(json.dumps(decision))
+    (folder / "gd/reference-baseline.json").write_text(json.dumps(baseline))
+    (folder / "batch").mkdir()
+
+    def replay(*_: object) -> dict[str, Any]:
+        return json.loads((folder / "gd/decision.json").read_text())
+
+    monkeypatch.setattr(ge.gd_report, "decision", replay)
+    monkeypatch.setattr(ge.evidence_report, "gd_decision", replay)
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = Provider()
+    change = {
+        "config": "ge.yaml",
+        "reference": {"condition": "D", "gd_decision": "gd", "gd_batch": "batch"},
+        "cohort": {"briefs": ["brief-01"], "repeat": 1},
+        "owner_review": {
+            "reviewer": "Synthetic owner",
+            "sample_size": 1,
+            "sample_seed": 3,
+            "minutes_per_item": 10,
+            "max_minutes": 10,
+        },
+    }
+    # A D planner that differs from the named baseline is not that reference.
+    wrong = folder / "wrong"
+    wrong.mkdir()
+    shutil.copy2(folder / "ge.yaml", wrong / "ge.yaml")
+    changed = yaml.safe_load((wrong / "ge.yaml").read_text())
+    changed["stories"]["conditions"][1]["params"] = {"critic_iterations": 0}
+    (wrong / "ge.yaml").write_text(yaml.safe_dump(changed))
+    elsewhere = {"condition": "D", "gd_decision": "../gd", "gd_batch": "../batch"}
+    registration(wrong, registered, **change | {"reference": elsewhere})
+    assert "D params differs" in rejected(wrong, capsys)
+    # The baseline's own contract identifies D; G-D's test-configuration checksum is not part.
+    path = registration(folder, registered, id="synthetic-test-only-ge-d", **change)
+    protocol = folder / "protocol.json"
+    assert ge_command("register", path, "--out", protocol) == 0
+    reference = read_sealed(protocol)["frozen"]["reference"]
+    assert (reference["condition"], reference["identification"]) == (
+        "D",
+        "replayed actual G-D pass",
+    )
+    commit(registered.root, "d-reference/protocol.json")
+    assert ge_command("run", protocol, "--runs-dir", folder / "runs") == 0
+    [run] = list((folder / "runs").iterdir())
+    evidence = ge.read_run(run)["evidence"]["reference"]
+    assert evidence["permitted"] == "D"
+    assert evidence["identity_problems"] == []
+    assert evidence["identified"] is True
+    report = read_sealed(run / "ge-evidence/report/report.json")
+    assert report["reference"]["identified"] is True
+    assert ge_command("verify", protocol, run) == 0
 
 
 @pytest.mark.ml

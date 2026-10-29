@@ -180,9 +180,13 @@ always recorded under `reference.reason`, with the decision's identity, outcome 
 `replays` under `reference.gd_decision`.
 
 When a replayed decision names the permitted reference, each reference run must
-match its recorded baseline: pipeline, parameters, model bindings and configuration
-checksum, and any of the decision's planning artifacts inside the run must be
-unchanged. Each difference is listed under `reference.problems`. Reference runs of
+match the planner contract of its full recorded baseline
+(`planner_contract_problems`, shared with [G-E](ge.md)): the pipeline, its
+parameters, the plan schema, the baseline's own role bindings and the prompts
+both use. The configuration checksum is not part of the contract: dev runs, which
+select dev briefs and may run E beside D, necessarily differ from G-D's frozen
+test configuration. Any of the decision's planning artifacts inside the run must
+also be unchanged. Each difference is listed under `reference.identity_problems`. Reference runs of
 the other condition are not used and are also listed there. Each E story is
 compared with the reference outputs for the same brief and brief checksum.
 

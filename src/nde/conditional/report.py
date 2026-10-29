@@ -50,7 +50,7 @@ from nde.llm.config import Strict
 from nde.narrative.ledger import plan_identity
 from nde.narrative.models import NarrativePlan
 from nde.narrative.validation import validate_plan
-from nde.narrative.workflow import PlanError, load_plan
+from nde.narrative.workflow import PlanError, load_plan, schema_json
 from nde.plan.alternatives import AlternativesError, check_report, structural_content
 from nde.plan.backends import ERevisionBackend
 from nde.plan.conditional import ConditionalPlanningParams, brief_conditions
@@ -1279,18 +1279,55 @@ def gd_permission(decision: Record) -> tuple[Literal["C", "D"], str]:
     return "C", f"{reason} does not permit D; the identified C baseline is the reference"
 
 
+def planner_contract_problems(
+    *,
+    pipeline: str,
+    params: Any,
+    models: dict[str, Any],
+    prompts: dict[str, str],
+    baseline: Record,
+) -> list[str]:
+    """How a D planner differs from the reference baseline an actual G-D pass named.
+
+    The contract is the pipeline, its parameters, the plan schema, the baseline's
+    own role bindings and the prompts both use. Dev and G-E configurations
+    necessarily differ from G-D's frozen test configuration (cohort, other
+    conditions), so its checksum is not part of the contract.
+    """
+    problems = [
+        f"D {name} differs from the G-D reference baseline"
+        for name, current, recorded in (
+            ("pipeline", pipeline, baseline.get("pipeline")),
+            ("params", params, baseline.get("params")),
+            ("schema", digest(schema_json()), baseline.get("schema_sha256")),
+        )
+        if current != recorded
+    ]
+    for role, recorded in sorted(_object(baseline.get("models")).items()):
+        if models.get(role) != recorded:
+            problems.append(f"D {role} model binding differs from the G-D reference baseline")
+    for label, checksum in sorted(_object(baseline.get("prompts")).items()):
+        if label in prompts and prompts[label] != checksum:
+            problems.append(f"D prompt differs from the G-D reference baseline: {label}")
+    return problems
+
+
+def run_prompts(run: Path) -> dict[str, str]:
+    """The prompt templates a run loaded, by label, from its manifest."""
+    return {
+        f"{use.template}@{use.version}": use.sha256 for use in read_manifest(run).prompt_templates
+    }
+
+
 def baseline_problems(identity_: Record, baseline: Record, run: Path) -> list[str]:
     """How a reference run differs from the baseline identity a G-D decision recorded."""
-    problems = [
-        f"reference run {field} differs from the G-D reference baseline"
-        for field, recorded in (
-            ("pipeline", baseline.get("pipeline")),
-            ("params", baseline.get("params")),
-            ("models", baseline.get("models")),
-            ("config_sha256", baseline.get("config_sha256")),
-        )
-        if identity_.get(field) != recorded
-    ]
+    problems = planner_contract_problems(
+        pipeline=identity_["pipeline"],
+        params=identity_["params"],
+        models=identity_["models"],
+        prompts=run_prompts(run),
+        baseline=baseline,
+    )
     for name, checksum in sorted(_object(baseline.get("planning_artifacts")).items()):
         path = Path(name)
         if path.is_relative_to(run) and (not path.is_file() or file_checksum(path) != checksum):
@@ -1298,10 +1335,12 @@ def baseline_problems(identity_: Record, baseline: Record, run: Path) -> list[st
     return problems
 
 
-def _gd(ctx: _Context) -> tuple[Literal["C", "D"], str, Record | None]:
+def _gd(ctx: _Context) -> tuple[Literal["C", "D"], str, Record | None, Record]:
+    """The permitted reference, why, the decision's summary and its full baseline record."""
     reference = ctx.request.reference
     if reference.gd_decision is None or reference.gd_batch is None:
-        return "C", "no G-D decision supplied; the identified C baseline is the reference", None
+        reason = "no G-D decision supplied; the identified C baseline is the reference"
+        return "C", reason, None, {}
     folder = ctx.resolve(reference.gd_decision)
     path, baseline_file = folder / "decision.json", folder / "reference-baseline.json"
     packets = [ctx.resolve(packet) for packet in reference.gd_realisation]
@@ -1312,7 +1351,7 @@ def _gd(ctx: _Context) -> tuple[Literal["C", "D"], str, Record | None]:
         replayed = json.loads(json.dumps(gd_decision(ctx.resolve(reference.gd_batch), packets)))
         separate = _read(baseline_file) if baseline_file.is_file() else None
     except (OSError, ValueError, KeyError) as error:
-        return "C", f"G-D decision unreadable: {error}", None
+        return "C", f"G-D decision unreadable: {error}", None, {}
     recorded = saved.get("reference_baseline")
     summary = {
         "path": ctx.rel(folder),
@@ -1331,9 +1370,9 @@ def _gd(ctx: _Context) -> tuple[Literal["C", "D"], str, Record | None]:
         "replays": replayed == saved and separate == recorded,
     }
     if not summary["replays"]:
-        return "C", "G-D decision no longer replays from its bound evidence", summary
+        return "C", "G-D decision no longer replays from its bound evidence", summary, {}
     permitted, reason = gd_permission(saved)
-    return permitted, reason, summary
+    return permitted, reason, summary, _object(recorded)
 
 
 def reference_identity(run: Path, condition: Literal["C", "D"]) -> Record:
@@ -1418,12 +1457,12 @@ def _c_selection(
 
 
 def _reference(ctx: _Context, policy: dict[str, str], units: list[_Unit]) -> Record:
-    permitted, reason, gd = _gd(ctx)
+    # Identity is checked against the full baseline record, not the summary kept in reports.
+    permitted, reason, gd, baseline = _gd(ctx)
     identities: list[Record] = []
     references: list[_Unit] = []
     problems: list[str] = []
     identity_problems: list[str] = []
-    baseline = _object(None if gd is None else gd.get("reference_baseline"))
     # A replayed actual G-D decision fixes the identity of the reference it names.
     fixed = gd is not None and gd["replays"] and baseline.get("condition") == permitted
     for ref in ctx.request.reference.runs:

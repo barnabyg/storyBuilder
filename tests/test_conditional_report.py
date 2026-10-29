@@ -823,7 +823,7 @@ def test_reference_is_c_unless_a_replayed_actual_gd_pass_permits_d(
     assert evidence.baseline_problems(identity_, baseline, gd_run) == []
     changed = identity_ | {"params": {**identity_["params"], "critic_iterations": 9}}
     assert evidence.baseline_problems(changed, baseline, gd_run) == [
-        "reference run params differs from the G-D reference baseline"
+        "D params differs from the G-D reference baseline"
     ]
     plan = gd_run / "stories/D/brief-01/r1/plan.json"
     with restored(plan):
