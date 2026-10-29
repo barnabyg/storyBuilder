@@ -35,6 +35,7 @@ from pydantic import Field, JsonValue, ValidationError, model_validator
 from nde import realisation
 from nde.annotations.records import digest
 from nde.briefs import BriefError
+from nde.cd_comparison import selected_c_problems
 from nde.conditional.data import Conditions
 from nde.conditional.inpainting import training_policy
 from nde.conditional.training import inspect_checkpoint
@@ -1331,11 +1332,40 @@ def _reference_units(ctx: _Context, ref: ReferenceRunRef) -> tuple[Record, list[
     return identity_, units
 
 
+def _c_selection(
+    ctx: _Context, identities: list[Record], permitted: str
+) -> tuple[Record | None, list[str]]:
+    """The owner's C tier selection, and how each C reference run differs from it."""
+    if ctx.request.reference.c_selection is None:
+        return None, []
+    path = ctx.resolve(ctx.request.reference.c_selection)
+    chosen = load_selection(path)
+    ctx.bind(path)
+    selection: Record = {
+        "path": str(path),
+        "id": chosen.id,
+        "tier": chosen.tier,
+        "test_only": chosen.test_only,
+    }
+    if permitted != "C":
+        return selection, []
+    problems: list[str] = []
+    for identity_ in identities:
+        run = Path(identity_["run"])
+        config = Path(read_manifest(run).config_path)
+        problems += [f"{run.name}: {item}" for item in selected_c_problems(chosen, config)]
+    return selection, problems
+
+
 def _reference(ctx: _Context, policy: dict[str, str], units: list[_Unit]) -> Record:
     permitted, reason, gd = _gd(ctx)
     identities: list[Record] = []
     references: list[_Unit] = []
     problems: list[str] = []
+    identity_problems: list[str] = []
+    baseline = _object(None if gd is None else gd.get("reference_baseline"))
+    # A replayed actual G-D decision fixes the identity of the reference it names.
+    fixed = gd is not None and gd["replays"] and baseline.get("condition") == permitted
     for ref in ctx.request.reference.runs:
         if ref.condition != permitted:
             problems.append(
@@ -1344,25 +1374,21 @@ def _reference(ctx: _Context, policy: dict[str, str], units: list[_Unit]) -> Rec
             )
             continue
         identity_, rows = _reference_units(ctx, ref)
-        baseline = _object(None if gd is None else gd.get("reference_baseline"))
-        if baseline.get("condition") == permitted and gd is not None and gd["replays"]:
-            # A replayed G-D decision fixed this reference's identity; runs must match it.
-            problems += [
+        if fixed:
+            identity_problems += [
                 f"{ref.run}: {problem}"
                 for problem in baseline_problems(identity_, baseline, Path(identity_["run"]))
             ]
         identities.append(identity_)
         references.extend(rows)
-    selection: Record | None = None
-    if ctx.request.reference.c_selection is not None:
-        path = ctx.resolve(ctx.request.reference.c_selection)
-        chosen = load_selection(path)
-        ctx.bind(path)
-        selection = {"path": str(path), "id": chosen.id, "tier": chosen.tier}
-        selection["test_only"] = chosen.test_only
-        tiers = {str(i["params"].get("tier")) for i in identities if i["condition"] == "C"}
-        if permitted == "C" and tiers - {chosen.tier}:
-            problems.append("C reference runs differ from the selected C tier")
+    selection, selection_problems = _c_selection(ctx, identities, permitted)
+    identity_problems += selection_problems
+    # Otherwise only the owner's frozen C selection identifies the C baseline.
+    identified = (
+        bool(identities)
+        and not identity_problems
+        and (fixed or (permitted == "C" and selection is not None))
+    )
     for unit in references:
         unit.compare_with(policy)
     comparisons: list[Record] = []
@@ -1393,7 +1419,9 @@ def _reference(ctx: _Context, policy: dict[str, str], units: list[_Unit]) -> Rec
         "gd_decision": gd,
         "identities": identities,
         "c_selection": selection,
-        "status": "compared" if measured else "unavailable",
+        "identified": identified,
+        "identity_problems": identity_problems,
+        "status": ("compared" if identified else "unidentified") if measured else "unavailable",
         "problems": problems,
         "comparisons": comparisons,
         "summary": {
@@ -1555,8 +1583,14 @@ def _pending(content: Record) -> list[str]:
     lineage = content["training_similarity"]["lineage"]
     if not lineage["complete"]:
         pending.append(f"training lineage incomplete: {', '.join(lineage['missing'])}")
-    if content["reference"]["status"] != "compared":
-        pending.append(f"no {content['reference']['permitted']} reference outputs compared")
+    reference = content["reference"]
+    if not reference["identified"]:
+        pending.append(
+            f"reference {reference['permitted']} baseline is not identified: supply its "
+            "replayed G-D decision or, for C, the owner's C selection"
+        )
+    if reference["status"] == "unavailable":
+        pending.append(f"no {reference['permitted']} reference outputs compared")
     if content["test_only"]:
         pending.append("test-only checkpoint: software evidence only")
     pending.append("G-E decision: separate registered comparison and owner review")

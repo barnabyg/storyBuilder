@@ -183,7 +183,15 @@ checksum, and any of the decision's planning artifacts inside the run must be
 unchanged. Each difference is listed under `reference.problems`. Reference runs of
 the other condition are not used and are also listed there. Each E story is
 compared with the reference outputs for the same brief and brief checksum.
-`c_selection`, when given, binds the owner's frozen C tier selection.
+
+A reference is `identified` only when its identity is established: by a replayed
+actual G-D decision naming it, or, for C, by `c_selection`, the owner's frozen C
+tier selection. Each C reference run's original configuration is then checked
+against that selection's reviewed C contract (tier, planning parameters, planner and
+prose bindings, schema and prompts), as `nde compare-cd` does. Any difference is
+listed under `reference.identity_problems`. Comparisons with an unidentified
+reference are still reported but have status `unidentified`, not `compared`, and the
+missing identification is listed under `pending`.
 
 ## Realisation evidence
 

@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 import yaml
 
+from nde import briefs, tiers
 from nde.annotations.records import digest
 from nde.cli import main
 from nde.conditional import report as evidence
@@ -27,7 +28,7 @@ from nde.narrative.models import NarrativePlan
 from nde.reconstruction.codec import CODEC_ID
 from nde.reconstruction.overlap import view_distance
 from tests.conditional_support import trained_checkpoint
-from tests.conftest import REPO
+from tests.conftest import REPO, write_config
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
 from tests.gd_fixtures import gd_batch, prepare_gd
 from tests.stories import jsonl, run, story_config
@@ -45,6 +46,7 @@ from tests.test_revision_backends import (
     revise,
     run_config,
 )
+from tests.test_tiers import tier_provider
 
 # G-D gate fixtures supply the closed batch the real `gd-report` writer decides.
 pytest_plugins = ("tests.test_g1",)
@@ -119,9 +121,12 @@ def runs(tmp_path_factory: pytest.TempPathFactory) -> Evidence:
                 "target_policy": POLICY,
                 "conditions": {"genre": "parable"},
             }
-            value = run_config(root, fake.base_url, UNITS, backend)
+            # Its own folder keeps the story run's config.yaml in place.
+            folder = root / "revision"
+            folder.mkdir()
+            value = run_config(folder, fake.base_url, UNITS, backend)
             value["plans"]["repeat"] = 3
-            revisions = revise(root, value, 0)
+            revisions = revise(folder, value, 0)
             assert revisions is not None
         finally:
             fake.stop()
@@ -716,6 +721,10 @@ def test_reference_is_c_unless_a_replayed_actual_gd_pass_permits_d(
     reference = report["reference"]
     assert reference["permitted"] == "C"
     assert reference["reason"].startswith("no G-D decision supplied")
+    # Without a selection or a replayed decision any C run is only an unidentified C.
+    assert reference["identified"] is False
+    assert reference["status"] == "unidentified"
+    assert any("not identified" in item for item in report["pending"])
     [c] = reference["identities"]
     assert (c["condition"], c["pipeline"]) == ("C", "baseline_c")
     assert reference["summary"] == {
@@ -777,6 +786,66 @@ def test_reference_is_c_unless_a_replayed_actual_gd_pass_permits_d(
         assert evidence.baseline_problems(identity_, baseline, gd_run) == [
             "reference planning artifact changed since G-D: plan.json"
         ]
+
+
+def tier_selection(tmp_path: Path, fake: FakeOpenAI) -> tuple[Path, Path]:
+    """An owner C tier selection from the tiers workflow, and its selected C run."""
+    fake.default = tier_provider
+    value = story_config(
+        fake.base_url,
+        [{"name": "B", "pipeline": "baseline_b"}, {"name": "C", "pipeline": "baseline_c"}],
+        briefs={"ids": ["brief-01"]},
+        equal_budget={"conditions": ["B", "C"]},
+    )
+    (tmp_path / "benchmark/dev").mkdir(parents=True)
+    shutil.copyfile(REPO / "benchmark/dev/brief-01.yaml", tmp_path / "benchmark/dev/brief-01.yaml")
+    briefs.freeze(tmp_path / "benchmark", "dev")
+    value["stories"]["briefs_dir"] = str(tmp_path / "benchmark")
+    packet = tiers.compare(write_config(tmp_path, value, "tiers.yaml"), tmp_path / "tiers")
+    judgement = tiers.DevJudgement(
+        brief="brief-01", tier="M", coherence=4, originality=4, note="Synthetic test fixture"
+    )
+    tiers.review(
+        tmp_path / "tiers",
+        tiers.DevReview(
+            comparison_sha256=packet.id,
+            reviewer="synthetic owner",
+            test_only=True,
+            judgements=[judgement],
+        ),
+    )
+    selection = tmp_path / "selection.json"
+    choice = tiers.Choice(
+        tier="M", owner="synthetic owner", rationale="Synthetic selection", test_only=True
+    )
+    tiers.select(tmp_path / "tiers", choice, selection)
+    return selection, Path(packet.runs["M"])
+
+
+@pytest.mark.ml
+def test_c_reference_is_identified_only_by_its_selection(
+    tmp_path: Path, runs: Evidence, fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    selection, selected = tier_selection(tmp_path, fake_llm)
+    # The selected tier's own C run is the identified C baseline.
+    chosen = {"runs": [{"run": str(selected), "condition": "C"}], "c_selection": str(selection)}
+    path = request(tmp_path / "selected", runs, reference=chosen)
+    reference = build(path, tmp_path / "selected/r")["reference"]
+    assert reference["identified"] is True
+    assert reference["identity_problems"] == []
+    assert reference["c_selection"]["tier"] == "M"
+    # Its brief-01 is the repository brief, not the E fixture's, so nothing is compared.
+    assert reference["status"] == "unavailable"
+    # A tier-L C run is not the selected tier-M baseline, whatever it is called.
+    other = {"runs": [{"run": str(runs.stories), "condition": "C"}], "c_selection": str(selection)}
+    path = request(tmp_path / "other", runs, reference=other)
+    report = build(path, tmp_path / "other/r")
+    reference = report["reference"]
+    assert reference["identified"] is False
+    assert reference["status"] == "unidentified"
+    assert any("differ from reviewed baseline" in p for p in reference["identity_problems"])
+    assert any("not identified" in item for item in report["pending"])
 
 
 @pytest.mark.ml
