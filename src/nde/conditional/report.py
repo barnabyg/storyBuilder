@@ -1065,9 +1065,14 @@ def _compare(population: _Population, queries: list[Record], neighbours: int) ->
     population.row.update(nearest=nearest, summary=_similarity_summary(nearest))
 
 
-def _audit(training: _Population, guarded: _Population, neighbours: int) -> Record:
-    """Protected records queried against a training index; any shared source is overlap."""
-    rows, unresolved = neighbour_rows(training.records or [], guarded.records or [], neighbours)
+def _audit(training: _Population, guarded: _Population) -> Record:
+    """Protected records queried against a training index; any shared source is overlap.
+
+    Every training record is compared, so the overlap list is exhaustive, not only the
+    structurally nearest neighbours.
+    """
+    index = training.records or []
+    rows, unresolved = neighbour_rows(index, guarded.records or [], max(1, len(index)))
     return {
         "training": training.row["name"],
         "protected": guarded.row["name"],
@@ -1107,7 +1112,7 @@ def _training(ctx: _Context, identity_: _Identity, units: list[_Unit]) -> Record
     for population in [*populations, *protected]:
         _compare(population, queries, ctx.request.neighbours)
     audits = [
-        _audit(training, guarded, ctx.request.neighbours)
+        _audit(training, guarded)
         for guarded in protected
         for training in populations
         if training.records is not None

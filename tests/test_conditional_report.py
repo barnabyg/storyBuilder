@@ -612,6 +612,8 @@ def test_protected_material_is_audited_against_every_training_population(
         tmp_path,
         runs,
         training_populations=[{"name": "g3", "path": str(g3), "role": "g3"}],
+        # One structural neighbour per query; the overlap list must still be exhaustive.
+        neighbours=1,
         protected_populations=[
             {"name": "held-out", "path": str(protected)},
             {"name": "clean", "path": str(clean)},

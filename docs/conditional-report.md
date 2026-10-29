@@ -152,9 +152,10 @@ with pretraining material is an explicit unknown limitation. Structural similari
 is a candidate match, not proof of memorisation or its absence.
 
 `protected_populations` must be evaluator-only or validation/test views. They are
-only ever queried: each one is audited against every training index for shared
-source, work or author (`protected_overlap`), and E outputs' nearest protected
-records are listed. A protected view cannot be supplied as a training population.
+only ever queried: each one is audited against every record of every training
+index for shared source, work or author (`protected_overlap`); `overlaps` lists every
+overlapping pair, however many there are, independent of `neighbours`. E outputs'
+nearest protected records are listed. A protected view cannot be supplied as a training population.
 
 ## Reference baseline
 
