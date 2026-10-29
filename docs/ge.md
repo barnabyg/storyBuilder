@@ -198,14 +198,20 @@ section. Any changed or missing plan, story, record or input makes it stale.
 `packet` refuses a stale run and writes `packet.json` (kind `ge-review-packet`,
 `packet_version` 1), a sealed `key.json`, `packet.md` and `review-template.json`.
 The packet lists exactly the protocol's sample. For each slot with two plans the
-owner sees both plans' cards as A and B, chosen by a seeded coin, under the
-registered question; titles and plan identity lines are omitted, but structure
-can still reveal the condition. The sealed key holds which condition and run file
-each label shows. Slots without a plan are settled by the registered rules and
-need no reading. The packet states the owner items and the
-estimated and budgeted minutes. Do not open `key.json` while reviewing.
+owner sees both plans' cards as A and B under the registered question; titles
+and plan identity lines are omitted. The A/B coin uses a random salt kept only
+in the sealed key, not the protocol's public sample seed, and plans are
+identified by salted tokens, so nothing in `packet.json`, `packet.md` or the
+template matches the run's condition-named checksums. The key holds the salt and
+which condition, run file and checksum each label shows. Slots without a plan
+are settled by the registered rules and need no reading. The packet states the
+owner items and the estimated and budgeted minutes.
 
-A review names the packet and, per owner item, the two plan checksums it read:
+Blinding is procedural, not enforced: the key and the run folder stay on disk,
+and plan structure itself can still reveal the condition. Do not open
+`key.json`, `ge-run.json` or the run folder while reviewing.
+
+A review names the packet and, per owner item, the two plan tokens it read:
 
 ```json
 {
@@ -214,7 +220,7 @@ A review names the packet and, per owner item, the two plan checksums it read:
   "test_only": false,
   "ratings": [{
     "item": "item-01",
-    "plans": {"A": "plan A sha256 from packet.json", "B": "plan B sha256"},
+    "plans": {"A": "plan A token from packet.json", "B": "plan B token"},
     "rating": "A",
     "note": "Why, in a sentence."
   }]

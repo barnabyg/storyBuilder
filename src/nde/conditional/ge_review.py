@@ -4,7 +4,10 @@ The packet holds exactly the protocol's frozen dev sample: for each sampled slot
 E's plan and the reference's plan under opaque labels A and B, the registered
 structural question and the owner time budget. Slots where a plan is absent are
 settled by the registered rules without owner reading. Reviews bind the packet
-and each plan's checksum, so a changed output makes the packet stale. Only the
+and each plan's salted token, so a changed output makes the packet stale.
+Blinding is procedural: the coin and tokens use a random salt kept only in the
+sealed key, so nothing the owner reads links a label to a condition, but the key
+and the run stay on disk. Only the
 registered reviewer's own, non-synthetic assessments complete it; model judges
 and synthetic fixtures are recorded and counted but never complete it, and
 missing review stays pending. Applying the criterion is the G-E decision's job.
@@ -12,6 +15,7 @@ missing review stays pending. Applying the criterion is the G-E decision's job.
 
 import hashlib
 import json
+import secrets
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -49,7 +53,7 @@ RULES = {
 
 class Rating(Strict):
     item: str = Field(min_length=1)
-    # The checksums of the two plans the owner read, exactly as the packet lists them.
+    # The tokens of the two plans the owner read, exactly as the packet lists them.
     plans: dict[Literal["A", "B"], str]
     rating: Literal["A", "B", "equivalent", "unknown"]
     note: str = Field(min_length=1)
@@ -91,9 +95,14 @@ def _kind(candidate: Record, reference: Record) -> str:
     return REFERENCE_ABSENT if reference["plan_sha256"] is None else OWNER
 
 
-def _order(seed: int, slot: str) -> bool:
-    """Whether E is shown as plan A: a seeded, per-slot coin."""
-    return int(hashlib.sha256(f"order:{seed}:{slot}".encode()).hexdigest(), 16) % 2 == 0
+def _order(salt: str, slot: str) -> bool:
+    """Whether E is shown as plan A: a per-slot coin from the key's secret salt."""
+    return int(hashlib.sha256(f"order:{salt}:{slot}".encode()).hexdigest(), 16) % 2 == 0
+
+
+def _token(salt: str, sha256: str) -> str:
+    """A plan's identity in the packet, unlinkable to the run's condition-named checksums."""
+    return hashlib.sha256(f"plan:{salt}:{sha256}".encode()).hexdigest()
 
 
 def _cards(plan_file: Path) -> list[str]:
@@ -115,9 +124,11 @@ def create(protocol_path: Path, run: Path, out: Path) -> Record:
     criterion = protocol["criteria"]["structural_criterion"]
     reference = protocol["frozen"]["reference"]["condition"]
     items: list[Record] = []
-    # Conditions and run paths name the condition, so they stay in the sealed key.
+    # Conditions, run paths and checksums name the condition, so they stay in the key.
+    salt = secrets.token_hex(16)
     key: dict[str, dict[str, str]] = {}
     paths: dict[str, dict[str, str]] = {}
+    checksums: dict[str, dict[str, str]] = {}
     for index, slot in enumerate(owner["sample"], start=1):
         name = f"item-{index:02d}"
         candidate, baseline = _unit(record, ge.CANDIDATE, slot), _unit(record, reference, slot)
@@ -130,18 +141,26 @@ def create(protocol_path: Path, run: Path, out: Path) -> Record:
             "plans": None,
         }
         if kind == OWNER:
-            first, second = (
-                (candidate, baseline)
-                if _order(owner["sample_seed"], slot)
-                else (baseline, candidate)
-            )
+            first, second = (candidate, baseline) if _order(salt, slot) else (baseline, candidate)
             shown = {"A": _plan(run, first), "B": _plan(run, second)}
-            item["plans"] = {label: {"sha256": sha} for label, (_, sha) in shown.items()}
+            item["plans"] = {
+                label: {"token": _token(salt, sha)} for label, (_, sha) in shown.items()
+            }
             paths[name] = {label: path for label, (path, _) in shown.items()}
+            checksums[name] = {label: sha for label, (_, sha) in shown.items()}
             key[name] = {"A": first["condition"], "B": second["condition"]}
         items.append(item)
     out.mkdir(parents=True)
-    sealed_key = create_record(out / KEY, {"kind": "ge-review-key", "items": key, "paths": paths})
+    sealed_key = create_record(
+        out / KEY,
+        {
+            "kind": "ge-review-key",
+            "salt": salt,
+            "items": key,
+            "paths": paths,
+            "sha256": checksums,
+        },
+    )
     owner_items = sum(item["kind"] == OWNER for item in items)
     packet = create_record(
         out / PACKET,
@@ -170,8 +189,9 @@ def create(protocol_path: Path, run: Path, out: Path) -> Record:
                 "estimated_minutes": owner_items * owner["minutes_per_item"],
             },
             "judges": "diagnostic only: model estimates never replace the owner's review",
-            "blinding": "Plans are labelled A and B by a seeded coin; the key is sealed apart. "
-            "Structure itself may still reveal the condition.",
+            "blinding": "Procedural: plans are labelled A and B by a coin from a secret salt "
+            "kept only in the sealed key, and identified by salted tokens. Do not open the key "
+            "or the run folder while reviewing. Structure itself may still reveal the condition.",
             "items": items,
             "key_sha256": file_sha(out / KEY),
             "key_id": sealed_key["id"],
@@ -185,7 +205,7 @@ def create(protocol_path: Path, run: Path, out: Path) -> Record:
         "ratings": [
             {
                 "item": item["item"],
-                "plans": {label: plan["sha256"] for label, plan in item["plans"].items()},
+                "plans": {label: plan["token"] for label, plan in item["plans"].items()},
                 "rating": "A | B | equivalent | unknown",
                 "note": "Why, in a sentence.",
             }
@@ -241,12 +261,13 @@ def stale_reasons(folder: Path, packet: Record) -> list[str]:
     reasons += ge.artifact_problems(run, record)
     if not (folder / KEY).is_file() or file_sha(folder / KEY) != packet["key_sha256"]:
         return [*reasons, "the sealed blinding key changed or is missing"]
-    paths: dict[str, dict[str, str]] = read_sealed(folder / KEY)["paths"]
+    key = read_sealed(folder / KEY)
+    paths: dict[str, dict[str, str]] = key["paths"]
     for item in packet["items"]:
         plans: dict[str, Record] = item["plans"] or {}
         for label, plan in plans.items():
             path = run / paths[item["item"]][label]
-            if not path.is_file() or file_sha(path) != plan["sha256"]:
+            if not path.is_file() or _token(key["salt"], file_sha(path)) != plan["token"]:
                 reasons.append(f"{item['item']} plan {label} changed or missing")
     return reasons
 
@@ -269,7 +290,7 @@ def record_review(folder: Path, path: Path) -> Record:
     if review.packet_id != packet["id"]:
         raise ValueError("review names another packet")
     shown = {
-        item["item"]: {label: plan["sha256"] for label, plan in item["plans"].items()}
+        item["item"]: {label: plan["token"] for label, plan in item["plans"].items()}
         for item in packet["items"]
         if item["kind"] == OWNER
     }

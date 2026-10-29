@@ -706,7 +706,7 @@ def review_file(path: Path, packet: dict[str, Any], *, rating: str = "A", **fiel
     ratings = [
         {
             "item": item["item"],
-            "plans": {label: plan["sha256"] for label, plan in item["plans"].items()},
+            "plans": {label: plan["token"] for label, plan in item["plans"].items()},
             "rating": rating,
             "note": "Synthetic fixture note.",
         }
@@ -741,8 +741,16 @@ def test_owner_packet_is_fixed_budgeted_and_missing_review_stays_pending(
     assert "Plan A" in text
     assert "candidate_e" not in text
     # Nothing the owner reads names a condition; the sealed key holds conditions and paths.
-    assert "stories/E" not in (folder / "packet.json").read_text()
-    assert "stories/E" not in (folder / "review-template.json").read_text()
+    # Nor does any identifier: the run's checksums are keyed by condition-named paths,
+    # and the A/B coin comes from a secret salt, not the protocol's public sample seed.
+    shown = (folder / "packet.json").read_text() + (folder / "review-template.json").read_text()
+    assert "stories/E" not in shown
+    record = ge.read_run(registered.run)
+    assert not [name for name, sha in record["artifacts"].items() if sha in shown]
+    key = read_sealed(folder / "key.json")
+    assert len(key["salt"]) == 32
+    assert key["salt"] not in shown
+    assert str(protocol["owner_review"]["sample_seed"]) not in key["salt"]
     # Without any review the owner evidence is pending.
     assert ge_command("review", folder) == 1
     assert ge_review.status(folder)["status"] == "pending"
