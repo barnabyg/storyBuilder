@@ -99,12 +99,16 @@ and files.
 
 ## Failures
 
-A missing, unusable or relabelled checkpoint, malformed lock authority or a
-streaming planner binding fails preparation. During a run, a rejected or
+A missing, unusable or relabelled checkpoint, malformed lock authority, a
+streaming planner binding or a `structured.max_repairs` above the completion
+workflow's limit of 8 fails preparation. During a run, a rejected or
 resource-stopped generation, or an incomplete completion, fails that story
 only: `stories.jsonl` keeps the failed record, the local work and attempted
 calls stay attributed, the conditional records and failed provenance are saved,
-and comparisons report the pair as unresolved rather than omitting it. A run
+and comparisons report the pair as unresolved rather than omitting it. Any
+other planning failure, such as the local model running out of memory or an
+internal fault, fails the story the same way: its error names the step and the
+exception, and `planning-error.txt` keeps the traceback beside the story. A run
 budget stop or provider error during completion aborts the run as for any step,
 after the completion record and local work are saved.
 

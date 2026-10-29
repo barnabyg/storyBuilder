@@ -149,6 +149,7 @@ def _condition(loaded: LoadedConfig, spec: ConditionSpec) -> Condition:
             )
     pipeline.check_roles(loaded.config.roles)
     try:
+        pipeline.check_structured(loaded.config.structured)
         pipeline.check_inputs()
     except ConfigError as error:
         raise ConfigError(f"condition {spec.name!r}: {error}") from error

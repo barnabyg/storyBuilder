@@ -187,6 +187,9 @@ class Pipeline[PlanT](ABC):
     def check_inputs(self) -> None:  # noqa: B027 - an optional hook; most pipelines have none
         """Validate local model inputs during preparation; raises ConfigError."""
 
+    def check_structured(self, structured: StructuredConfig) -> None:  # noqa: B027 - optional
+        """Validate the run's structured-output settings during preparation; raises ConfigError."""
+
     @abstractmethod
     def templates(self) -> list[TemplateNeed]:
         """Every prompt template the pipeline uses, so configs are checked before any call."""

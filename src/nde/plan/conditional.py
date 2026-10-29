@@ -10,6 +10,7 @@ local model's work is recorded as a `LocalWorkRecord`, never as provider calls.
 
 import hashlib
 import json
+import traceback
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -27,6 +28,8 @@ from nde.corpus.records_io import read_json, read_sealed
 from nde.files import write_text_lf
 from nde.gitinfo import git
 from nde.llm.config import ModelBinding
+from nde.llm.errors import ProviderError
+from nde.llm.ledger import BudgetExceededError
 from nde.narrative.base import Strict
 from nde.narrative.ledger import plan_identity
 from nde.narrative.models import NarrativePlan
@@ -50,6 +53,8 @@ GENERATION_STEP = "conditional-generation"
 # The story's folder for E's durable generation and completion records.
 CONDITIONAL_DIR = "conditional"
 PIPELINE = "candidate_e"
+# The traceback of a planning failure no established error type describes.
+ERROR_FILE = "planning-error.txt"
 LITERARY_ADHERENCE = "unassessed; mechanical validation only, no literary or owner judgement"
 
 
@@ -259,6 +264,8 @@ class _Progress:
         self.proposal: dict[str, Any] | None = None
         self.completion: dict[str, Any] | None = None
         self.work: list[LocalWorkRecord] = []
+        # The step running now, which an unexpected failure is attributed to.
+        self.step = GENERATION_STEP
 
 
 def _generate(
@@ -320,16 +327,20 @@ def _complete(
     progress: _Progress,
 ) -> tuple[NarrativePlan, dict[str, Any]]:
     """Complete the proposal's whole text manifest through the run's gateway."""
+    progress.step = COMPLETION_STEP
     proposal_path, record = proposal
     binding = ctx.roles["planner"]
-    request = CompletionRequest(
-        proposal=proposal_path,
-        fields=list(record["completion_fields"]),
-        model=binding,
-        max_repairs=ctx.structured_config.max_repairs,
-        seed=completion_seed(ctx.seed),
-        max_tokens=params.completion_max_tokens,
-    )
+    try:
+        request = CompletionRequest(
+            proposal=proposal_path,
+            fields=list(record["completion_fields"]),
+            model=binding,
+            max_repairs=ctx.structured_config.max_repairs,
+            seed=completion_seed(ctx.seed),
+            max_tokens=params.completion_max_tokens,
+        )
+    except ValueError as error:
+        raise StepFailedError(COMPLETION_STEP, str(error)) from error
     request_path = folder / "completion-request.json"
     write_text_lf(request_path, request.model_dump_json(indent=2) + "\n")
     out = folder / "completion"
@@ -435,6 +446,16 @@ def generate_e_plan(ctx: StoryContext, params: ConditionalPlanningParams) -> Nar
         )
         status = "succeeded"
         return plan
+    except (StepFailedError, ProviderError, BudgetExceededError):
+        raise
+    except Exception as error:
+        # Any other failure, such as the local model running out of memory or an
+        # internal fault, still fails this story explicitly: its type, message and
+        # traceback are kept beside the story with its local work and provenance.
+        ctx.keep(ERROR_FILE, traceback.format_exc())
+        raise StepFailedError(
+            progress.step, f"unexpected {type(error).__name__}: {error} (see {ERROR_FILE})"
+        ) from error
     finally:
         retain(ctx)
         record = provenance_record(ctx, params, progress, status, ctx.state.calls[first:])

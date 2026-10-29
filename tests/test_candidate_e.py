@@ -578,3 +578,55 @@ def test_c_and_d_configs_and_run_files_keep_their_released_form(
     assert not (result / "local-work.jsonl").exists()
     assert "budget_basis" not in (result / "comparison.json").read_text()
     assert "Resource accounting" not in (result / "report.md").read_text()
+
+
+@pytest.mark.ml
+def test_e_rejects_repair_limits_its_completion_cannot_honour_before_any_work(
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    checkpoint: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    config = e_config(fake_llm, [e_condition(checkpoint)])
+    config["structured"] = {"max_repairs": 9}
+    assert main(["run", str(write_config(tmp_path, config))]) == 2
+    assert "max_repairs" in capsys.readouterr().err
+    assert fake_llm.call_count == 0
+    assert not list(tmp_path.rglob("local-work.jsonl"))
+
+
+@pytest.mark.ml
+def test_unexpected_local_model_failure_is_a_recorded_failed_e_story(
+    fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, checkpoint: Path
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = Provider()
+
+    def out_of_memory(*_: object, **__: object) -> dict[str, Any]:
+        raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setattr("nde.conditional.generation.sample_candidate", out_of_memory)
+    config = e_config(
+        fake_llm,
+        [BASELINE_D, e_condition(checkpoint)],
+        equal_budget={"conditions": ["D", "E"], "resource_policy": POLICY},
+    )
+    result = run(tmp_path, config)
+    story, folder = story_folder(result)
+    assert story["status"] == "failed"
+    assert "conditional-generation" in story["error"]
+    assert "RuntimeError: CUDA out of memory" in story["error"]
+    assert story_folder(result, "D")[0]["status"] == "ok"
+    [work] = jsonl(result / "local-work.jsonl")
+    assert work["status"] == "interrupted"
+    assert work["tokens"] == work["attempts"][0]["tokens"] > 0
+    provenance = json.loads((folder / "planning-provenance.json").read_text())
+    assert provenance["status"] == "failed"
+    assert provenance["local_work"] == [work]
+    # The unexpected failure keeps its traceback beside the story, never silently dropped.
+    assert "RuntimeError: CUDA out of memory" in (folder / "planning-error.txt").read_text()
+    assert "planning-error.txt" in story["files"]
+    [match] = manifest(result)["stories"]["equal_budget"]["matches"]
+    assert match["reason"] == "no story to match: E failed"

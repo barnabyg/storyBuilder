@@ -48,6 +48,8 @@ PROMPT_NAME = "conditional_text_completion"
 PROMPT_VERSION = 1
 MAX_TEXT_CHARACTERS = 16000
 MAX_PROVIDER_RETRIES = 3
+# Repair requests a completion may make after an invalid first response.
+MAX_REPAIRS = 8
 
 
 class CompletionRequest(Strict):
@@ -56,7 +58,7 @@ class CompletionRequest(Strict):
     proposal: Path
     fields: list[str] = Field(min_length=1)
     model: ModelBinding
-    max_repairs: int = Field(default=2, ge=0, le=8)
+    max_repairs: int = Field(default=2, ge=0, le=MAX_REPAIRS)
     seed: int = 7
     max_tokens: int = Field(default=1024, ge=1, le=8192)
 
