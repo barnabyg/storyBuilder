@@ -769,6 +769,27 @@ def review_file(path: Path, packet: dict[str, Any], *, rating: str = "A", **fiel
 
 
 @pytest.mark.ml
+def test_nothing_the_owner_reads_links_a_label_to_a_condition(
+    tmp_path: Path, registered: Fixture
+) -> None:
+    folder = tmp_path / "packet"
+    assert ge_command("packet", registered.protocol, registered.run, "--out", folder) == 0
+    # The sealed key holds conditions and paths. No identifier links them either: the
+    # run's checksums are keyed by condition-named paths, so plans appear as salted tokens.
+    shown = (folder / "packet.json").read_text() + (folder / "review-template.json").read_text()
+    assert "stories/E" not in shown
+    record = ge.read_run(registered.run)
+    assert not [name for name, sha in record["artifacts"].items() if sha in shown]
+    key = read_sealed(folder / "key.json")
+    assert len(key["salt"]) == 32
+    assert key["salt"] not in shown
+    # Each packet draws a fresh secret salt; the public sample seed does not fix the coin.
+    again = tmp_path / "again"
+    assert ge_command("packet", registered.protocol, registered.run, "--out", again) == 0
+    assert read_sealed(again / "key.json")["salt"] != key["salt"]
+
+
+@pytest.mark.ml
 def test_owner_packet_is_fixed_budgeted_and_missing_review_stays_pending(
     tmp_path: Path, registered: Fixture
 ) -> None:
@@ -790,17 +811,6 @@ def test_owner_packet_is_fixed_budgeted_and_missing_review_stays_pending(
     assert QUESTION in text
     assert "Plan A" in text
     assert "candidate_e" not in text
-    # Nothing the owner reads names a condition; the sealed key holds conditions and paths.
-    # Nor does any identifier: the run's checksums are keyed by condition-named paths,
-    # and the A/B coin comes from a secret salt, not the protocol's public sample seed.
-    shown = (folder / "packet.json").read_text() + (folder / "review-template.json").read_text()
-    assert "stories/E" not in shown
-    record = ge.read_run(registered.run)
-    assert not [name for name, sha in record["artifacts"].items() if sha in shown]
-    key = read_sealed(folder / "key.json")
-    assert len(key["salt"]) == 32
-    assert key["salt"] not in shown
-    assert str(protocol["owner_review"]["sample_seed"]) not in key["salt"]
     # Without any review the owner evidence is pending.
     assert ge_command("review", folder) == 1
     assert ge_review.status(folder)["status"] == "pending"
