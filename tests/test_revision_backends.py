@@ -376,10 +376,13 @@ def adversarial_sampler(
     view = textless(encode_plan(NarrativePlan.model_validate(source), POLICY, {})["view"])
     mutation(view)
 
-    def sample(*_args: Any, observed: list[int], **_options: Any) -> dict[str, Any]:
+    def sample(
+        checkpoint: Path, *_args: Any, observed: list[int], **_options: Any
+    ) -> dict[str, Any]:
         tokens = tokenize(view)
         return {
             "status": "complete",
+            "checkpoint_id": read_sealed(checkpoint)["id"],
             "generated_tokens": tokens + [PAD] * (len(observed) - len(tokens)),
             "diagnostics": [],
             "work": {"tokens": 1, "attention_cells": 1, "passes": 1, "elapsed_seconds": 0.0},
@@ -819,3 +822,60 @@ def test_e_target_policy_without_its_training_dataset_is_declared_or_refused(
                 {"kind": "e", "checkpoint": learned, "target_policy": POLICY}
             ),
         )
+
+
+@pytest.mark.ml
+@pytest.mark.parametrize("drift", ["replaced", "unreadable"])
+def test_e_checkpoint_drift_during_inference_is_a_recorded_rejection(
+    tmp_path: Path,
+    llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    learned: Path,
+    drift: str,
+) -> None:
+    model = tmp_path / "model.json"
+    model.write_bytes(learned.read_bytes())
+    preflight_sha256 = hashlib.sha256(model.read_bytes()).hexdigest()
+    real = inpainting.sample_candidate
+
+    def drifting(*args: Any, **options: Any) -> dict[str, Any]:
+        if drift == "replaced":
+            changed = read_sealed(model)
+            changed["binding"]["config"]["inference_max_seconds"] = 61
+            model.unlink()
+            create_record(model, {k: v for k, v in changed.items() if k not in {"id", "version"}})
+        else:
+            model.unlink()
+        return real(*args, **options)
+
+    monkeypatch.setattr(inpainting, "sample_candidate", drifting)
+    backend = {"kind": "e", "checkpoint": str(model), "target_policy": POLICY}
+    value = run_config(tmp_path, llm.base_url, UNITS, backend)
+    value["plans"]["repeat"] = 2
+    run = revise(tmp_path, value, 1)
+    assert run is not None
+    records = jsonl(run / "plans.jsonl")
+    assert len(records) == 2
+    assert records[0]["status"] == "failed"
+    first = run / records[0]["path"]
+    record = provenance(first)
+    assert record["status"] == "failed"
+    assert "checkpoint changed or became unreadable" in record["error"]
+    assert record["backend"]["status"] == "checkpoint-changed"
+    assert record["backend"]["checkpoint_file_sha256"] == preflight_sha256
+    [attempt] = record["backend"]["attempts"]
+    assert attempt["status"] == "rejected"
+    assert "checkpoint" in attempt["diagnostics"][0]
+    if drift == "replaced":
+        # The drifted inference really ran, so its work stays counted.
+        assert record["backend"]["work"]["tokens"] > 0
+    else:
+        assert record["backend"]["work"]["tokens"] == 0
+    assert (first / "revisions/revision/boundary.json").is_file()
+    assert (first / "revisions/revision/last-accepted/plan.json").is_file()
+    assert not (first / "plan.json").exists()
+    assert record["calls"] == []
+    # The next alternative is still run and recorded rather than aborting the run.
+    second = provenance(run / records[1]["path"])
+    if drift == "unreadable":
+        assert second["backend"]["status"] == "preflight-failed"

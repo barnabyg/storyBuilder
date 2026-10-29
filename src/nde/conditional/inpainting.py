@@ -374,6 +374,7 @@ class Preflight:
 
     observation: Observation
     checkpoint: dict[str, Any]
+    checkpoint_file_sha256: str
     target_policy_check: dict[str, Any]
 
 
@@ -387,7 +388,11 @@ def prepare_inpainting(
     """Reject unsupported authority, runtime, checkpoint or evidence before any call."""
     validate_selection(plan, spec)
     runtime()
+    # The file is bound once, here: every attempt must use exactly this checkpoint.
+    data = backend.checkpoint.read_bytes()
     checkpoint = inspect_checkpoint(backend.checkpoint)
+    if json.loads(data).get("id") != checkpoint["id"]:
+        raise PlanError("E checkpoint changed during preflight")
     scientific_authority(checkpoint)
     candidate_cost(
         checkpoint, Conditions.model_validate(backend.conditions), backend.guidance_scale
@@ -396,7 +401,7 @@ def prepare_inpainting(
     observation = observe(plan, spec, backend, checkpoint)
     if not observation.editable and not observation.text_fields:
         raise PlanError("E cannot represent any selected structural or text unit")
-    return Preflight(observation, checkpoint, policy_check)
+    return Preflight(observation, checkpoint, hashlib.sha256(data).hexdigest(), policy_check)
 
 
 @dataclass
@@ -415,9 +420,26 @@ class _Run:
     ctx: StoryContext
     record: RevisionRecord
     backend: ERevisionBackend
-    observation: Observation
-    checkpoint: dict[str, Any]
-    target_policy_check: dict[str, Any]
+    preflight: Preflight
+
+    @property
+    def observation(self) -> Observation:
+        return self.preflight.observation
+
+    @property
+    def checkpoint(self) -> dict[str, Any]:
+        return self.preflight.checkpoint
+
+
+def _drift(run: _Run, work: _Work, row: dict[str, Any], diagnostic: str) -> StepFailedError:
+    """The checkpoint is no longer the one preflight bound: reject, and stop this alternative."""
+    row["status"] = "rejected"
+    row["diagnostics"].append(diagnostic)
+    work.status = "checkpoint-changed"
+    return StepFailedError(
+        f"revision-{run.record.name}",
+        f"E checkpoint changed or became unreadable during inpainting: {diagnostic}",
+    )
 
 
 def _attempt(run: _Run, work: _Work, number: int, deadline: float) -> NarrativePlan | None:
@@ -442,14 +464,20 @@ def _attempt(run: _Run, work: _Work, number: int, deadline: float) -> NarrativeP
     path = f"{run.record.folder}/inpainting/attempt-{number:03d}.json"
     # The reservation is kept before inference, so interrupted work stays attributable.
     run.ctx.keep(path, json.dumps(row, indent=2) + "\n")
-    result = sample_candidate(
-        backend.checkpoint,
-        conditions,
-        seed=seed,
-        guidance_scale=backend.guidance_scale,
-        deadline=deadline,
-        observed=run.observation.tokens,
-    )
+    try:
+        # The sampler reloads the checkpoint file, which may have changed since preflight.
+        result = sample_candidate(
+            backend.checkpoint,
+            conditions,
+            seed=seed,
+            guidance_scale=backend.guidance_scale,
+            deadline=deadline,
+            observed=run.observation.tokens,
+        )
+    except (OSError, ValueError, KeyError) as error:
+        failure = _drift(run, work, row, f"checkpoint unusable: {type(error).__name__}: {error}")
+        run.ctx.keep(path, json.dumps(row, indent=2) + "\n")
+        raise failure from error
     work.tokens += result["work"]["tokens"]
     work.attention_cells += result["work"]["attention_cells"]
     work.passes += result["work"]["passes"]
@@ -465,6 +493,14 @@ def _attempt(run: _Run, work: _Work, number: int, deadline: float) -> NarrativeP
     )
     candidate: NarrativePlan | None = None
     try:
+        if result["checkpoint_id"] != run.checkpoint["id"]:
+            raise _drift(
+                run,
+                work,
+                row,
+                f"checkpoint identity drift: inference used {result['checkpoint_id']}, "
+                f"preflight bound {run.checkpoint['id']}",
+            )
         if result["status"] == "resource-stop":
             row["status"] = work.status = "resource-stop"
             raise StepFailedError(f"revision-{run.record.name}", "E inference allowance exhausted")
@@ -568,7 +604,7 @@ def _metadata(run: _Run | None, backend: ERevisionBackend, work: _Work) -> dict[
         "specification": SPECIFICATION,
         "checkpoint": str(run.backend.checkpoint),
         "checkpoint_id": run.checkpoint["id"],
-        "checkpoint_file_sha256": hashlib.sha256(run.backend.checkpoint.read_bytes()).hexdigest(),
+        "checkpoint_file_sha256": run.preflight.checkpoint_file_sha256,
         "parameter_sha256": run.checkpoint["parameter_sha256"],
         "representation": binding["representation"],
         "layout_id": binding["layout_id"],
@@ -577,7 +613,7 @@ def _metadata(run: _Run | None, backend: ERevisionBackend, work: _Work) -> dict[
         "test_only": binding["config"]["test_only"],
         "scientific_evidence": binding["scientific_evidence"].get("status"),
         "target_policy": run.backend.target_policy,
-        "target_policy_check": run.target_policy_check,
+        "target_policy_check": run.preflight.target_policy_check,
         "conditions": Conditions.model_validate(run.backend.conditions).model_dump(mode="json"),
         "guidance_scale": run.backend.guidance_scale,
         "sampling_temperature": binding["config"]["sampling_temperature"],
@@ -627,12 +663,10 @@ def inpaint_plan(
     try:
         try:
             preflight = prepare_inpainting(before, spec, backend)
-        except ValueError as error:
+        except (OSError, ValueError, KeyError, TypeError) as error:
             raise StepFailedError(f"revision-{name}", str(error)) from error
         observation = preflight.observation
-        run = _Run(
-            ctx, record, backend, observation, preflight.checkpoint, preflight.target_policy_check
-        )
+        run = _Run(ctx, record, backend, preflight)
         ctx.keep(
             f"{record.folder}/inpainting/observation.json",
             json.dumps({"view": observation.view, **observation.summary()}, indent=2) + "\n",

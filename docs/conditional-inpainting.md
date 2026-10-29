@@ -54,7 +54,11 @@ content stay observed and are clamped. Masked values keep their serialized width
 so version 1 cannot add, remove or reorder records even where a whole-channel
 mask would let D do so. Selections E cannot represent at all fail preflight.
 
-Each attempt uses its own derived seed and is reserved before inference. The
+Preflight hashes the checkpoint file once and binds its identity. Each attempt
+uses its own derived seed and is reserved before inference, and must run on that
+same checkpoint: if the file becomes unreadable or its identity changes, the
+attempt is recorded as rejected, the alternative fails with status
+`checkpoint-changed` and its provenance and boundary are still saved. The
 complete learned layout is mapped back onto the source by record identity, and
 selected unlocked text (titles, summaries, descriptions and interpretive reading
 text, including channels outside E's representation) is reset for completion.
