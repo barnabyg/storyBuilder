@@ -28,8 +28,8 @@
 - **Next research work:** complete/replay the real G-schema owner evidence,
   make the dev tier selection and commit a G1 protocol before generation and
   blind reading. Real D/corpus experiments require G1; real reconstruction
-  requires G1 and G2. Phase 7 remains conditional on G3. Phases 7–8 are not
-  implemented.
+  requires G1 and G2. Phase 7 remains conditional on G3: its tooling is
+  implemented on fixtures only, and Phase 8 is not implemented.
 
 | Phase | Implementation status on `main` | Implementation issues | Operating guide |
 | --- | --- | --- | --- |
@@ -38,7 +38,7 @@
 | P4 | Masked revision, coarse-to-fine D, bounded critic, controls/diversity, G-D | [#48–55](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP4%5D%22), closed | [Revisions](revisions.md), [D](baseline-d.md), [G-D](gd.md) |
 | P5 | Provenance, splits, segmentation/features, independent extraction, pilot/review, exports and exemplars | [#56–65](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP5%5D%22), closed | [Corpus](corpus.md), [extraction](extraction.md), [G2](corpus-g2.md) |
 | P6 | Codec/tasks, datasets, CPU ML models, paired evaluation, audits/sweeps, G3 and augmentation | [#66–75](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP6%5D%22), open; tooling present | [Training](reconstruction-training.md), [experiments](reconstruction-experiments.md), [G3](reconstruction-evaluation.md) |
-| P7 | Conditional examples, variable layouts, brief-conditioned training with guidance, bounded generation, text completion, D/E inpainting, the Candidate E run pipeline, adherence/diversity/similarity reporting and registered G-E preparation; G-E decision not started | [#76–85](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP7%5D%22): #76–80 closed; #81–84 implemented, open pending acceptance; #85 open (29 October 2026) | [Data](conditional-data.md), [generation](conditional-generation.md), [inpainting](conditional-inpainting.md), [E](candidate-e.md), [evidence](conditional-report.md), [G-E](ge.md) |
+| P7 | Conditional examples, variable layouts, brief-conditioned training with guidance, bounded generation, text completion, D/E inpainting, the Candidate E run pipeline, adherence/diversity/similarity reporting, registered G-E preparation and the G-E decision report; no G-E result | [#76–85](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP7%5D%22): #76–80 closed; #81–85 implemented, open pending acceptance (29 October 2026) | [Data](conditional-data.md), [generation](conditional-generation.md), [inpainting](conditional-inpainting.md), [E](candidate-e.md), [evidence](conditional-report.md), [G-E](ge.md) |
 
 Status above was checked against `main` at `47e25b6` and GitHub Issues on
 27 October 2026. The dated G0/G-instr results below remain historical records;
@@ -618,8 +618,10 @@ implemented and verified on CPU fixture checkpoints only: the Candidate E run
 pipeline, D/E inpainting and the [condition-adherence, diversity and
 training-similarity report](conditional-report.md) are available. The
 [registered G-E preparation](ge.md) (#84: readiness, protocol, bound dev run and
-owner review packet) is implemented; the G-E decision report (#85) is not, and
-no G-E protocol is registered.
+owner review packet) and the [G-E decision](ge.md#g-e-decision) (#85: criteria,
+iteration history, reference retention and Phase 8 eligibility) are implemented,
+so Phase 7 tooling is complete. No G-E protocol is registered and no G-E outcome
+is recorded: the scientific gate remains pending on a genuine G3 pass.
 Real E experiments still require a genuine G3 pass; reconstruction software or
 synthetic criteria are insufficient, and E refuses non-fixture checkpoints
 without passed G3 evidence.
@@ -670,7 +672,7 @@ the outcome is recorded. Phase 6 implementation issues remain open separately.
 | G-D (not recorded) | P4 | Does refinement help? | D meets pre-registered coherence comparison against C, originality safeguard and controllability targets | C becomes the reference baseline |
 | **G2** (not recorded) | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
 | **G3** (not recorded) | P6 | Does denoising beat AR on long-range structure? | Pre-registered validator target and positive long-range margin over matched AR | Stop; D or C is the result |
-| G-E (future) | P7 | Is E competitive enough to evaluate? | Pre-registered validity comparison and owner-reviewed dev structure criterion against the reference baseline | Iterate once, then stop if still below criteria |
+| G-E (not recorded) | P7 | Is E competitive enough to evaluate? | Pre-registered validity comparison and owner-reviewed dev structure criterion against the reference baseline | Iterate once, then stop if still below criteria |
 | **Final** (future) | P8 | Does diffusion deliver a real gain? | E beats the reference baseline on owner coherence at the fixed planned n; originality safeguard met | A valid negative result; publish the internal report |
 
 ## 7. Risk register
