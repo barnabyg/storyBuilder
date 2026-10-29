@@ -239,6 +239,16 @@ actual`). Synthetic ratings can finish the mechanics (`evidence: synthetic`) but
 the status stays `pending`. A missing review stays pending, and a changed plan,
 run record, run artifact or key makes the packet `stale`.
 
+Reviewer identity is self-declared, as for every other owner review in this
+repository ([realisation](realisation.md), tier and corpus reviews): `actual`
+means a non-synthetic, non-diagnostic review whose `reviewer` names the
+registered reviewer and whose plan tokens match the packet. Nothing proves that
+the owner, rather than someone or something writing their name, made the
+ratings, or that the key stayed closed. The saved review keeps the checksum of
+the submitted file; keep that file under version control or with the owner's
+other review records, so the decision can be audited against it. Owner review
+evidence rests on this procedure, not on cryptographic proof.
+
 ## For the G-E decision
 
 The decision report consumes, without re-deciding anything here:

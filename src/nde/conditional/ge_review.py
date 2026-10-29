@@ -10,7 +10,8 @@ sealed key, so nothing the owner reads links a label to a condition, but the key
 and the run stay on disk. Only the
 registered reviewer's own, non-synthetic assessments complete it; model judges
 and synthetic fixtures are recorded and counted but never complete it, and
-missing review stays pending. Applying the criterion is the G-E decision's job.
+missing review stays pending. The reviewer's identity is self-declared, as for
+every owner review in this repository. Applying the criterion is the G-E decision's job.
 """
 
 import hashlib
@@ -388,4 +389,6 @@ def status(folder: Path) -> Record:
         "rule": "Only the registered reviewer's actual ratings complete review. Model "
         "judges are diagnostic and synthetic reviews are test-only; their agreement "
         "never replaces the owner.",
+        "reviewer_identity": "self-declared: the review names the registered reviewer; "
+        "nothing proves who rated the plans or that the key stayed closed",
     }

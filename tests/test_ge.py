@@ -809,7 +809,10 @@ def test_only_the_registered_owners_actual_review_completes_a_real_packet(
     packet = create_record(real / "packet.json", value)
     someone = review_file(tmp_path / "someone.json", packet, reviewer="Someone else")
     assert ge_command("review", real, someone) == 1
-    assert ge_review.status(real)["rated"]["other-reviewer"] > 0
+    status = ge_review.status(real)
+    assert status["rated"]["other-reviewer"] > 0
+    # Reviewer identity is self-declared, and the status says so.
+    assert status["reviewer_identity"].startswith("self-declared")
     synthetic = review_file(tmp_path / "synthetic.json", packet, test_only=True)
     assert ge_command("review", real, synthetic) == 1
     assert ge_review.status(real)["evidence"] == "synthetic"
