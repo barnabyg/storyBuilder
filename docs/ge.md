@@ -422,4 +422,7 @@ software evidence only: they never establish G3, G-E, condition adherence or
 literary quality, and every fixture decision stays pending. No genuine G3 pass
 exists yet, so no real G-E protocol can be registered. Tests in `tests/test_ge.py`
 and `tests/test_ge_decision.py` use a real tiny CPU checkpoint and fake-provider
-calls; genuine outcomes are exercised only by promoting decision content in memory.
+calls. Genuine outcomes are exercised only by promotion inside a test: the G3
+authority replay and the evidence report's test-only flag are promoted in memory,
+and an actual failure, its settlement, the bound real iteration and an actual pass
+then run through the public commands.

@@ -113,8 +113,12 @@ def packet(protocol: Path, run: Path, folder: Path) -> Path:
     return folder
 
 
-def review(folder: Path, prefer: str, **fields: Any) -> None:
-    """A synthetic owner review of every owner item, preferring E, the reference or neither."""
+def review(folder: Path, prefer: str, *, code: int = 1, **fields: Any) -> None:
+    """An owner review of every owner item, preferring E, the reference or neither.
+
+    `nde ge review` exits 1 while the owner evidence stays pending (synthetic reviews
+    always do) and 0 once the registered reviewer's actual ratings complete it.
+    """
     value = ge_review.read_packet(folder)
     key = read_sealed(folder / "key.json")["items"]
     ratings = [
@@ -132,8 +136,7 @@ def review(folder: Path, prefer: str, **fields: Any) -> None:
     path = folder.with_name(f"{folder.name}-review-{len(list(folder.parent.iterdir()))}.json")
     review_value = {"packet_id": value["id"], "reviewer": "Synthetic owner", "ratings": ratings}
     path.write_text(json.dumps(review_value | fields))
-    # A synthetic review finishes the mechanics but never completes the owner evidence.
-    assert ge_command("review", folder, path) == 1
+    assert ge_command("review", folder, path) == code
 
 
 def decide(
@@ -522,6 +525,94 @@ def refused(
     assert ge_command("register", path, "--out", folder / "protocol.json") == 2
     assert not (folder / "protocol.json").exists()
     return capsys.readouterr().err
+
+
+SYNTHETIC_IDENTITIES = (
+    "a test-only checkpoint cannot authorise a real G-E protocol",
+    "a test-only C selection cannot identify a real reference",
+)
+
+
+def promote(patch: pytest.MonkeyPatch) -> None:
+    """Promote fixture evidence to genuine in memory, inside the calling test only.
+
+    Fixtures hold no genuine G3 pass and no real checkpoint. The authority replay is
+    promoted to a genuine G3 pass (dropping only the fixture identities' test-only
+    refusals), and the evidence report to a non-test-only one. Every other check,
+    record and command runs unchanged.
+    """
+    evaluate, build = ge.evaluate, ge.evidence_report.build
+
+    def genuine(registration: ge.GERegistration, base: Path) -> ge.Evaluation:
+        result = evaluate(registration, base)
+        result.problems = [p for p in result.problems if p not in SYNTHETIC_IDENTITIES]
+        result.frozen["g3"] = {
+            "status": "genuine",
+            "reason": "promoted in memory by the test",
+            "decision_id": "promoted-g3-decision",
+            "g3_protocol_id": None,
+        }
+        return result
+
+    def report(manifest: Path, *, origin: Path | None = None) -> dict[str, Any]:
+        return build(manifest, origin=origin) | {"test_only": False}
+
+    patch.setattr(ge, "evaluate", genuine)
+    patch.setattr(ge.evidence_report, "build", report)
+
+
+@pytest.mark.ml
+def test_genuine_outcomes_settle_and_bind_the_iteration_end_to_end(
+    tmp_path: Path, registered: Fixture, fake_llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    promote(monkeypatch)
+    repo = new_repo(tmp_path / "e")
+    real: dict[str, Any] = {"test_only": False, **BOUNDARY}
+    first, first_run = attempt(repo, registered, "first", source=registered.run, **real)
+    assert ge.read_run(first_run)["test_only"] is False
+    first_packet = packet(first, first_run, repo / "first-packet")
+    # The registered reviewer's actual ratings prefer the reference: an actual failure.
+    review(first_packet, "C", code=0)
+    code, decided = decide(first, first_run, repo / "first-decision", first_packet)
+    assert code == 0
+    assert (decided["outcome"], decided["criteria_outcome"]) == ("failed", "failed")
+    assert (decided["test_only"], decided["owner_review"]["evidence"]) == (False, "actual")
+    assert decided["g3"]["status"] == "genuine"
+    assert decided["pending"] == []
+    assert decided["action"]["result"] == "iterate_once_or_stop"
+    assert decided["action"]["reference_planner"]["condition"] == "C"
+    assert decided["action"]["phase_8"] == "not_eligible"
+    assert read_sealed(ge_decision.settlement_path(first))["outcome"] == "failed"
+    commit(
+        repo,
+        "first/protocol.decision-claim.json",
+        "first/protocol.review-claim.json",
+        "first-decision",
+    )
+    # The single real iteration is registered on that actual failure and generated afresh.
+    fake_llm.default = GEProvider()
+    iteration_config(repo / "second", registered, fake_llm)
+    bound = {"attempt": 2, "previous_protocol": "../first/protocol.json", "change": "Guidance."}
+    second, second_run = attempt(
+        repo, registered, "second", source=None, config="ge.yaml", iteration=bound, **real
+    )
+    assert read_sealed(second)["frozen"]["iteration"]["previous"]["decision_id"] == decided["id"]
+    second_packet = packet(second, second_run, repo / "second-packet")
+    review(second_packet, "equivalent", code=0)
+    out = repo / "second-decision"
+    code, record = decide(second, second_run, out, second_packet)
+    assert record["problems"] == []
+    first_attempt = record["history"]["first_attempt"]
+    assert (first_attempt["decision_id"], first_attempt["outcome"]) == (decided["id"], "failed")
+    assert first_attempt["test_only"] is False
+    assert (code, record["outcome"], record["criteria_outcome"]) == (0, "passed", "passed")
+    assert record["action"]["result"] == "eligible_to_prepare_phase_8"
+    assert record["action"]["phase_8"] == "eligible_to_prepare"
+    assert "not proof that E improves final stories" in record["action"]["statement"]
+    assert record["action"]["reference_planner"]["status"] == "retained"
+    assert read_sealed(ge_decision.settlement_path(second))["outcome"] == "passed"
+    commit(repo, "second/protocol.decision-claim.json", "second/protocol.review-claim.json")
+    assert ge_command("replay", out) == 0
 
 
 def iteration_config(folder: Path, fixture: Fixture, fake: FakeOpenAI) -> None:
