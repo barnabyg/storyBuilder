@@ -83,7 +83,8 @@ def attempt(
 ) -> tuple[Path, Path]:
     """Register, commit and run a protocol; `source` stories are copied instead of generated."""
     folder = repo / name
-    path = registration(folder, fixture, id=f"synthetic-test-only-ge-{name}", **changes)
+    ident = name.encode("ascii", "replace").decode().replace("?", "-")
+    path = registration(folder, fixture, id=f"synthetic-test-only-ge-{ident}", **changes)
     protocol = folder / "protocol.json"
     assert ge_command("register", path, "--out", protocol) == 0
     commit(repo, f"{name}/protocol.json")
@@ -218,6 +219,15 @@ def test_a_decision_waits_for_a_recorded_run_and_a_current_owner_review(
     assert any("stories/E/brief-01/r1/plan.json" in problem for problem in record["problems"])
     assert not ge_decision.settlement_path(protocol).exists()
     assert sorted(run.parent.iterdir()) == runs
+    # Evidence that cannot be named relative to the decision folder (another drive) is
+    # refused rather than recorded as a location-dependent absolute path.
+
+    def absolute(path: Path, _: Path) -> str:
+        return path.resolve().as_posix()
+
+    monkeypatch.setattr(ge, "relative", absolute)
+    assert ge_command("decide", protocol, run, "--out", repo / "elsewhere") == 2
+    assert not (repo / "elsewhere").exists()
 
 
 @pytest.mark.ml
@@ -326,8 +336,12 @@ def test_inconsistent_evidence_never_unblinds_and_the_first_applied_ratings_are_
     review(folder, "C")
     _, again = decide(protocol, run, repo / "d-again", folder)
     assert {row["file"]: row["id"] for row in again["owner_review"]["reviews"]} == used
-
     assert (again["criteria_outcome"], again["structural"]["share"]) == ("passed", 0.5)
+    # A committed settled decision blocks re-deciding even when its claim is removed.
+    commit(repo, "d-again")
+    ge_decision.settlement_path(protocol).unlink()
+    assert ge_command("decide", protocol, run, "--packet", folder, "--out", repo / "d-3") == 2
+    assert not (repo / "d-3").exists()
 
 
 def content(
@@ -599,10 +613,12 @@ def test_a_fresh_first_attempt_cannot_reset_the_history(
     tmp_path: Path, registered: Fixture
 ) -> None:
     repo = new_repo(tmp_path / "d")
-    first, _ = attempt(repo, registered, "first", source=registered.run)
+    # A non-ASCII path is read back from history, not skipped as a quoted name.
+    first, _ = attempt(repo, registered, "première", source=registered.run)
     first_id = read_sealed(first)["id"]
     # Deleting the run first attempt and registering a fresh one does not reset history.
-    git_fixture(repo, "rm", "-r", "-q", "first")
+    git_fixture(repo, "rm", "-r", "-q", "première")
+
     git_fixture(repo, "commit", "-q", "-m", "synthetic history reset")
     loosened = BOUNDARY["validator_comparison"] | {"aggregation": "pooled"}
     reset, reset_run = attempt(

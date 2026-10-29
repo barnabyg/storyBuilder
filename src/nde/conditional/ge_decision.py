@@ -27,6 +27,7 @@ Nothing here trains, generates, spends, launches another gate or starts Phase 8.
 
 import json
 import math
+import subprocess
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,7 +36,6 @@ from typing import Any, cast
 from nde.conditional import ge, ge_review
 from nde.corpus.records_io import create_record, file_sha, identity, read_sealed
 from nde.files import write_text_lf
-from nde.gitinfo import git
 
 type Record = dict[str, Any]
 
@@ -45,6 +45,14 @@ DECISION = "decision.json"
 SETTLEMENT_KIND = ge.SETTLEMENT_KIND
 RATINGS_KIND = "ge-review-claim"
 WITHHELD = "withheld: the evidence is inconsistent, so no owner rating is unblinded"
+HISTORY_KINDS = {
+    ge.PROTOCOL_KIND,
+    ge.CLAIM_KIND,
+    SETTLEMENT_KIND,
+    RATINGS_KIND,
+    ge_review.PACKET_KIND,
+    DECISION_KIND,
+}
 COMPLETE = ("passed", "failed")
 FIRST, ITERATION = 1, 2
 # Boundaries are inclusive; a floating-point rate this close to a threshold meets it.
@@ -273,6 +281,8 @@ class History:
     packets: dict[str, set[str]] = field(default_factory=dict[str, set[str]])
     # Protocol ID to the frozen rating sets (packet ID and review files) review claims name.
     ratings: dict[str, set[Frozen]] = field(default_factory=dict[str, set[Frozen]])
+    # History records that could not be read; each makes a decision inconsistent.
+    errors: list[str] = field(default_factory=list[str])
 
     def add(self, record: Record) -> None:
         kind = record.get("kind")
@@ -288,22 +298,39 @@ class History:
             self.packets.setdefault(str(record["protocol_id"]), set()).add(str(record["id"]))
         elif kind == RATINGS_KIND:
             self.ratings.setdefault(str(record["protocol_id"]), set()).add(_frozen(record))
+        elif kind == DECISION_KIND and settles(record):
+            # A committed complete decision settles its protocol even without its claim.
+            self.settlements.setdefault(str(record["protocol"]["id"]), set()).add(str(record["id"]))
 
 
-def _sealed(text: str | None) -> Record | None:
-    """A sealed record from file text, or None when it is not one."""
-    if not text:
-        return None
+def _record(text: str) -> tuple[Record | None, bool]:
+    """A sealed G-E history record from file text, and whether it claims to be one."""
     try:
         value = json.loads(text)
     except ValueError:
-        return None
+        return None, False
     if not isinstance(value, dict):
-        return None
+        return None, False
     record = cast(Record, value)
+    claimed = record.get("kind") in HISTORY_KINDS
     if record.get("version") != "1" or record.get("id") != identity(record):
+        return None, claimed
+    return record, claimed
+
+
+def _git(arguments: list[str], root: Path) -> str | None:
+    """Git output decoded as UTF-8 with unquoted paths, or None when git fails."""
+    try:
+        # S603/S607: fixed git arguments; git is resolved from PATH as a developer prerequisite.
+        completed = subprocess.run(  # noqa: S603
+            ["git", "-c", "core.quotePath=false", *arguments],  # noqa: S607
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
         return None
-    return record
+    return completed.stdout.decode("utf-8")
 
 
 settlement_path = ge.settlement_path
@@ -321,27 +348,49 @@ def history(protocol: Path) -> History:
     history is still found in the commit that added it.
     """
     found = History()
-    texts: list[str | None] = []
+    texts: list[tuple[str, str]] = []
     protocols = [protocol.resolve()]
-    top = git(["rev-parse", "--show-toplevel"], protocol.parent)
+    top = _git(["rev-parse", "--show-toplevel"], protocol.parent)
     if top is not None:
-        root = Path(top)
-        arguments = ["log", "--all", "--format=", "--name-only", "-G", HISTORY_PATTERN]
-        listed = git([*arguments, "--", "*.json"], root) or ""
-        for name in sorted({line for line in listed.splitlines() if line}):
-            commits = (git(["log", "--all", "--format=%H", "--", name], root) or "").split()
-            texts += [git(["show", f"{commit}:{name}"], root) for commit in commits]
+        root = Path(top.strip())
+        arguments = ["log", "--all", "-z", "--format=", "--name-only", "-G", HISTORY_PATTERN]
+        listed = _git([*arguments, "--", "*.json"], root) or ""
+        for name in sorted({entry.strip("\n") for entry in listed.split("\0")} - {""}):
+            # Every commit that leaves the file in place; deleting commits hold no version.
+            log = ["log", "--all", "--format=%H", "--diff-filter=d", "--", name]
+            for commit in (_git(log, root) or "").split():
+                text = _git(["show", f"{commit}:{name}"], root)
+                if text is None:
+                    found.errors.append(f"history record unreadable: {name} at {commit}")
+                else:
+                    texts.append((f"{name} at {commit}", text))
             protocols.append(root / name)
     # Claims are kept beside protocols and need not be committed; the files there now count.
     for path in protocols:
         for name in (path, ge.claim_path(path), settlement_path(path), ratings_path(path)):
             if name.is_file():
-                texts.append(name.read_text(encoding="utf-8"))
-    for text in texts:
-        record = _sealed(text)
-        if record is not None:
+                texts.append((name.as_posix(), name.read_text(encoding="utf-8")))
+    for where, text in texts:
+        record, claimed = _record(text)
+        if record is not None and claimed:
             found.add(record)
+        elif claimed:
+            found.errors.append(f"history record is not a sealed G-E record: {where}")
     return found
+
+
+def located(path: Path, base: Path) -> str:
+    """`path` relative to `base`; refused when only an absolute path could name it.
+
+    A decision records only relative paths, so it replays wherever its evidence moves.
+    """
+    name = ge.relative(path.resolve(), base)
+    if Path(name).is_absolute():
+        raise ValueError(
+            f"{path} cannot be named relative to {base} (another drive?): keep the "
+            "decision folder with its evidence"
+        )
+    return name
 
 
 def reference_identity(reference: Record) -> Record:
@@ -469,7 +518,7 @@ def _first_attempt(path: Path, protocol: Record, out: Path) -> tuple[Record | No
     return {
         "protocol_id": previous["id"],
         "claim_id": previous.get("claim_id"),
-        "decision": ge.relative(folder, out),
+        "decision": located(folder, out),
         "decision_id": saved["id"],
         "criteria_outcome": saved["criteria_outcome"],
         "outcome": saved["outcome"],
@@ -481,7 +530,7 @@ def _history_section(
     path: Path, protocol: Record, out: Path, found: History
 ) -> tuple[Record, list[str]]:
     attempt, previous = _attempt(protocol)
-    problems: list[str] = []
+    problems = [f"history: {error}" for error in found.errors]
     try:
         ge.committed(ge.claim_path(path))
     except ValueError:
@@ -610,7 +659,7 @@ def _owner_review(  # noqa: PLR0913 - the packet folder and everything it must b
         status = ge_review.status(folder, None if frozen is None else dict(frozen[1]))
         reviews = _reviews(folder, status["review_files"])
     except (OSError, ValueError, KeyError, StopIteration) as error:
-        section["packet"] = {"path": ge.relative(folder.resolve(), out)}
+        section["packet"] = {"path": located(folder, out)}
         reason = "the review packet cannot be read"
         return section, None, reason, [*problems, f"review packet: {error}"]
     problems += [f"review packet stale: {reason}" for reason in status["stale"]]
@@ -621,7 +670,7 @@ def _owner_review(  # noqa: PLR0913 - the packet folder and everything it must b
         )
     section.update(
         packet={
-            "path": ge.relative(folder.resolve(), out),
+            "path": located(folder, out),
             "id": packet["id"],
             "key_id": packet["key_id"],
             "test_only": packet["test_only"],
@@ -681,9 +730,9 @@ def _frozen_ratings(
 
 def _run_section(run: Path, record: Record | None, out: Path) -> Record:
     if record is None:
-        return {"path": ge.relative(run.resolve(), out), "record_id": None}
+        return {"path": located(run, out), "record_id": None}
     return {
-        "path": ge.relative(run.resolve(), out),
+        "path": located(run, out),
         "record_id": record["id"],
         "claim_id": record["claim"]["id"],
         "protocol_commit": record["protocol"]["commit"],
@@ -732,7 +781,7 @@ def assess(path: Path, run: Path, packet: Path | None, out: Path) -> Record:
         "test_only": bool(protocol["test_only"] or (record is not None and record["test_only"])),
         "statement": STATEMENT,
         "protocol": {
-            "path": ge.relative(path.resolve(), out),
+            "path": located(path, out),
             "id": protocol["id"],
             "sha256": file_sha(path),
             "attempt": iteration["attempt"],
@@ -849,7 +898,7 @@ def decide(path: Path, run: Path, packet: Path | None, out: Path) -> Record:
                 "kind": SETTLEMENT_KIND,
                 "protocol_id": protocol["id"],
                 "decision_id": record["id"],
-                "decision": ge.relative(out.resolve(), path.parent.resolve()),
+                "decision": located(out, path.parent.resolve()),
                 "attempt": record["protocol"]["attempt"],
                 "criteria_outcome": record["criteria_outcome"],
                 "outcome": record["outcome"],

@@ -140,11 +140,11 @@ This example registers nothing real; supply genuine identities and limits.
   frozen cohort (briefs and checksums, split, repeat, run seed and slots), its
   reference identity, its validator and structural criteria and its owner review,
   must change E, and cannot point at another iteration. Registration checks one
-  protocol and the
-  attempt it names; it cannot see other protocols, so it does not stop a fresh
-  attempt 1 or a second attempt 2 naming the same first attempt. The
-  [decision](#development-iteration-history) enforces that history across
-  protocols.
+  protocol and the attempt it names; it cannot see other protocols, so it does
+  not stop a fresh attempt 1 or a second attempt 2 naming the same first
+  attempt. The [decision](#development-iteration-history) enforces that history
+  across protocols.
+
 
 `register` refuses anything readiness blocks and writes a sealed `ge-protocol`
 record (`protocol_version` 1) with its paths rebased beside the protocol. Its
@@ -342,7 +342,9 @@ pending items. It records the protocol, run, claim, packet, key and review
 identities, G3 authority, lineage, prior exposure, limitations and the
 diagnostic-only judge status. Adherence judgement, realisation review and overlap
 are reported; they are not G-E criteria. Paths are relative to the decision
-folder, so a decision moved with its evidence still replays.
+folder, so a decision moved with its evidence still replays. `decide` refuses
+(exit 2) evidence that can only be named by an absolute path, such as a protocol,
+run or packet on another drive.
 
 ### Settled decisions and replay
 
@@ -350,7 +352,8 @@ A decision **settles** its protocol when its criteria were completely applied to
 consistent evidence: passed or failed, actual or synthetic. `decide` then creates
 the sealed `PROTOCOL.decision-claim.json` (kind `ge-decision-claim`) beside the
 protocol, naming the decision. A settled protocol is never decided again, even
-if the claim is deleted, while any commit still holds it. Pending and
+if the claim is deleted, while any commit still holds the claim or the complete
+decision itself. Pending and
 inconsistent decisions do not settle, so they can be written again to new
 folders once the evidence changes. Commit the decision claim and the decision
 folder.
@@ -367,10 +370,12 @@ cannot disturb a settled decision or the development iteration bound to it.
 ### Development iteration history
 
 The decision enforces the single development iteration across protocols. Its
-history is every G-E protocol, run claim, decision claim and review packet
-committed in the protocol's repository, in any commit of any local branch,
-deleted or superseded versions included. The claims currently kept beside those
-protocols count too. A **comparison** is every protocol with the same test-only
+history is every G-E protocol, run claim, review claim, decision claim, decision
+and review packet committed in the protocol's repository, in any commit of any
+local branch, deleted or superseded versions included, whatever characters their
+paths use. The claims currently kept beside those protocols count too. A history
+record that cannot be read back, or is not a sealed record of its kind, makes the
+decision inconsistent rather than being skipped. A **comparison** is every protocol with the same test-only
 status and the same canonical reference identity: the reference condition, its
 planner pipeline and parameters, and the owner's C selection ID or the G-D
 decision ID. The dev briefs do not matter, and neither do the bytes or path of
