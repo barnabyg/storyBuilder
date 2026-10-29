@@ -87,7 +87,9 @@ config needs at least one of them.
 Before any call, `nde run` rejects unknown briefs, unknown pipelines, invalid
 condition parameters, missing or changed prompt templates, a role a pipeline
 uses that has no model, and unpriced models (see [briefs.md](briefs.md) for
-the briefs themselves).
+the briefs themselves). A selection naming a split checks and reads only that
+split's briefs and frozen record (dev/test ID collisions are still found from
+file names); IDs without a split check every split.
 
 Stories are written brief by brief: for each brief and repetition, every
 condition in turn, so a budget stop leaves comparable stories. Repetition *i*

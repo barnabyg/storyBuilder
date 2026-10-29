@@ -516,6 +516,9 @@ def _cohort(registration: GERegistration, loaded: LoadedConfig, result: Evaluati
     selection = stories.briefs
     if selection.split not in {None, "dev"}:
         raise ValueError("G-E selects dev briefs only; the held-out cohort is never generated")
+    if selection.split is None:
+        # Without a split every split's briefs would be checked, the held-out ones included.
+        raise ValueError("G-E configurations select `split: dev` (with optional ids)")
     ids = selection.ids or sorted(path.stem for path in (root / "dev").glob("*.yaml"))
     if (
         len(ids) != len(set(ids))

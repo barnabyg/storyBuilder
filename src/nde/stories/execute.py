@@ -113,9 +113,13 @@ def _format(error: ValidationError) -> str:
 
 
 def select_briefs(selection: BriefSelection, briefs_dir: Path) -> list[Brief]:
-    """The briefs a stories selection names, in order; raises ConfigError."""
+    """The briefs a stories selection names, in order; raises ConfigError.
+
+    A selection naming a split checks and reads only that split's briefs.
+    """
+    splits = SPLITS if selection.split is None else (selection.split,)
     try:
-        available = load_briefs(briefs_dir)
+        available = load_briefs(briefs_dir, splits)
     except BriefError as error:
         raise ConfigError(str(error)) from error
     if selection.split is not None:

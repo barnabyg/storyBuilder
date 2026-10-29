@@ -34,6 +34,7 @@ from tests.test_conditional_report import FIELDS, LOCK, Planner, tier_selection
 from tests.test_g1 import git_fixture
 from tests.test_reconstruction_g3 import complete, g3_inputs
 
+HELD_OUT = "{not: [valid yaml held-out brief"
 QUESTION = "Which plan has the more coherent long-range structure for this brief?"
 
 
@@ -59,7 +60,11 @@ class Fixture:
 
 
 def _benchmark(root: Path) -> Path:
-    """Frozen dev briefs E can (brief-01) and cannot (brief-02) satisfy; no held-out split."""
+    """Frozen dev briefs E can (brief-01) and cannot (brief-02) satisfy.
+
+    The held-out split holds an unreadable file throughout: nothing G-E runs,
+    verifies or packets may open it.
+    """
     benchmark = root / "benchmark"
     (benchmark / "dev").mkdir(parents=True)
     repository = Path(__file__).resolve().parents[1] / "benchmark/dev"
@@ -68,6 +73,8 @@ def _benchmark(root: Path) -> Path:
         value.update(min_scenes=low, max_scenes=4)
         (benchmark / f"dev/{brief}.yaml").write_text(yaml.safe_dump(value))
     briefs.freeze(benchmark, "dev")
+    (benchmark / "test").mkdir()
+    (benchmark / "test/brief-99.yaml").write_text(HELD_OUT)
     return benchmark
 
 
@@ -79,7 +86,7 @@ def _config(root: Path, fake: FakeOpenAI, checkpoint: Path, selection: Path) -> 
     value = story_config(
         fake.base_url,
         [e_condition(checkpoint, condition_fields=FIELDS, locks=LOCK), c],
-        briefs={"ids": ["brief-01", "brief-02"]},
+        briefs={"split": "dev", "ids": ["brief-01", "brief-02"]},
         briefs_dir=str(_benchmark(root)),
         repeat=2,
         equal_budget={"conditions": ["E", "C"], "resource_policy": {"version": "1"}},
@@ -509,19 +516,23 @@ def test_unsupported_rules_unregistered_thresholds_and_mismatched_identities_are
     (held_out / "ge.yaml").write_text(yaml.safe_dump(config))
     registration(held_out, registered, config="ge.yaml")
     assert "held-out cohort is never generated" in rejected(held_out, capsys)
+    # IDs without `split: dev` would validate every split, the held-out one included.
+    config["stories"]["briefs"] = {"ids": ["brief-01", "brief-02"]}
+    (held_out / "ge.yaml").write_text(yaml.safe_dump(config))
+    assert "split: dev" in rejected(held_out, capsys)
 
 
 @pytest.mark.ml
 def test_g_e_reads_only_dev_briefs(tmp_path: Path, registered: Fixture) -> None:
-    benchmark = registered.root / "benchmark"
-    (benchmark / "test").mkdir()
-    try:
-        # An unreadable held-out file proves readiness never opens the held-out split.
-        (benchmark / "test/brief-99.yaml").write_text("{not: [valid")
-        path = registration(tmp_path / "dev-only", registered)
-        assert ge_command("readiness", path, "--out", tmp_path / "out") == 0
-    finally:
-        shutil.rmtree(benchmark / "test")
+    # The fixture's run was generated beside an unreadable held-out brief file.
+    held_out = registered.root / "benchmark/test/brief-99.yaml"
+    assert held_out.read_text() == HELD_OUT
+    path = registration(tmp_path / "dev-only", registered)
+    assert ge_command("readiness", path, "--out", tmp_path / "out") == 0
+    assert ge_command("verify", registered.protocol, registered.run) == 0
+    assert ge_command("packet", registered.protocol, registered.run, "--out", tmp_path / "p") == 0
+    # Only the selected split is checked: the shared whole-benchmark check still fails.
+    assert briefs.check(held_out.parents[1]).problems
 
 
 @pytest.mark.ml

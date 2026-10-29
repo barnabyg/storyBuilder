@@ -97,8 +97,10 @@ This example registers nothing real; supply genuine identities and limits.
   outputs necessarily come from another configuration than G-D's test run. A
   registered C is refused when a replayed G-D decision permits D.
 - `cohort` must equal the configuration's dev briefs, in order, and its `repeat`.
+  The configuration must select `briefs: {split: dev}` (optionally with `ids`).
   Each brief must be in the frozen `dev` split, unchanged. Configurations that
-  select the `test` split or a brief outside `dev` are refused.
+  select the `test` split, list IDs without `split: dev`, or name a brief outside
+  `dev` are refused.
 - `resources` must equal E's local-model limits and completion budget and the
   run's repair, length, revision, budget-tolerance and dollar limits.
 - `validator_comparison`: E's plan-validity rate minus the reference's must be at
@@ -239,10 +241,11 @@ The decision report consumes, without re-deciding anything here:
 
 ## Limits and evidence status
 
-The shared run machinery validates every brief file in the configured benchmark
-folder before a run, as it always has; G-E's own commands open only the `dev`
-split, and no command selects or generates other briefs. Keep Phase 8's
-held-out cohort in its own frozen benchmark version. Fixture runs use test-only checkpoints and selections and are
+Because the configuration selects `split: dev`, the run, the evidence report and
+every `nde ge` command check and read only the dev split's briefs and frozen
+record; held-out brief files are never opened (a dev/test ID collision is still
+found from file names). Keep Phase 8's held-out cohort in its own frozen
+benchmark version all the same. Fixture runs use test-only checkpoints and selections and are
 software evidence only: they never establish G3, G-E, condition adherence or
 literary quality. Tests in `tests/test_ge.py` use a real tiny CPU checkpoint and
 fake-provider calls.
