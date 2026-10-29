@@ -34,6 +34,11 @@ that pending intent and any cached response; it never causes an invalid final
 plan to be published. A rerun must use a new output directory and cannot rewrite
 the original proposal or a completed run.
 
+Candidate E story runs use the same workflow through
+`nde.conditional.completion.complete_with_gateway`, on the run's own gateway,
+cache, prices and caps; a run budget stop or provider error then stops the run
+after the completion record is saved. See [Candidate E](candidate-e.md).
+
 After complete validation, `plan.json`, `validation.json`, `cards.md` and
 `cards.html` expose the completed plan. Partial, rejected, provider-failed and
 budget-stopped runs keep their diagnostics and last valid artifact without

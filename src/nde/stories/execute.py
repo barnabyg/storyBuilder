@@ -47,6 +47,7 @@ from nde.stories.pipeline import (
     derive_seed,
 )
 from nde.stories.registry import PIPELINES
+from nde.stories.resources import local_totals
 
 # The normalised story, which blind batches and judges see, and the model's raw text.
 RAW_FILE = "story.raw.md"
@@ -97,6 +98,9 @@ class PreparedStories:
                 conditions=self.equal_budget.conditions,
                 tolerance=self.equal_budget.tolerance,
                 max_revision_passes=self.equal_budget.max_revision_passes,
+                resource_policy=None
+                if self.equal_budget.resource_policy is None
+                else self.equal_budget.resource_policy.model_dump(mode="json"),
             ),
         )
 
@@ -108,9 +112,14 @@ def _format(error: ValidationError) -> str:
     )
 
 
-def _select_briefs(selection: BriefSelection, briefs_dir: Path) -> list[Brief]:
+def select_briefs(selection: BriefSelection, briefs_dir: Path) -> list[Brief]:
+    """The briefs a stories selection names, in order; raises ConfigError.
+
+    A selection naming a split checks and reads only that split's briefs.
+    """
+    splits = SPLITS if selection.split is None else (selection.split,)
     try:
-        available = load_briefs(briefs_dir)
+        available = load_briefs(briefs_dir, splits)
     except BriefError as error:
         raise ConfigError(str(error)) from error
     if selection.split is not None:
@@ -144,7 +153,51 @@ def _condition(loaded: LoadedConfig, spec: ConditionSpec) -> Condition:
                 f"condition {spec.name!r} uses role {role!r}, which has no model in `roles`"
             )
     pipeline.check_roles(loaded.config.roles)
+    try:
+        pipeline.check_structured(loaded.config.structured)
+        pipeline.check_inputs()
+    except ConfigError as error:
+        raise ConfigError(f"condition {spec.name!r}: {error}") from error
     return Condition(spec, pipeline)
+
+
+def _check_resource_policy(conditions: list[Condition], spec: EqualBudgetConfig | None) -> None:
+    """Local model work is another unit: comparing it needs an explicit registered policy."""
+    if spec is None or spec.resource_policy is not None:
+        return
+    local = [
+        c.spec.name for c in conditions if c.spec.name in spec.conditions and c.pipeline.local_model
+    ]
+    if local:
+        raise ConfigError(
+            f"equal_budget compares {', '.join(local)}, which runs a local conditional model; "
+            "register equal_budget.resource_policy, since local model work is not provider "
+            "tokens and cannot silently count as an equal budget"
+        )
+
+
+def story_conditions(loaded: LoadedConfig) -> list[Condition]:
+    """A story config's pipelines and roles, resolved without reading any brief."""
+    stories = loaded.config.stories
+    if stories is None:
+        return []
+    conditions = [_condition(loaded, spec) for spec in stories.conditions]
+    _check_resource_policy(conditions, stories.equal_budget)
+    return conditions
+
+
+def story_templates(
+    loaded: LoadedConfig, conditions: list[Condition], templates: dict[str, PromptTemplate]
+) -> None:
+    """Load every prompt template the conditions and equal-budget revisions need."""
+    stories = loaded.config.stories
+    needs = [need for condition in conditions for need in condition.pipeline.templates()]
+    if stories is not None and stories.equal_budget is not None:
+        needs.append(TemplateNeed(stories.equal_budget.revision_prompt, REVISION_VARIABLES))
+    for need in needs:
+        require_template(
+            templates, loaded.prompts_dir, need.prompt, dict.fromkeys(need.variables, "x")
+        )
 
 
 def prepare_stories(
@@ -155,19 +208,13 @@ def prepare_stories(
     briefs_dir = loaded.briefs_dir
     if stories is None or briefs_dir is None:
         return None
-    briefs = _select_briefs(stories.briefs, briefs_dir)
-    conditions = [_condition(loaded, spec) for spec in stories.conditions]
+    briefs = select_briefs(stories.briefs, briefs_dir)
+    conditions = story_conditions(loaded)
     if any(condition.spec.params.get("exemplars") for condition in conditions) and any(
         brief.split != "dev" for brief in briefs
     ):
         raise ConfigError("corpus exemplars may be used only on dev briefs")
-    needs = [need for condition in conditions for need in condition.pipeline.templates()]
-    if stories.equal_budget is not None:
-        needs.append(TemplateNeed(stories.equal_budget.revision_prompt, REVISION_VARIABLES))
-    for need in needs:
-        require_template(
-            templates, loaded.prompts_dir, need.prompt, dict.fromkeys(need.variables, "x")
-        )
+    story_templates(loaded, conditions, templates)
     checksums: dict[str, str] = {}
     for split in SPLITS:
         checksum = split_checksum(briefs_dir, split)
@@ -270,6 +317,7 @@ def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: i
         condition=condition.spec.name,
         repetition=repetition,
         seed=seed,
+        directory=run.run_dir / folder,
     )
     record = StoryRecord(
         brief=brief.id,
@@ -331,6 +379,18 @@ def _passes(count: int) -> str:
     return f"{count} revision pass{'' if count == 1 else 'es'}"
 
 
+def _totals(
+    run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetConfig, match: BudgetMatch
+) -> None:
+    """Record the pair's spend so far, however the match ends."""
+    match.after = {name: jobs[name].tokens for name in spec.conditions}
+    if spec.resource_policy is not None:
+        match.local_work = {
+            name: local_totals(run.state.local_work, name, match.brief, match.repetition)
+            for name in spec.conditions
+        }
+
+
 def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetConfig) -> BudgetMatch:
     """Give the cheaper story revision passes until the two budgets are within tolerance."""
     first, second = (jobs[name] for name in spec.conditions)
@@ -354,7 +414,7 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
                 # Preserve both the previous selected story and partial revision artifacts.
                 save(run, cheaper)
                 match.reason = f"revision interrupted: {error}"
-                match.after = {name: jobs[name].tokens for name in spec.conditions}
+                _totals(run, jobs, spec, match)
                 run.state.budget_matches.append(match)
                 raise
             match.passes += 1
@@ -367,7 +427,7 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
                     f"{cheaper.tokens} tokens against {dearer.tokens}"
                 )
                 break
-    match.after = {name: jobs[name].tokens for name in spec.conditions}
+    _totals(run, jobs, spec, match)
     match.matched = not failed and within(cheaper.tokens, dearer.tokens, spec.tolerance)
     if not match.matched and match.reason is None:
         match.reason = f"not within {spec.tolerance:.0%} after {_passes(match.passes)}"

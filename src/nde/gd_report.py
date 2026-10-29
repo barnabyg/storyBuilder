@@ -206,7 +206,7 @@ def _realisation(binding: GDBinding, packets: list[Path]) -> list[dict[str, Any]
     return evidence or [{"owner_status": "pending", "note": "No realisation packets supplied"}]
 
 
-def _reference(binding: GDBinding, condition: str) -> dict[str, Any]:
+def reference_record(binding: GDBinding, condition: str) -> dict[str, Any]:
     loaded = load_config(Path(binding.config_path))
     stories = loaded.config.stories
     if stories is None:
@@ -343,7 +343,7 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
             "Condition-guess accuracy alone cannot establish successful blinding.",
         ],
         "blinding": blinding,
-        "reference_baseline": _reference(binding, "D" if outcome == "passed" else "C")
+        "reference_baseline": reference_record(binding, "D" if outcome == "passed" else "C")
         if outcome in {"passed", "failed"}
         else None,
         "phase_6": PHASE_6,

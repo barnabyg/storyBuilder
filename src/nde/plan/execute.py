@@ -1,5 +1,6 @@
 """Plan-only runs share experiment preparation, gateway and final run accounting."""
 
+import hashlib
 import json
 import tempfile
 import time
@@ -13,10 +14,14 @@ from nde.files import write_text_lf
 from nde.llm.errors import ProviderError
 from nde.llm.gateway import Gateway
 from nde.llm.ledger import BudgetExceededError
+from nde.narrative.models import NarrativePlan
 from nde.narrative.workflow import PlanError, load_plan
+from nde.plan.alternatives import build_report, write_report
+from nde.plan.backends import ERevisionBackend
 from nde.plan.narrative import NarrativePlanningParams, generate_plan, planning_templates
 from nde.plan.revision import (
     RevisionPlanningParams,
+    identity,
     revise_plan,
     revision_templates,
     validate_selection,
@@ -25,7 +30,7 @@ from nde.runs.config import ConfigError, LoadedConfig
 from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.state import RunState
 from nde.schema.brief import Brief
-from nde.stories.pipeline import StepFailedError, StoryContext
+from nde.stories.pipeline import StepFailedError, StoryContext, TemplateNeed
 
 PUBLISH_ATTEMPTS = 10
 PUBLISH_RETRY_SECONDS = 0.05
@@ -54,6 +59,50 @@ class PreparedPlans:
     briefs: list[Brief]
     repeat: int
     params: NarrativePlanningParams
+    # A revision's recorded original: every alternative must start from these bytes.
+    source: dict[str, str] | None = None
+
+
+def _revision_needs(params: RevisionPlanningParams) -> tuple[dict[str, str], list[TemplateNeed]]:
+    """Check source, mask/locks and the selected backend before any provider or model call."""
+    path = Path(params.saved_plan)
+    plan = load_plan(path)
+    validate_selection(plan, params.revision)
+    source = {
+        "file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "plan_sha256": identity(plan),
+    }
+    if not isinstance(params.backend, ERevisionBackend):
+        return source, revision_templates(params.revision)
+    # Loaded only when E is selected: nde.conditional imports the run registry, so a
+    # module-level import here would be circular.
+    from nde.conditional.inpainting import (  # noqa: PLC0415
+        inpainting_templates,
+        prepare_inpainting,
+    )
+
+    try:
+        prepare_inpainting(plan, params.revision, params.backend)
+    except (KeyError, OSError, TypeError, ValueError) as error:
+        raise PlanError(f"E inpainting preflight: {error}") from error
+    return source, inpainting_templates(params.backend)
+
+
+def _revise(ctx: StoryContext, prepared: PreparedPlans) -> None:
+    """One alternative, derived independently from the unchanged recorded original."""
+    params, source = prepared.params, prepared.source
+    if not isinstance(params, RevisionPlanningParams) or source is None:
+        raise StepFailedError("revision", "revision runs require a recorded original plan")
+    path = Path(params.saved_plan)
+    if hashlib.sha256(path.read_bytes()).hexdigest() != source["file_sha256"]:
+        raise StepFailedError("revision", "recorded original plan changed during the run")
+    before: NarrativePlan = load_plan(path)
+    if isinstance(params.backend, ERevisionBackend):
+        from nde.conditional.inpainting import inpaint_plan  # noqa: PLC0415 - see _revision_needs
+
+        inpaint_plan(ctx, before, params.revision, params.backend)
+    else:
+        revise_plan(ctx, before, params.revision, backend=params.backend)
 
 
 def prepare_plans(
@@ -71,10 +120,13 @@ def prepare_plans(
             if "revision" in config.params
             else NarrativePlanningParams.model_validate(config.params)
         )
+        source: dict[str, str] | None = None
+        needs: list[TemplateNeed] = []
         if isinstance(params, RevisionPlanningParams):
-            source = (loaded.directory / params.saved_plan).resolve()
-            params.saved_plan = str(source)
-            validate_selection(load_plan(source), params.revision)
+            params.saved_plan = str((loaded.directory / params.saved_plan).resolve())
+            if isinstance(params.backend, ERevisionBackend):
+                params.backend.checkpoint = (loaded.directory / params.backend.checkpoint).resolve()
+            source, needs = _revision_needs(params)
         available = load_briefs((loaded.directory / config.briefs_dir).resolve())
     except (BriefError, PlanError, ValidationError) as error:
         raise ConfigError(str(error)) from error
@@ -91,11 +143,8 @@ def prepare_plans(
         raise ConfigError("plan brief selection is empty or contains unknown IDs")
     if any(brief.split != "dev" for brief in chosen):
         raise ConfigError("plan generate is dev-only; held-out generation requires a gate workflow")
-    needs = (
-        revision_templates(params.revision)
-        if isinstance(params, RevisionPlanningParams)
-        else planning_templates(params)
-    )
+    if not isinstance(params, RevisionPlanningParams):
+        needs = planning_templates(params)
     for need in needs:
         require_template(
             templates,
@@ -103,7 +152,7 @@ def prepare_plans(
             need.prompt,
             dict.fromkeys(need.variables, "x"),
         )
-    return PreparedPlans(sorted(chosen, key=lambda brief: brief.id), config.repeat, params)
+    return PreparedPlans(sorted(chosen, key=lambda brief: brief.id), config.repeat, params, source)
 
 
 @dataclass(frozen=True)
@@ -144,9 +193,7 @@ def run_plans(run: PlanRun) -> bool:
             }
             try:
                 if isinstance(prepared.params, RevisionPlanningParams):
-                    revise_plan(
-                        ctx, load_plan(Path(prepared.params.saved_plan)), prepared.params.revision
-                    )
+                    _revise(ctx, prepared)
                 else:
                     generate_plan(ctx, prepared.params)
                 record["status"] = "succeeded"
@@ -172,4 +219,11 @@ def run_plans(run: PlanRun) -> bool:
                     run_dir / "plans.jsonl",
                     "".join(json.dumps(r) + "\n" for r in records),
                 )
+                if isinstance(prepared.params, RevisionPlanningParams) and prepared.source:
+                    write_report(
+                        run_dir,
+                        build_report(
+                            run_dir, Path(prepared.params.saved_plan), prepared.source, records
+                        ),
+                    )
     return passed

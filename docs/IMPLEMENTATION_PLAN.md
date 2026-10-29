@@ -1,8 +1,8 @@
 # Narrative Diffusion Engine — Implementation Plan
 
-**Status:** Working plan v3; G-schema passed; implementation inventory retains its earlier Phase 6 baseline
+**Status:** Working plan v3; tooling through Phase 7 on `main`; G-schema passed
 **Created:** 18 October 2026
-**Updated:** 27 October 2026, recording the completed G-schema owner review
+**Updated:** 29 October 2026, recording the G-schema result, the dev M tier selection and Phase 6–7 issue closure
 **Source:** [Narrative_Diffusion_Writing_Engine_Proposal.md](../Narrative_Diffusion_Writing_Engine_Proposal.md)
 
 ## Current position
@@ -24,19 +24,15 @@
   controls are on `main`. Their implementation issues are closed.
 - **Phase 6 tooling is also on `main`:** structural encoding, protected
   datasets, local denoising/matched AR training, scoring, audits, sweeps, G3
-  reporting and the optional augmentation workflow. Issues #66–75 remain open
-  as of this update; reconcile their acceptance/closure separately from code
-  availability. This plan update does not close them.
+  reporting and the optional augmentation workflow. Issues #66–75 are closed.
 - **Implementation is not a scientific pass.** Beyond the dated G-schema result,
   no genuine G1, G-D, G2 or G3 outcome is recorded in this plan. Synthetic fixture criteria can
   pass while the scientific outcome remains pending. Closed implementation
   tickets and green verification do not authorise later research phases.
-- **Next research work:** make the dev tier selection and commit a G1 protocol before generation and
+- **Next research work:** with the dev M tier selected, commit a G1 protocol before generation and
   blind reading. Real D/corpus experiments require G1; real reconstruction
-  requires G1 and G2. Real Phase 7 experiments remain conditional on G3.
-
-The engineering inventory below retains the earlier `47e25b6` baseline; this
-gate-result update does not reconcile subsequent implementation or issue changes.
+  requires G1 and G2. Phase 7 remains conditional on G3: its tooling is
+  implemented on fixtures only, and Phase 8 is not implemented.
 
 | Phase | Implementation status on `main` | Implementation issues | Operating guide |
 | --- | --- | --- | --- |
@@ -44,10 +40,11 @@ gate-result update does not reconcile subsequent implementation or issue changes
 | P3 | State ledger, C, equal budgets, realisation, tier selection, G1 admission/decision | [#39–47](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP3%5D%22), closed | [C](baseline-c.md), [G1 workflow](g1-workflow.md), [G1 decision](g1-decision.md) |
 | P4 | Masked revision, coarse-to-fine D, bounded critic, controls/diversity, G-D | [#48–55](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP4%5D%22), closed | [Revisions](revisions.md), [D](baseline-d.md), [G-D](gd.md) |
 | P5 | Provenance, splits, segmentation/features, independent extraction, pilot/review, exports and exemplars | [#56–65](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP5%5D%22), closed | [Corpus](corpus.md), [extraction](extraction.md), [G2](corpus-g2.md) |
-| P6 | Codec/tasks, datasets, CPU ML models, paired evaluation, audits/sweeps, G3 and augmentation | [#66–75](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP6%5D%22), open; tooling present | [Training](reconstruction-training.md), [experiments](reconstruction-experiments.md), [G3](reconstruction-evaluation.md) |
+| P6 | Codec/tasks, datasets, CPU ML models, paired evaluation, audits/sweeps, G3 and augmentation | [#66–75](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP6%5D%22), closed | [Training](reconstruction-training.md), [experiments](reconstruction-experiments.md), [G3](reconstruction-evaluation.md) |
+| P7 | Conditional examples, variable layouts, brief-conditioned training with guidance, bounded generation, text completion, D/E inpainting, the Candidate E run pipeline, adherence/diversity/similarity reporting, registered G-E preparation and the G-E decision report; no G-E result | [#76–85](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP7%5D%22): closed | [Data](conditional-data.md), [generation](conditional-generation.md), [inpainting](conditional-inpainting.md), [E](candidate-e.md), [evidence](conditional-report.md), [G-E](ge.md) |
 
-Status above was checked against `main` at `47e25b6` and GitHub Issues on
-27 October 2026. The dated G0/G-instr results below remain historical records;
+Status above was checked against `main` at `39692ae` and GitHub Issues on
+29 October 2026. The dated G0/G-instr results below remain historical records;
 the task tables retain their original plan IDs, which differ from GitHub issue
 numbers. Operating guides describe the implemented interfaces. Future changes
 to scientific criteria require a new committed protocol, not reinterpretation
@@ -648,9 +645,18 @@ scientific G3 pass or real pretrained-model result is recorded here.
 
 ### Phase 7 — Conditional diffusion planner, Candidate E (L) — proposal Stage 5
 
-**Implementation:** not started. Begin real conditional-generation work only
-after a genuine G3 pass; reconstruction software or synthetic criteria are
-insufficient. No E pipeline is currently available.
+**Implementation:** P7.1–P7.4 tooling and P7.5 reporting (#76–83) are
+implemented and verified on CPU fixture checkpoints only: the Candidate E run
+pipeline, D/E inpainting and the [condition-adherence, diversity and
+training-similarity report](conditional-report.md) are available. The
+[registered G-E preparation](ge.md) (#84: readiness, protocol, bound dev run and
+owner review packet) and the [G-E decision](ge.md#g-e-decision) (#85: criteria,
+iteration history, reference retention and Phase 8 eligibility) are implemented,
+so Phase 7 tooling is complete. No G-E protocol is registered and no G-E outcome
+is recorded: the scientific gate remains pending on a genuine G3 pass.
+Real E experiments still require a genuine G3 pass; reconstruction software or
+synthetic criteria are insufficient, and E refuses non-fixture checkpoints
+without passed G3 evidence.
 
 **Goal:** generate new whole-story plans from briefs.
 
@@ -687,7 +693,7 @@ Proposal Stage 7 (novel length, graph diffusion, tooling for revision) is **out 
 The dated G0, G-instr and G-schema outcomes are recorded scientific decisions in
 this plan. For the remaining rows, implemented gate tooling does not establish
 a result: retain pending status until genuine bound evidence is replayed and
-the outcome is recorded. Phase 6 implementation issues remain open separately.
+the outcome is recorded.
 
 | Gate | Phase | Question | Default pass (confirm in pre-registration) | If it fails |
 | --- | --- | --- | --- | --- |
@@ -698,7 +704,7 @@ the outcome is recorded. Phase 6 implementation issues remain open separately.
 | G-D (not recorded) | P4 | Does refinement help? | D meets pre-registered coherence comparison against C, originality safeguard and controllability targets | C becomes the reference baseline |
 | **G2** (not recorded) | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
 | **G3** (not recorded) | P6 | Does denoising beat AR on long-range structure? | Pre-registered validator target and positive long-range margin over matched AR | Stop; D or C is the result |
-| G-E (future) | P7 | Is E competitive enough to evaluate? | Pre-registered validity comparison and owner-reviewed dev structure criterion against the reference baseline | Iterate once, then stop if still below criteria |
+| G-E (not recorded) | P7 | Is E competitive enough to evaluate? | Pre-registered validity comparison and owner-reviewed dev structure criterion against the reference baseline | Iterate once, then stop if still below criteria |
 | **Final** (future) | P8 | Does diffusion deliver a real gain? | E beats the reference baseline on owner coherence at the fixed planned n; originality safeguard met | A valid negative result; publish the internal report |
 
 ## 7. Risk register
@@ -737,7 +743,7 @@ Mapped to the uncertainties in proposal §9.
 
 ## 9. Still open
 
-Implementation through Phase 6 does not resolve the following scientific and
+Implementation through Phase 7 does not resolve the following scientific and
 operational work. Keep missing evidence pending rather than repeating fixture
 checks as a substitute for owner judgement.
 
@@ -745,8 +751,7 @@ checks as a substitute for owner judgement.
    Next are committed G1 registration and blind reading. Follow with independently registered
    G-D/G2 work and genuine G1/G2 prerequisites for G3. Record each actual
    outcome; existing gate commands already enforce admission.
-2. **Phase 6 issue close-out:** reconcile #66–75 against current code, focused
-   tests and CPU ML verification, recording remaining gaps before closing.
+2. **Issue close-out:** Phase 6 and 7 implementation issues (#66–85) are closed.
    Tooling on `main` is not a reason to manufacture a scientific result.
 3. **Fresh held-out briefs, before a G1 follow-up or Phase 8:** plan authorship,
    owner curation, benchmark versioning and independent freezing without

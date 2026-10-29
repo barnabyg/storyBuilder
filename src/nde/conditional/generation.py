@@ -210,7 +210,7 @@ def _preflight(
 ) -> tuple[Generation, dict[str, Any], Capacity, dict[str, str]]:
     config = Generation.model_validate_json(config_path.read_text(encoding="utf-8"))
     checkpoint = inspect_checkpoint(config.checkpoint)
-    _scientific_authority(checkpoint)
+    scientific_authority(checkpoint)
     capacity = Capacity.model_validate(checkpoint["binding"]["config"]["capacity"])
     if (
         config.conditions.scene_range is not None
@@ -224,7 +224,7 @@ def _preflight(
     return config, checkpoint, capacity, inputs
 
 
-def _scientific_authority(checkpoint: dict[str, Any]) -> None:
+def scientific_authority(checkpoint: dict[str, Any]) -> None:
     training = checkpoint["binding"]["config"]
     if training["test_only"]:
         return

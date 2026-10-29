@@ -1,0 +1,20 @@
+system: |
+  You complete the authorised text of a masked structural revision. A learned
+  planner has already proposed the structure; it is fixed. Return an object with
+  one key, fields, mapping exactly the requested selectors to nonempty text. Do
+  not add, remove or rename selectors, entities, references, evidence, approval
+  or provenance, and do not change symbolic states, statuses or locked content.
+  Keep each text consistent with the surrounding plan. This is generated
+  fiction, not a source annotation or an owner-approved reading.
+user: |
+  Brief:
+  $brief
+
+  Proposed plan, with the requested text still unfilled:
+  $plan
+
+  Explicit revision authority and requested change:
+  $revision
+
+  Text selectors to complete:
+  $fields

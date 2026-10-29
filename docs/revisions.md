@@ -84,3 +84,22 @@ constraints and validation diagnostics. Rejected candidates retain their own
 specific diagnostics and raw text under `planning/revision-<name>/`; they never
 replace the source or selected plan. Literary boundary consistency remains a
 human assessment, separate from these explicit symbolic checks.
+
+## Backends and independent alternatives
+
+`plans.params.backend` selects the operator behind this contract. Omitted, the
+request runs the released D operator above and its provenance is unchanged.
+`{version: '1', kind: d}` selects D explicitly and adds `backend` metadata to
+provenance. `kind: e` runs Candidate E's [conditional inpainting](conditional-inpainting.md)
+with the same mask, locks, preflight, complete-candidate validation, boundary
+evidence, failure retention and artifact layout. Existing requests, provenance
+and control reports remain readable; a missing `backend` block means D.
+
+`plans.repeat` yields independent alternatives: each repetition reloads the same
+saved plan, checks it against the checksum recorded before the run, and uses its
+own seed, calls, costs and provenance. The source file is never modified. Each
+revision run writes `alternatives.json` and `alternatives.md`, listing every
+expected alternative and counting only distinct accepted changes. No-ops, exact
+duplicates and structural duplicates are reported rather than counted as
+diversity. `uv run nde plan alternatives RUN_DIR` recomputes the report from the
+saved artifacts and fails if the source, a plan or a provenance record changed.

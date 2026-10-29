@@ -78,8 +78,31 @@ masked output, with classifier-free guidance and bounded work accounting.
 locks without a target annotation. It saves rejected attempts and validated
 structural proposals. The [restricted text-completion workflow](docs/conditional-completion.md)
 fills authorised names, descriptions and subtext through the gateway, preserving
-structure and saving validated plans and cards. Real E experiments require
+structure and saving validated plans and cards. [Candidate E story runs](docs/candidate-e.md)
+use both in an ordinary `nde run` experiment, then C/D's shared prose, ledger and
+final-story selection, recording local model work separately from provider calls.
+[Inpainting](docs/conditional-inpainting.md) offers E behind D's `nde plan revise`
+mask/lock contract, with honest reporting of duplicate alternatives.
+[`nde conditional-report`](docs/conditional-report.md) reports E's requested versus
+realised conditions with documented predicates and complete denominators, keeps
+genre, theme and ending adherence pending until the owner assesses it, and measures
+ID-independent structural diversity across seeds and similarity to known training
+populations and the permitted reference baseline. Real E experiments require
 genuine passed G3 evidence; tiny fixtures establish software mechanics only.
+
+[`nde ge`](docs/ge.md) prepares the registered G-E development comparison. A
+no-spend readiness check replays the checkpoint's genuine G3 pass and lineage;
+a committed protocol freezes E, the identified C/D reference, the exact dev
+cohort and seeds, resource limits, the validator and structural criteria, the
+owner sample and budget, and the single permitted development iteration. The
+registered run records complete denominators, failures, costs and evidence, and
+the owner's blinded structural review packet stays pending until the owner
+completes it. `nde ge decide` then revalidates all of it and seals an immutable
+G-E decision: complete pass, complete failure, pending or inconsistent. It
+enforces the single development iteration across the repository's committed G-E
+history and keeps the identified reference planner on failure. A pass records
+eligibility to prepare Phase 8, not proof that E improves stories, and nothing is
+launched. Fixture decisions stay pending; a real one needs genuine G3 evidence.
 
 ## Verification
 

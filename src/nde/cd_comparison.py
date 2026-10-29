@@ -17,7 +17,7 @@ from nde.runs.runner import RunOptions, run_experiment
 from nde.stories.baseline_c import BaselineCParams
 from nde.stories.budget import story_budget
 from nde.stories.comparison import compare as compare_final
-from nde.stories.execute import prepare_stories
+from nde.stories.execute import story_conditions, story_templates
 
 
 def _c_params(config: ExperimentConfig) -> BaselineCParams:
@@ -56,7 +56,8 @@ def selected_c_problems(selection: tiers.Selection, config_path: Path) -> list[s
         if checksum_lf(schema_json().encode()) != selection.schema_sha256:
             problems.append("selected C schema differs from reviewed baseline")
         templates: dict[str, PromptTemplate] = {}
-        prepare_stories(loaded, templates)
+        # The C contract's prompts only; its briefs are not part of the contract.
+        story_templates(loaded, story_conditions(loaded), templates)
         for label in (
             current.skeleton_prompt.label,
             current.channels_prompt.label,

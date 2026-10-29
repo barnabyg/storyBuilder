@@ -62,7 +62,7 @@ class DiversityReport(Strict):
 type Features = Counter[tuple[str, ...]]
 
 
-def _edges(plan: NarrativePlan) -> Features:
+def typed_edges(plan: NarrativePlan) -> Features:
     scenes = {scene.id: str(index) for index, scene in enumerate(plan.scenes)}
     facts = {fact.id: str(index) for index, fact in enumerate(plan.knowledge_facts)}
     people = {person.id: str(index) for index, person in enumerate(plan.characters)}
@@ -88,7 +88,7 @@ def _edges(plan: NarrativePlan) -> Features:
     return result
 
 
-def _distance(left: Features, right: Features) -> float:
+def multiset_distance(left: Features, right: Features) -> float:
     union = sum((left | right).values())
     return 0.0 if union == 0 else 1.0 - sum((left & right).values()) / union
 
@@ -128,7 +128,7 @@ def diversity_report(path: Path) -> DiversityReport:
                 if scene.id in sample.functions and sample.functions[scene.id].status == "known"
             )
         )
-        edges.append(_edges(plan) if valid else Counter())
+        edges.append(typed_edges(plan) if valid else Counter())
     pairs: list[Distance] = []
     for left, right in combinations(range(len(samples)), 2):
         a, b = samples[left], samples[right]
@@ -138,8 +138,8 @@ def diversity_report(path: Path) -> DiversityReport:
                 right=b.seed,
                 function_distance=None
                 if a.unknown_functions or b.unknown_functions
-                else _distance(functions[left], functions[right]),
-                edge_distance=_distance(edges[left], edges[right])
+                else multiset_distance(functions[left], functions[right]),
+                edge_distance=multiset_distance(edges[left], edges[right])
                 if a.validator_passed and b.validator_passed
                 else None,
             )

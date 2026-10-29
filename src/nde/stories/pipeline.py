@@ -17,6 +17,7 @@ import hashlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, JsonValue
@@ -86,6 +87,9 @@ class StoryContext:
     files: dict[str, str] = field(default_factory=dict[str, str])
     # Approved development examples, supplied only to structural requests.
     planning_examples: str | None = None
+    # The story's folder in the run directory, for pipelines whose local work keeps
+    # durable records while it runs; None outside a story run.
+    directory: Path | None = None
 
     def _prompt(self, ref: PromptRef, variables: Mapping[str, str]) -> Prompt:
         template = self.templates[ref.label]
@@ -112,6 +116,20 @@ class StoryContext:
         try:
             prompt = self._prompt(step.prompt, step.variables)
             return self.gateway.complete(self.roles[step.role], prompt, seed=seed).text
+        finally:
+            record_calls_since(self.gateway, self.state, first, attribution)
+
+    def attributed[T](self, step: str, request: Callable[[], T]) -> T:
+        """Calls an established workflow makes on the gateway, attributed to `step`.
+
+        For requests that do not render a prompt template, such as conditional text
+        completion; every provider call they make is recorded like any other.
+        """
+        attribution = self._attribution(step)
+        self.state.current_call = attribution.call
+        first = len(self.gateway.history)
+        try:
+            return request()
         finally:
             record_calls_since(self.gateway, self.state, first, attribution)
 
@@ -152,6 +170,9 @@ class Pipeline[PlanT](ABC):
     """A generation pipeline bound to one condition's parameters."""
 
     roles: ClassVar[tuple[RoleName, ...]]
+    # Whether the pipeline runs a local conditional model, whose work is reported in
+    # its own units and needs a registered resource policy in equal-budget comparisons.
+    local_model: ClassVar[bool] = False
 
     def required_roles(self) -> tuple[RoleName, ...]:
         """Roles needed by the configured pipeline, including optional stages."""
@@ -162,6 +183,12 @@ class Pipeline[PlanT](ABC):
         for role in self.required_roles():
             if role not in roles:
                 raise ConfigError(f"pipeline uses role {role!r}, which has no model in `roles`")
+
+    def check_inputs(self) -> None:  # noqa: B027 - an optional hook; most pipelines have none
+        """Validate local model inputs during preparation; raises ConfigError."""
+
+    def check_structured(self, structured: StructuredConfig) -> None:  # noqa: B027 - optional
+        """Validate the run's structured-output settings during preparation; raises ConfigError."""
 
     @abstractmethod
     def templates(self) -> list[TemplateNeed]:

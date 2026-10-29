@@ -9,6 +9,7 @@
   "plan_channels@2": "01ada4fa319c564a28d0635e43cd2053c56f1153abf5f39f5b8571e6531a3a05",
   "plan_critic@1": "ac6a41a3571d85158f8d239edf76ec9af4dac26be8350d5d121c7a0002ed4f7f",
   "plan_d_skeleton@1": "45a4fb3c9e5ec4c36c20fe5ac059f0a78fb9aab0b6c8a33caf49d862c79316cb",
+  "plan_inpainting_text@1": "83fc27db2d98ba7bce681aacb6d8fcd779274d1927384d13b3d8310d1b009a5c",
   "plan_intentions@1": "b7e75c106c310a09d0fb2c1943f98171045aadbfa66134abc3023b057df8d482",
   "plan_revision@1": "44a3f2274fd9769490729a9efda086750f5645a9e42cd88ee04994b3dea6c7af",
   "plan_skeleton@1": "01a419126a5ef864afe901b87f847bea42a6b7a4cd6c82f744aa40f89caf1c06",
