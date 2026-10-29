@@ -344,6 +344,23 @@ def test_missing_outputs_stay_unknown_and_held_out_runs_are_refused(
     assert not (tmp_path / "held-out/report").exists()
 
 
+@pytest.mark.ml
+def test_unreadable_evidence_is_unknown_not_failure(tmp_path: Path, runs: Evidence) -> None:
+    revision = runs.revisions / "plans/brief-01/r2/revisions/revision/provenance.json"
+    planning = runs.stories / "stories/E/brief-01/r2/planning-provenance.json"
+    with restored(revision, planning):
+        revision.unlink()
+        planning.unlink()
+        report = build(request(tmp_path, runs), tmp_path / "report")
+    statuses = {unit["unit"]: unit["status"] for unit in report["units"]}
+    for unit in ("revision/e-revisions/brief-01/r2", "story/e-stories/brief-01/r2"):
+        assert statuses[unit] == "unreadable"
+        assert {row["status"] for row in rows(report, "deterministic", unit=unit)} == {"unknown"}
+        assert {row["status"] for row in rows(report, "judgement", unit=unit)} == {"missing"}
+    assert report["consistent"] is False
+    assert any("provenance unavailable" in problem for problem in report["problems"])
+
+
 def judgement_file(path: Path, **review: Any) -> Path:
     path.write_text(json.dumps({"reviewer": "Owner", **review}))
     return path

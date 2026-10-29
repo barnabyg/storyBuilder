@@ -74,6 +74,8 @@ REPORT = "report.json"
 STRUCTURE_METRIC = "retained-structure-multiset-jaccard-v1"
 EDGE_METRIC = "ordinal-position-multiset-jaccard-v1"
 JUDGEMENT_CONDITIONS = ("genre", "themes", "ending_intent")
+# A unit whose saved evidence cannot be read: unknown, never failure.
+UNREADABLE = "unreadable"
 PREDICATES = {
     "scene_range": "success iff the selected plan's scene count lies in the requested "
     "inclusive scene_range condition",
@@ -89,6 +91,7 @@ PREDICATES = {
     "validity": "success iff the selected plan passes complete plan validation",
     "no-output": "a failed unit fails every requested predicate: nothing realised the request",
     "missing": "an expected unit without any record is unknown, never success",
+    "unreadable": "a unit whose saved provenance, plan or story cannot be read is unknown",
 }
 STRUCTURE = (
     "The checkpoint's retained codec view (target policy channels; identities and references "
@@ -359,7 +362,7 @@ def _story_unit(  # noqa: PLR0913 - one unit's run, request, brief, slot and sav
         provenance = _read(folder / "planning-provenance.json")
     except (OSError, ValueError) as error:
         ctx.problems.append(f"{unit.id}: planning provenance unavailable: {error}")
-        unit.status = "failed" if unit.status == "ok" else unit.status
+        unit.status = UNREADABLE
         return unit
     ctx.bind(folder / "planning-provenance.json")
     if provenance.get("brief_sha256") != _brief_sha256(brief):
@@ -381,7 +384,7 @@ def _story_unit(  # noqa: PLR0913 - one unit's run, request, brief, slot and sav
         prose = selected_text(run.path, rec)
     except (OSError, ValueError, PlanError) as error:
         ctx.problems.append(f"{unit.id}: selected plan or story unavailable: {error}")
-        unit.status = "failed"
+        unit.status = UNREADABLE
         return unit
     if selection.get("plan_sha256") != plan_identity(plan) or provenance.get(
         "plan_sha256"
@@ -464,7 +467,7 @@ def _revision_unit(  # noqa: PLR0913 - one alternative's run, request, brief, sl
         unit.before = load_plan(revision / "source-plan.json")
     except (OSError, ValueError, KeyError, PlanError) as error:
         ctx.problems.append(f"{unit.id}: revision provenance unavailable: {error}")
-        unit.status = "failed"
+        unit.status = UNREADABLE
         return unit
     ctx.bind(revision / "provenance.json", revision / "source-plan.json")
     if provenance.get("brief") != brief.model_dump(mode="json"):
@@ -490,7 +493,7 @@ def _revision_unit(  # noqa: PLR0913 - one alternative's run, request, brief, sl
         unit.plan = load_plan(folder / "plan.json")
     except (OSError, PlanError) as error:
         ctx.problems.append(f"{unit.id}: selected plan unavailable: {error}")
-        unit.status = "failed"
+        unit.status = UNREADABLE
         return unit
     if provenance.get("after_sha256") != unit.plan_sha256:
         ctx.problems.append(f"{unit.id}: selected plan differs from its revision provenance")
@@ -553,6 +556,8 @@ def _selector_status(plan: NarrativePlan, selector: str, expected: Any) -> tuple
 def _evaluate(unit: _Unit, predicate: str, request: Any) -> tuple[Status, str]:  # noqa: PLR0911
     if unit.status == "missing":
         return "unknown", "expected output is missing"
+    if unit.status == UNREADABLE:
+        return "unknown", "the unit's saved evidence is unreadable"
     plan = unit.plan
     if plan is None:
         return "failure", "no selected output realised the request"
@@ -642,7 +647,7 @@ def _judgement_request(unit: _Unit, condition: str) -> Any:
 def _judgement_status(unit: _Unit) -> str:
     if unit.plan is not None:
         return "pending"
-    return "missing" if unit.status == "missing" else "no-output"
+    return "missing" if unit.status in {"missing", UNREADABLE} else "no-output"
 
 
 def _judgements(ctx: _Context, units: list[_Unit]) -> Record:
