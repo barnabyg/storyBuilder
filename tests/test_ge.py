@@ -165,13 +165,12 @@ def commit(root: Path, *names: str) -> None:
     git_fixture(root, "commit", "-q", "-m", "synthetic test-only G-E registration")
 
 
-@pytest.fixture(scope="module")
-def registered(tmp_path_factory: pytest.TempPathFactory) -> Fixture:
+def prepared(root: Path) -> Fixture:
+    """A trained tiny checkpoint, C selection, committed protocol and its one fake-provider run."""
     if importlib.util.find_spec("torch") is None:
         if os.environ.get("NDE_REQUIRE_ML") == "1":
             pytest.fail("CPU ML lane requires the pinned torch runtime")
         pytest.skip("optional CPU ML runtime")
-    root = tmp_path_factory.mktemp("ge")
     git_fixture(root, "init", "-q")
     fake = FakeOpenAI()
     fake.start()
@@ -209,6 +208,11 @@ def registered(tmp_path_factory: pytest.TempPathFactory) -> Fixture:
             fake.stop()
     [run] = list(runs.iterdir())
     return Fixture(root, checkpoint, selection, config, path, protocol, run)
+
+
+@pytest.fixture(scope="module")
+def registered(tmp_path_factory: pytest.TempPathFactory) -> Fixture:
+    return prepared(tmp_path_factory.mktemp("ge"))
 
 
 @contextmanager

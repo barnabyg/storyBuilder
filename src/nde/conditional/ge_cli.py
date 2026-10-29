@@ -1,7 +1,8 @@
-"""`nde ge`: no-spend readiness, registration, registered dev run and owner review packet.
+"""`nde ge`: readiness, registration, the registered dev run, owner review and the decision.
 
-Exit codes: 0 ready, current or complete; 1 blocked, stale, pending or a run that
-did not succeed; 2 malformed or unsupported input. No command decides G-E.
+Exit codes: 0 ready, current or complete; 1 blocked, stale, pending, inconsistent or
+a run that did not succeed; 2 malformed or unsupported input. Only `decide` applies
+the registered criteria, and it launches nothing.
 """
 
 import argparse
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from nde.conditional import ge, ge_review
+from nde.conditional import ge, ge_decision, ge_review
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
 from nde.runs.config import ConfigError
@@ -46,6 +47,13 @@ def configure(parser: argparse.ArgumentParser) -> None:
     review = commands.add_parser("review", help="record an owner review; report completeness")
     review.add_argument("packet", type=Path)
     review.add_argument("review", type=Path, nargs="?")
+    decide = commands.add_parser("decide", help="seal the G-E decision; starts nothing")
+    decide.add_argument("protocol", type=Path)
+    decide.add_argument("run", type=Path)
+    decide.add_argument("--packet", type=Path, help="the owner's review packet folder")
+    decide.add_argument("--out", type=Path, required=True, help="new decision folder")
+    replay = commands.add_parser("replay", help="replay a sealed G-E decision, no spend")
+    replay.add_argument("decision", type=Path, help="decision folder")
 
 
 def _stale(reasons: list[str], label: str) -> int:
@@ -70,8 +78,36 @@ def _review(args: argparse.Namespace) -> int:
     return 0 if result["status"] == "complete" else 1
 
 
+def _decide(args: argparse.Namespace) -> int:
+    record = ge_decision.decide(args.protocol, args.run, args.packet, args.out)
+    for problem in record["problems"]:
+        print(f"inconsistent: {problem}", file=sys.stderr)
+    for reason in record["pending"]:
+        print(f"pending: {reason}", file=sys.stderr)
+    print(
+        f"G-E decision {record['outcome']} (criteria {record['criteria_outcome']}), action "
+        f"{record['action']['result']}: {args.out / 'decision.md'}"
+    )
+    if ge_decision.settles(record):
+        claim = ge_decision.settlement_path(args.protocol)
+        print(f"settled: commit {claim} and {args.out} with the protocol")
+    return 0 if record["outcome"] in ge_decision.COMPLETE else 1
+
+
+def _replay(args: argparse.Namespace) -> int:
+    saved, reasons = ge_decision.replay(args.decision)
+    if reasons:
+        return _stale(reasons, "G-E decision")
+    print(f"G-E decision {saved['outcome']} current: {args.decision}")
+    return 0
+
+
 def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911 - one exit per command
     command = args.ge_command
+    if command == "decide":
+        return _decide(args)
+    if command == "replay":
+        return _replay(args)
     if command == "readiness":
         result = ge.readiness(args.registration)
         ge.write_status(result, args.out, "ge-readiness", "G-E readiness")

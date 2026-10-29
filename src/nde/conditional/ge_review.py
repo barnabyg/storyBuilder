@@ -78,17 +78,19 @@ class StructuralReview(Strict):
         return self
 
 
-def _unit(record: Record, condition: str, slot: str) -> Record:
+def unit(record: Record, condition: str, slot: str) -> Record:
+    """A run record's unit for one condition and cohort slot."""
     return next(u for u in record["units"] if u["condition"] == condition and u["slot"] == slot)
 
 
-def _plan(run: Path, unit: Record) -> tuple[str, str]:
+def _plan(run: Path, row: Record) -> tuple[str, str]:
     """A unit's saved plan file, relative to the run, and its checksum."""
-    path = Path(str(unit["path"])) / "plan.json"
+    path = Path(str(row["path"])) / "plan.json"
     return path.as_posix(), file_sha(run / path)
 
 
-def _kind(candidate: Record, reference: Record) -> str:
+def item_kind(candidate: Record, reference: Record) -> str:
+    """How the registered rules settle a sampled slot, from the run's two units."""
     if "unknown" in {candidate["validity"], reference["validity"]}:
         return MISSING
     if candidate["plan_sha256"] is None:
@@ -132,8 +134,8 @@ def create(protocol_path: Path, run: Path, out: Path) -> Record:
     checksums: dict[str, dict[str, str]] = {}
     for index, slot in enumerate(owner["sample"], start=1):
         name = f"item-{index:02d}"
-        candidate, baseline = _unit(record, ge.CANDIDATE, slot), _unit(record, reference, slot)
-        kind = _kind(candidate, baseline)
+        candidate, baseline = unit(record, ge.CANDIDATE, slot), unit(record, reference, slot)
+        kind = item_kind(candidate, baseline)
         item: Record = {
             "item": name,
             "slot": slot,

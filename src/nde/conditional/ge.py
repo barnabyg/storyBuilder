@@ -694,7 +694,7 @@ def _located(candidate: Record) -> Record:
     return candidate | {"checkpoint": candidate["checkpoint"] | {"path": None}}
 
 
-def _unlocated(reference: Record) -> Record:
+def unlocated(reference: Record) -> Record:
     """The reference identity without where its evidence is found from a protocol."""
     return reference | {
         name: None if reference[name] is None else reference[name] | {"path": None}
@@ -733,7 +733,7 @@ def _iteration(
         and earlier.owner_review == registration.owner_review
         # The whole cohort: briefs and their checksums, split, repeat, run seed and slots.
         and previous["frozen"]["cohort"] == frozen["cohort"]
-        and _unlocated(previous["frozen"]["reference"]) == _unlocated(frozen["reference"])
+        and unlocated(previous["frozen"]["reference"]) == unlocated(frozen["reference"])
     )
     if not unchanged:
         raise ValueError(
@@ -1450,9 +1450,13 @@ def artifact_problems(run: Path, record: Record) -> list[str]:
     ]
 
 
-def verify(path: Path, run: Path) -> list[str]:
-    """Why a recorded run no longer holds against its protocol and evidence, if at all."""
-    reasons = [f"protocol: {problem}" for problem in check(path)["problems"]]
+def verify(path: Path, run: Path, checked: Record | None = None) -> list[str]:
+    """Why a recorded run no longer holds against its protocol and evidence, if at all.
+
+    `checked` is this protocol's `check` result when the caller has just made it.
+    """
+    checked = check(path) if checked is None else checked
+    reasons = [f"protocol: {problem}" for problem in checked["problems"]]
     protocol = read_protocol(path)
     try:
         record = read_run(run)

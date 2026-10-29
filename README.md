@@ -97,7 +97,12 @@ cohort and seeds, resource limits, the validator and structural criteria, the
 owner sample and budget, and the single permitted development iteration. The
 registered run records complete denominators, failures, costs and evidence, and
 the owner's blinded structural review packet stays pending until the owner
-completes it. Deciding G-E is a separate step.
+completes it. `nde ge decide` then revalidates all of it and seals an immutable
+G-E decision: complete pass, complete failure, pending or inconsistent. It
+enforces the single development iteration across the repository's committed G-E
+history and keeps the identified reference planner on failure. A pass records
+eligibility to prepare Phase 8, not proof that E improves stories, and nothing is
+launched. Fixture decisions stay pending; a real one needs genuine G3 evidence.
 
 ## Verification
 

@@ -2,9 +2,10 @@
 
 G-E asks whether Candidate E is competitive enough with the reference planner
 to justify Phase 8's owner reading. `nde ge` prepares and runs that comparison
-on frozen **dev** briefs and assembles the owner's structural review packet. It
-never applies the criteria, decides G-E, selects held-out briefs or launches
-another gate; the decision report is separate.
+on frozen **dev** briefs, assembles the owner's structural review packet and,
+as a separate final step, seals the [G-E decision](#g-e-decision). It never
+selects held-out briefs, trains, generates outside the registered run, or
+launches another gate or Phase 8.
 
 ```powershell
 uv run nde ge readiness registration.json --out ge-readiness
@@ -15,12 +16,15 @@ uv run nde ge run prereg/ge-1.json --runs-dir runs
 uv run nde ge verify prereg/ge-1.json runs/RUN
 uv run nde ge packet prereg/ge-1.json runs/RUN --out review/ge-1
 uv run nde ge review review/ge-1 owner-review.json
+git add prereg/ge-1.run-claim.json; git commit -m "research: record the G-E dev run"
+uv run nde ge decide prereg/ge-1.json runs/RUN --packet review/ge-1 --out decisions/ge-1
+uv run nde ge replay decisions/ge-1
 ```
 
-Exit codes: **0** ready, current or complete; **1** blocked, stale, pending, or a
-run that did not succeed; **2** malformed or unsupported input. `readiness`,
-`register`, `check`, `verify`, `packet` and `review` make no provider call and
-run no model.
+Exit codes: **0** ready, current or complete (for `decide`, a complete actual pass
+or failure); **1** blocked, stale, pending, inconsistent, or a run that did not
+succeed; **2** malformed or unsupported input. Every command except `run` makes
+no provider call and runs no model.
 
 ## Readiness: genuine G3 only
 
@@ -132,9 +136,9 @@ This example registers nothing real; supply genuine identities and limits.
   validator and structural criteria and its owner review, must change E, and
   cannot point at another iteration. Registration checks one protocol and the
   attempt it names; it cannot see other protocols, so it does not stop a fresh
-  attempt 1 or a second attempt 2 naming the same first attempt. Enforcing the
-  history across protocols (at most one iteration per first attempt, no reset to
-  a new attempt 1) belongs to the G-E decision.
+  attempt 1 or a second attempt 2 naming the same first attempt. The
+  [decision](#development-iteration-history) enforces that history across
+  protocols.
 
 `register` refuses anything readiness blocks and writes a sealed `ge-protocol`
 record (`protocol_version` 1) with its paths rebased beside the protocol. Its
@@ -251,20 +255,122 @@ the submitted file; keep that file under version control or with the owner's
 other review records, so the decision can be audited against it. Owner review
 evidence rests on this procedure, not on cryptographic proof.
 
-## For the G-E decision
+## G-E decision
 
-The decision report consumes, without re-deciding anything here:
+`nde ge decide PROTOCOL RUN [--packet PACKET] --out NEW_FOLDER` applies the
+registered criteria and writes a sealed `decision.json` (kind `ge-decision`,
+`decision_version` 1) and `decision.md` in a new folder. It first revalidates
+everything, with no provider call:
 
-- the committed protocol (`nde.conditional.ge.read_protocol`, `check`): its
-  `criteria`, `frozen` identities, `owner_review.sample`, `iteration` and
-  `test_only`;
-- the run claim (`read_claim`) and the one recorded run carrying its ID
-  (`read_run`, `verify`): `validator`, `units`, `failures`, `costs`, `evidence`
-  (including its `status`) and the artifact checksums;
-- the packet status (`nde.conditional.ge_review.status`): `status`, `evidence`
-  and the unblinded per-item `outcomes` (`competitive`, `not_competitive`,
-  `excluded` or `pending`), which are populated only once ratings cover every
-  owner item.
+- the protocol `check`: committed and unchanged, the genuine G3 replay, and the
+  checkpoint, data and reference lineage;
+- the run `verify`: the claimed run, every artifact checksum and the evidence
+  report's replay, plus the run's own `problems` and the report's reference
+  identification;
+- the packet: it must belong to this protocol and run record, show exactly the
+  registered owner sample with the registered reviewer and criterion, settle each
+  item as the run's outputs require, and its key must map each owner item's A and
+  B to that slot's E and reference plans. Its review status must be current.
+
+Any failure makes the decision **inconsistent**.
+
+The criteria are applied in the candidate direction, E against the identified
+reference:
+
+- **Validator comparison.** E's rate minus the reference's, under the
+  registered aggregation, must be at least minus `margin`, and E's rate at least
+  `minimum_candidate_rate`. Every expected slot is in each denominator and a slot
+  without a plan counts as not valid. Any unknown unit leaves it pending. Counts,
+  unknown units, rates and the difference are recorded.
+- **Structural competitiveness.** From the packet's unblinded outcomes,
+  competitive pairs (E better, or equivalent) over the owner denominator must
+  reach `minimum_share`. Unknown ratings and slots where E has no plan are not
+  competitive. Slots where only the reference lacks a plan are excluded and
+  listed. A missing packet, missing ratings or evidence, or a sample with no
+  owner-comparable pair leaves it pending.
+
+Boundaries are inclusive: a floating-point rate within 1e-12 of its threshold
+meets it. Both criteria are required. Any pending criterion leaves the whole
+`criteria_outcome` pending, even when the other has already failed.
+
+Owner evidence counts only as the registered reviewer's **actual** ratings of
+every owner item of a current packet. Diagnostic (model) ratings never count.
+Synthetic ratings count only for a test-only packet, and then only as software
+evidence. A test-only protocol, run or packet keeps the `outcome` **pending**
+even when its `criteria_outcome` is passed or failed.
+
+| `outcome` | Meaning | `action.result` |
+| --- | --- | --- |
+| `passed` | Both criteria met on actual, consistent evidence | `eligible_to_prepare_phase_8` |
+| `failed` (attempt 1) | A criterion not met on actual, consistent evidence | `iterate_once_or_stop` |
+| `failed` (attempt 2) | The single iteration also fell short | `stop` |
+| `pending` | Evidence incomplete or synthetic | `none` |
+| `inconsistent` | Stale, changed, mismatched or history-violating evidence | `none` |
+
+Every decision records the identified C/D reference, which stays the planner.
+A pass records eligibility to *prepare* Phase 8: freeze a fresh held-out
+benchmark and pre-register that comparison separately. It is not evidence that E
+improves final stories. No outcome starts training, paid generation, another
+gate or Phase 8.
+
+From the verified run the decision preserves every unit's plan and final-story
+identity, failures and costs. It also keeps the evidence report's
+condition-adherence, diversity, overlap, reference and realisation findings and
+pending items. It records the protocol, run, claim, packet, key and review
+identities, G3 authority, lineage, prior exposure, limitations and the
+diagnostic-only judge status. Adherence judgement, realisation review and overlap
+are reported; they are not G-E criteria. Paths are relative to the decision
+folder, so a decision moved with its evidence still replays.
+
+### Settled decisions and replay
+
+A decision **settles** its protocol when its criteria were completely applied to
+consistent evidence: passed or failed, actual or synthetic. `decide` then creates
+the sealed `PROTOCOL.decision-claim.json` (kind `ge-decision-claim`) beside the
+protocol, naming the decision. A settled protocol is never decided again, even
+if the claim is deleted, while any commit still holds it. Pending and
+inconsistent decisions do not settle, so they can be written again to new
+folders once the evidence changes. Commit the decision claim and the decision
+folder.
+
+`nde ge replay DECISION` recomputes the decision from the recorded protocol, run
+and packet, and lists every section that differs. A settled decision must also be
+its protocol's only settled decision. A later superseding review, a changed plan
+or story, or a history violation makes a settled decision stale, and replay
+exits 1.
+
+### Development iteration history
+
+The decision enforces the single development iteration across protocols. Its
+history is every G-E protocol, run claim, decision claim and review packet
+committed in the protocol's repository, in any commit of any local branch,
+deleted or superseded versions included. The claims currently kept beside those
+protocols count too. A **comparison** is the protocols with the same test-only
+status, the same reference identity and overlapping dev briefs. Only protocols
+that were run (claimed) count.
+
+- The decided protocol's run claim must be committed, so the repository records
+  the run.
+- A comparison has one run first attempt. Another run attempt 1, including one
+  registered after deleting the first, is a **history reset**: every decision in
+  the comparison becomes inconsistent.
+- It has at most one run development iteration, bound to that first attempt. A
+  second one is inconsistent, as is an iteration of another first attempt.
+- An iteration is decided only against the first attempt's **settled, committed
+  decision**, found through the claim beside the first protocol. That decision
+  must still replay, and its `criteria_outcome` must be `failed`. No iteration
+  follows a pass. A real iteration also needs an actual failed first attempt,
+  not a synthetic one. The iteration's decision records the first attempt's
+  protocol, claim and decision IDs, so replaying it replays the first decision
+  too.
+- Another review packet committed for the same protocol is inconsistent: one
+  packet per run.
+
+History cannot see records that were never committed here: a run claim deleted
+before it was committed, packets kept outside the repository, or protocols in
+another clone. Like reviewer identity, this rests on following the procedure:
+commit each protocol before running, its run claim after running, and the
+decision claim after deciding.
 
 ## Limits and evidence status
 
@@ -274,5 +380,7 @@ record; held-out brief files are never opened (a dev/test ID collision is still
 found from file names). Keep Phase 8's held-out cohort in its own frozen
 benchmark version all the same. Fixture runs use test-only checkpoints and selections and are
 software evidence only: they never establish G3, G-E, condition adherence or
-literary quality. Tests in `tests/test_ge.py` use a real tiny CPU checkpoint and
-fake-provider calls.
+literary quality, and every fixture decision stays pending. No genuine G3 pass
+exists yet, so no real G-E protocol can be registered. Tests in `tests/test_ge.py`
+and `tests/test_ge_decision.py` use a real tiny CPU checkpoint and fake-provider
+calls; genuine outcomes are exercised only by promoting decision content in memory.
