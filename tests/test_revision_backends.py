@@ -673,3 +673,35 @@ def test_e_hybrid_text_failures_keep_learned_work_and_the_source(
         diagnostics = folder / "planning/revision-revision-text/1.diagnostics.json"
         assert "revision_text" in diagnostics.read_text()
         assert len(record["calls"]) == 1
+
+
+def test_plan_command_reports_bad_evidence_but_not_internal_faults(
+    tmp_path: Path,
+    llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    llm.default = responder(mutated(accepted_plan))
+    run = revise(tmp_path, run_config(tmp_path, llm.base_url, UNITS, {"kind": "d"}), 0)
+    assert run is not None
+    # Malformed provenance is an inconsistent alternative, not a crash or a config error.
+    path = folder_of(run) / "revisions/revision/provenance.json"
+    record = json.loads(path.read_text())
+    del record["seed"]
+    path.write_text(json.dumps(record))
+    capsys.readouterr()
+    assert main(["plan", "alternatives", str(run)]) == 1
+    [row] = json.loads(capsys.readouterr().out)["alternatives"]
+    assert "provenance is malformed" in row["diagnostics"][0]
+    # An unreadable saved report is a usage error with a message.
+    (run / "alternatives.json").write_text("{")
+    assert main(["plan", "alternatives", str(run)]) == 2
+    assert "nde plan: saved alternatives evidence" in capsys.readouterr().err
+    # An internal fault keeps its traceback instead of exiting like a config error.
+
+    def fault(_plan: object) -> object:
+        raise KeyError("internal")
+
+    monkeypatch.setattr("nde.narrative.cli.validate_plan", fault)
+    with pytest.raises(KeyError, match="internal"):
+        main(["plan", "validate", str(tmp_path / "source.json")])

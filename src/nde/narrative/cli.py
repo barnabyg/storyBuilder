@@ -11,7 +11,7 @@ from nde.narrative.ledger import render_ledger
 from nde.narrative.projection import project
 from nde.narrative.validation import validate_plan
 from nde.narrative.workflow import PlanError, load_plan, render, schema_json
-from nde.plan.alternatives import check_report
+from nde.plan.alternatives import AlternativesError, check_report
 from nde.runs.config import ConfigError, load_config
 from nde.runs.records import read_manifest
 from nde.runs.runner import RunOptions, run_experiment
@@ -86,6 +86,6 @@ def run(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
         return 0 if result.valid else 1
-    except (ConfigError, PlanError, OSError, KeyError, ValueError) as error:
+    except (ConfigError, PlanError, OSError, AlternativesError) as error:
         print(f"nde plan: {error}", file=sys.stderr)
         return 2

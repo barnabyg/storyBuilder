@@ -43,6 +43,10 @@ def structure_identity(plan: NarrativePlan) -> str:
     return identity(strip(plan.model_dump(mode="json"), "", ""))
 
 
+class AlternativesError(Exception):
+    """A run's saved alternatives report or plan records cannot be read."""
+
+
 def _read(path: Path) -> dict[str, Any] | None:
     try:
         value: Any = json.loads(path.read_text(encoding="utf-8"))
@@ -74,19 +78,25 @@ def _alternative(run_dir: Path, record: dict[str, Any], source_sha256: str) -> d
     if provenance is None:
         row["diagnostics"].append("alternative provenance is missing or unreadable")
         return row
-    backend: dict[str, Any] = provenance.get("backend") or {"version": "1", "kind": "d"}
-    row.update(
-        backend=backend["kind"],
-        seed=provenance["seed"],
-        checkpoint_id=backend.get("checkpoint_id"),
-        guidance_scale=backend.get("guidance_scale"),
-        test_only=backend.get("test_only", False),
-        local_work=backend.get("work"),
-        before_sha256=provenance["before_sha256"],
-        after_sha256=provenance["after_sha256"],
-        changed_units=provenance["changed_units"],
-        **_costs(provenance["calls"]),
-    )
+    try:
+        backend: dict[str, Any] = provenance.get("backend") or {"version": "1", "kind": "d"}
+        row.update(
+            backend=backend["kind"],
+            seed=provenance["seed"],
+            checkpoint_id=backend.get("checkpoint_id"),
+            guidance_scale=backend.get("guidance_scale"),
+            test_only=backend.get("test_only", False),
+            local_work=backend.get("work"),
+            before_sha256=provenance["before_sha256"],
+            after_sha256=provenance["after_sha256"],
+            changed_units=provenance["changed_units"],
+            **_costs(provenance["calls"]),
+        )
+    except (AttributeError, KeyError, TypeError) as error:
+        row["diagnostics"].append(
+            f"alternative provenance is malformed: {type(error).__name__}: {error}"
+        )
+        return row
     if provenance["before_sha256"] != source_sha256:
         row["diagnostics"].append("alternative was not derived from the recorded original")
     selected = folder / ("revisions/revision/last-accepted/plan.json")
@@ -202,20 +212,28 @@ def write_report(run_dir: Path, report: dict[str, Any]) -> None:
 
 
 def check_report(run_dir: Path) -> dict[str, Any]:
-    """Rebuild a saved report from current artifacts; stale or changed evidence is inconsistent."""
-    saved = json.loads((run_dir / REPORT).read_text(encoding="utf-8"))
-    records = [
-        json.loads(line)
-        for line in (run_dir / "plans.jsonl").read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    source = saved["source"]
-    report = build_report(
-        run_dir,
-        Path(source["path"]),
-        {"file_sha256": source["file_sha256"], "plan_sha256": source["plan_sha256"]},
-        records,
-    )
+    """Rebuild a saved report from current artifacts; stale or changed evidence is inconsistent.
+
+    Raises AlternativesError when the saved report or plan records cannot be read.
+    """
+    try:
+        saved = json.loads((run_dir / REPORT).read_text(encoding="utf-8"))
+        records = [
+            json.loads(line)
+            for line in (run_dir / "plans.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        source = saved["source"]
+        path = Path(source["path"])
+        recorded = {"file_sha256": source["file_sha256"], "plan_sha256": source["plan_sha256"]}
+        if any(not {"path", "brief", "repetition"} <= set(record) for record in records):
+            raise KeyError("plan record without path, brief or repetition")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise AlternativesError(
+            f"saved alternatives evidence in {run_dir} is unreadable or malformed: "
+            f"{type(error).__name__}: {error}"
+        ) from error
+    report = build_report(run_dir, path, recorded, records)
     if report != saved:
         report["consistent"] = False
         report["stale"] = "saved alternatives report differs from current artifacts"
