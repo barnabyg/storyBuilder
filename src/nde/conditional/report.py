@@ -70,6 +70,9 @@ from nde.stories.selected import selected_text
 from nde.tiers import load_selection
 
 KIND = "conditional-evidence-report"
+# Version 2 separates operational no-output from non-adherence failure.
+REPORT_VERSION = "2"
+NO_OUTPUT = "no-output"
 REPORT = "report.json"
 STRUCTURE_METRIC = "retained-structure-multiset-jaccard-v1"
 EDGE_METRIC = "ordinal-position-multiset-jaccard-v1"
@@ -91,10 +94,13 @@ PREDICATES = {
     "revision_scope": "success iff the selected plan changes only units the revision mask "
     "authorises, with identities kept (the shared revision boundary)",
     "validity": "success iff the selected plan passes complete plan validation",
-    "no-output": "a failed unit fails every requested predicate: nothing realised the request",
+    "no-output": "a unit that failed operationally without a saved, verified plan (or, for "
+    "target_words, without final prose) has no output to judge: it stays in the denominator "
+    "and is neither success nor non-adherence failure",
     "missing": "an expected unit without any record is unknown, never success",
     "unreadable": "a unit whose saved provenance, plan or story cannot be read is unknown",
-    "unverified": "a revision whose saved source plan is not the recorded original is unknown",
+    "unverified": "a unit whose saved plan or source does not bind its recorded identities "
+    "is unknown",
 }
 STRUCTURE = (
     "The checkpoint's retained codec view (target policy channels; identities and references "
@@ -118,7 +124,7 @@ NOT_A_DECISION = (
     "literary adherence, owner review or scientific advancement."
 )
 
-type Status = Literal["success", "failure", "unknown"]
+type Status = Literal["success", "failure", "unknown", "no-output"]
 type Record = dict[str, Any]
 
 
@@ -377,26 +383,46 @@ def _story_unit(  # noqa: PLR0913 - one unit's run, request, brief, slot and sav
         ctx.problems.append(f"{unit.id}: recorded conditions or locks differ from the request")
     unit.checkpoint_id = _object(provenance.get("checkpoint")).get("id")
     unit.diagnostics = _story_diagnostics(provenance)
-    if rec.status != "ok":
-        return unit
+    _story_output(ctx, unit, provenance, run.path, rec)
+    return unit
+
+
+def _story_output(
+    ctx: _Context, unit: _Unit, provenance: Record, run: Path, rec: StoryRecord
+) -> None:
+    """Attach the story's verified plan and, when it succeeded, its final prose."""
+    folder = run / rec.path
     plan_file, selection_file = folder / "plan.json", folder / "conditional-selection.json"
-    ctx.bind(plan_file, selection_file, folder / "story.md", folder / "story.raw.md")
+    if rec.status != "ok" and not plan_file.is_file():
+        # Planning itself failed: there is no output, which is not non-adherence.
+        return
+    ctx.bind(plan_file, selection_file)
     try:
         plan = load_plan(plan_file)
         selection = _read(selection_file)
-        prose = selected_text(run.path, rec)
     except (OSError, ValueError, PlanError) as error:
-        ctx.problems.append(f"{unit.id}: selected plan or story unavailable: {error}")
+        ctx.problems.append(f"{unit.id}: selected plan unavailable: {error}")
         unit.status = UNREADABLE
-        return unit
+        return
     if selection.get("plan_sha256") != plan_identity(plan) or provenance.get(
         "plan_sha256"
     ) != checksum_lf(plan_file.read_bytes()):
         ctx.problems.append(f"{unit.id}: selected plan differs from its E selection/provenance")
-    if rec.sha256 is not None and rec.sha256 != digest(prose):
+        unit.status = UNVERIFIED
+        return
+    # A story that failed after planning keeps its verified plan; only prose is absent.
+    unit.plan = plan
+    if rec.status != "ok":
+        return
+    ctx.bind(folder / "story.md", folder / "story.raw.md")
+    try:
+        unit.prose = selected_text(run, rec)
+    except (OSError, ValueError) as error:
+        ctx.problems.append(f"{unit.id}: final story unavailable: {error}")
+        unit.status, unit.plan = UNREADABLE, None
+        return
+    if rec.sha256 is not None and rec.sha256 != digest(unit.prose):
         ctx.problems.append(f"{unit.id}: final story differs from its recorded selection")
-    unit.plan, unit.prose = plan, prose
-    return unit
 
 
 def _story_units(ctx: _Context, ref: StoryRunRef) -> tuple[_Run, list[_Unit]]:
@@ -563,29 +589,38 @@ def _selector_status(plan: NarrativePlan, selector: str, expected: Any) -> tuple
     return "failure", f"locked value changed to {canonical(actual)}"
 
 
+UNEVALUABLE: dict[str, str] = {
+    "missing": "expected output is missing",
+    UNREADABLE: "the unit's saved evidence is unreadable",
+    UNVERIFIED: "the unit's saved evidence does not bind its recorded inputs",
+}
+
+
+def _words(unit: _Unit, request: Any) -> tuple[Status, str]:
+    if unit.prose is None:
+        if unit.kind == "story":
+            return NO_OUTPUT, "no final prose: an operational failure, not non-adherence"
+        return "unknown", "plan-only output has no prose to measure"
+    low, high = request
+    words = word_count(unit.prose)
+    lower, upper = low * (1 - unit.tolerance), high * (1 + unit.tolerance)
+    status: Status = "success" if lower <= words <= upper else "failure"
+    return status, f"{words} words in the final prose; allowed {lower:g}-{upper:g}"
+
+
 def _evaluate(unit: _Unit, predicate: str, request: Any) -> tuple[Status, str]:  # noqa: PLR0911
-    if unit.status == "missing":
-        return "unknown", "expected output is missing"
-    if unit.status == UNREADABLE:
-        return "unknown", "the unit's saved evidence is unreadable"
-    if unit.status == UNVERIFIED:
-        return "unknown", "the unit's saved evidence does not bind its recorded inputs"
+    if unit.status in UNEVALUABLE:
+        return "unknown", UNEVALUABLE[unit.status]
     plan = unit.plan
     if plan is None:
-        return "failure", "no selected output realised the request"
+        return NO_OUTPUT, "no saved plan: an operational failure, not non-adherence"
     if predicate == "scene_range":
         low, high = request
         count = len(plan.scenes)
         status: Status = "success" if low <= count <= high else "failure"
         return status, f"{count} scenes; requested {low}-{high}"
     if predicate == "target_words":
-        if unit.prose is None:
-            return "unknown", "plan-only output has no prose to measure"
-        low, high = request
-        words = word_count(unit.prose)
-        lower, upper = low * (1 - unit.tolerance), high * (1 + unit.tolerance)
-        status = "success" if lower <= words <= upper else "failure"
-        return status, f"{words} words in the final prose; allowed {lower:g}-{upper:g}"
+        return _words(unit, request)
     if predicate == "lock":
         return _selector_status(plan, request["selector"], request["value"])
     if predicate == "revision_lock" and unit.before is not None:
@@ -639,7 +674,7 @@ def _deterministic(units: list[_Unit]) -> Record:
                     "reason": reason,
                 }
             )
-    statuses = ("success", "failure", "unknown")
+    statuses = ("success", "failure", "unknown", NO_OUTPUT)
     return {
         "predicates": PREDICATES,
         "rows": rows,
@@ -657,7 +692,7 @@ def _judgement_request(unit: _Unit, condition: str) -> Any:
 
 
 def _judgement_status(unit: _Unit) -> str:
-    if unit.plan is not None:
+    if unit.output_sha256 is not None:
         return "pending"
     return "missing" if unit.status in {"missing", UNREADABLE, UNVERIFIED} else "no-output"
 
@@ -1328,6 +1363,7 @@ def build(manifest: Path) -> Record:
         unit.compare_with(identity_.policy)
     content: Record = {
         "kind": KIND,
+        "report_version": REPORT_VERSION,
         "scope": "development evidence; not a G-E decision",
         "request": {"path": str(manifest), **request.model_dump(mode="json")},
         "e_identity": {
@@ -1417,10 +1453,11 @@ def _markdown(report: Record) -> str:
         "",
         "## Deterministic compliance",
         "",
-        "| Predicate | Expected | Success | Failure | Unknown |",
-        "| --- | --- | --- | --- | --- |",
+        "| Predicate | Expected | Success | Failure | Unknown | No output |",
+        "| --- | --- | --- | --- | --- | --- |",
         *(
-            f"| {name} | {c['expected']} | {c['success']} | {c['failure']} | {c['unknown']} |"
+            f"| {name} | {c['expected']} | {c['success']} | {c['failure']} | {c['unknown']} "
+            f"| {c[NO_OUTPUT]} |"
             for name, c in deterministic["by_predicate"].items()
         ),
         "",

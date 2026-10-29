@@ -266,16 +266,18 @@ def test_report_binds_inputs_and_evaluates_predicates_with_complete_denominators
     ] == ["states/goal"]
     deterministic = report["adherence"]["deterministic"]
     expected = {
-        # brief-01's two scenes are in range; brief-02's failed stories realised nothing.
-        "scene_range": (4, 2, 2, 0),
-        "target_words": (4, 2, 2, 0),
-        "lock": (4, 2, 2, 0),
-        "revision_lock": (3, 3, 0, 0),
-        "revision_scope": (3, 3, 0, 0),
-        "validity": (7, 5, 2, 0),
+        # brief-01's two scenes are in range; brief-02's stories failed operationally and
+        # left no plan, which is no output rather than non-adherence.
+        "scene_range": (4, 2, 0, 0, 2),
+        "target_words": (4, 2, 0, 0, 2),
+        "lock": (4, 2, 0, 0, 2),
+        "revision_lock": (3, 3, 0, 0, 0),
+        "revision_scope": (3, 3, 0, 0, 0),
+        "validity": (7, 5, 0, 0, 2),
     }
+    assert report["report_version"] == "2"
     assert {
-        name: (c["expected"], c["success"], c["failure"], c["unknown"])
+        name: (c["expected"], c["success"], c["failure"], c["unknown"], c["no-output"])
         for name, c in deterministic["by_predicate"].items()
     } == expected
     assert deterministic["total"]["expected"] == sum(row[0] for row in expected.values())
@@ -289,14 +291,14 @@ def test_report_binds_inputs_and_evaluates_predicates_with_complete_denominators
         "unit": "story/e-stories/brief-02/r1",
         "predicate": "lock",
         "request": {"selector": "characters/characters.0/name", "value": "Ann"},
-        "status": "failure",
-        "reason": "no selected output realised the request",
+        "status": "no-output",
+        "reason": "no saved plan: an operational failure, not non-adherence",
     }
     diagnostics = report["model_diagnostics"]["units"]["story/e-stories/brief-02/r1"]
     assert diagnostics["generation_status"] == "attempt-limit"
     assert len(diagnostics["attempts"]) == 3
     markdown = (out / "report.md").read_text()
-    assert "| scene_range | 4 | 2 | 2 | 0 |" in markdown
+    assert "| scene_range | 4 | 2 | 0 | 0 | 2 |" in markdown
     assert "not a G-E decision" in markdown
     assert check(out) == 0
     # A report folder is never overwritten.
@@ -323,8 +325,9 @@ def test_missing_outputs_stay_unknown_and_held_out_runs_are_refused(
     assert report["adherence"]["deterministic"]["by_predicate"]["scene_range"] == {
         "expected": 4,
         "success": 1,
-        "failure": 2,
+        "failure": 0,
         "unknown": 1,
+        "no-output": 2,
     }
     assert {row["status"] for row in rows(report, "judgement", unit=missing)} == {"missing"}
     config = runs.stories / "config.json"
@@ -378,6 +381,33 @@ def test_revision_predicates_need_the_recorded_source_plan(tmp_path: Path, runs:
         for problem in report["problems"]
     )
     assert report["consistent"] is False
+
+
+@pytest.mark.ml
+def test_operational_failure_with_a_saved_plan_keeps_plan_adherence(
+    tmp_path: Path, runs: Evidence
+) -> None:
+    index = runs.stories / "stories.jsonl"
+    with restored(index):
+        records = jsonl(index)
+        for row in records:
+            if row["path"] == "stories/E/brief-01/r2":
+                # Planning succeeded and saved its plan; prose then failed.
+                row.update(status="failed", error="step 'scene-01': provider error")
+        write_text_lf(index, "".join(json.dumps(row) + "\n" for row in records))
+        report = build(request(tmp_path, runs), tmp_path / "report")
+    unit = "story/e-stories/brief-01/r2"
+    statuses = {row["predicate"]: row["status"] for row in rows(report, "deterministic", unit=unit)}
+    assert statuses == {
+        "scene_range": "success",
+        "lock": "success",
+        "validity": "success",
+        "target_words": "no-output",
+    }
+    assert {row["status"] for row in rows(report, "judgement", unit=unit)} == {"no-output"}
+    [summary] = [u for u in report["units"] if u["unit"] == unit]
+    assert summary["plan_sha256"] is not None
+    assert summary["output_sha256"] is None
 
 
 def judgement_file(path: Path, **review: Any) -> Path:

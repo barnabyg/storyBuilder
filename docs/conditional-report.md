@@ -34,7 +34,8 @@ are optional. `target_policy` is only used when the checkpoint's training datase
 is unavailable, and is then recorded as declared and unverified.
 
 The output folder must be new. It holds `report.json` (kind
-`conditional-evidence-report`, version 1, sealed with a content `id`) and a
+`conditional-evidence-report`, record version 1 with `report_version` 2, sealed with a
+content `id`) and a
 readable `report.md`. Build exits 0 when a report is written, including one
 with failures, unknowns, problems or pending review, and 2 for malformed or
 unsupported inputs.
@@ -61,8 +62,9 @@ the checkpoint and the training datasets.
 ## Deterministic compliance
 
 Only explicitly representable requests are evaluated mechanically. Each row is
-`success`, `failure` or `unknown` with its reason; the denominators include every
-expected unit.
+`success`, `failure`, `unknown` or `no-output` with its reason, and
+`by_predicate`/`total` count each status; the denominators include every expected
+unit. `failure` always means a produced output did not satisfy the request.
 
 | Predicate | Success when |
 | --- | --- |
@@ -73,12 +75,18 @@ expected unit.
 | `revision_scope` | the plan changes only units the mask authorises (the shared revision boundary) |
 | `validity` | the selected plan passes complete plan validation |
 
-A failed unit fails every predicate it requested, because nothing realised the
-request. A missing unit, or one whose saved provenance, plan or story cannot be
+Operational failure is kept apart from non-adherence. A story that failed after
+planning keeps its saved plan when `conditional-selection.json` and the planning
+provenance verify it, so its plan predicates are evaluated and only
+`target_words` is `no-output`. A unit with no saved plan, such as a rejected
+generation, a sampler or provider failure or a failed revision alternative, is
+`no-output` for every predicate: it stays in the denominator but is neither success
+nor failure. A missing unit, or one whose saved provenance, plan or story cannot be
 read (status `unreadable`), is `unknown`, never success or failure. So is a
-revision alternative whose saved source plan or recorded `before_sha256` is not the
-run's recorded original (status `unverified`): locks and scope cannot be judged
-against a substituted baseline. Both are also listed under `problems`. Model diagnostics (attempts,
+story whose plan does not match its selection or provenance, and a revision
+alternative whose saved source plan or recorded `before_sha256` is not the run's
+recorded original (status `unverified`): locks and scope cannot be judged against a
+substituted baseline. Both are also listed under `problems`. Model diagnostics (attempts,
 rejections, guidance, local work and completion calls) are reported separately and
 never count as adherence.
 
@@ -86,7 +94,8 @@ never count as adherence.
 
 Genre, themes and the natural-language ending (`ending_intent`) need actual
 judgement. They stay `pending` until the owner assesses the current final output;
-units without output are `no-output`, and missing or unreadable units `missing`. A judgement file is:
+units without final output (no prose for a story, no plan for a revision) are
+`no-output`, and missing, unreadable or unverified units `missing`. A judgement file is:
 
 ```json
 {
