@@ -30,6 +30,12 @@ plans:
 `checkpoint` resolves relative to the config. `target_policy` names the approved
 channel policy of the checkpoint's training targets and must include `plot`.
 Channels it excludes are not represented by E and stay as the source has them.
+Preflight checks it against the policy of the training dataset the checkpoint is
+bound to, found among the checkpoint's recorded inputs by its sealed identity;
+any difference in a non-excluded channel fails before any call or inference. If
+that dataset is no longer available unchanged, a real checkpoint is refused and a
+test-only fixture checkpoint proceeds with the policy recorded as declared and
+unverified (`target_policy_check` in the provenance `backend` block).
 `conditions` uses the registered [condition semantics](conditional-data.md) and
 defaults to unknown. `max_tokens`, `max_attention_cells` and `max_seconds` bound
 local work per alternative; `text_prompt` defaults to `plan_inpainting_text@1`.
@@ -69,7 +75,7 @@ The run keeps D's layout: `plan.json`, cards, `revisions/revision/provenance.jso
 `boundary.json`, `change-summary.md`, `source-plan.json` and `last-accepted/`.
 Provenance adds a versioned `backend` block with the checkpoint/parameter/
 representation identities, test-only status, target policy, conditions, guidance,
-sampling temperature, masked leaves, text manifest, every attempt's seed, work
+sampling temperature, target-policy check, masked leaves, text manifest, every attempt's seed, work
 reservation, generated masked values and diagnostics, and total local
 tokens/attention cells/passes/time. LLM completion calls, tokens and costs remain
 in `calls`. `inpainting/observation.json` and `inpainting/attempt-NNN.json` keep

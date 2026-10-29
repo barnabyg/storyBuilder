@@ -5,7 +5,7 @@ import hashlib
 import importlib.util
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +18,7 @@ from nde.conditional.layout import textless
 from nde.conditional.training import inspect_checkpoint, sample_candidate
 from nde.corpus.records_io import create_record, read_sealed
 from nde.narrative.models import NarrativePlan
+from nde.narrative.workflow import PlanError
 from nde.plan.backends import ERevisionBackend
 from nde.plan.revision import RevisionPlanningParams, RevisionSpec, identity
 from nde.reconstruction.codec import (
@@ -755,3 +756,66 @@ def test_observation_masks_exactly_the_editable_spans_and_sampling_fills_only_th
         if known != MASK
     )
     assert all(generated[index] != MASK for index in expected)
+
+
+@pytest.fixture
+def bound_dataset(learned: Path) -> Iterator[Path]:
+    """The fixture checkpoint with its training inputs back where it was trained."""
+    hidden, training = learned.parent / "unavailable-training", learned.parent / "training"
+    hidden.rename(training)
+    try:
+        yield learned
+    finally:
+        training.rename(hidden)
+
+
+@pytest.mark.ml
+def test_e_target_policy_is_verified_against_the_checkpoints_training_dataset(
+    tmp_path: Path,
+    llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    bound_dataset: Path,
+) -> None:
+    llm.default = lambda _body: completion(json.dumps({"fields": {DESCRIPTION: TEXT}}))
+    backend = {"kind": "e", "checkpoint": str(bound_dataset), "target_policy": POLICY}
+    run = revise(tmp_path, run_config(tmp_path, llm.base_url, UNITS, backend), 0)
+    assert run is not None
+    check = provenance(folder_of(run))["backend"]["target_policy_check"]
+    assert check["status"] == "verified"
+    assert check["dataset_id"] == read_sealed(bound_dataset)["binding"]["dataset_id"]
+
+    def forbidden(*_args: Any, **_options: Any) -> dict[str, Any]:
+        raise AssertionError("a mismatched target policy must not reach inference")
+
+    monkeypatch.setattr(inpainting, "sample_candidate", forbidden)
+    calls = llm.call_count
+    capsys.readouterr()
+    for channel in ("relationships", "interpretation"):
+        enabled = {**backend, "target_policy": {**POLICY, channel: "hard"}}
+        value = run_config(tmp_path, llm.base_url, UNITS, enabled)
+        assert revise(tmp_path, value, 2) is None
+        assert "differs from the checkpoint's training policy" in capsys.readouterr().err
+    assert llm.call_count == calls
+
+
+@pytest.mark.ml
+def test_e_target_policy_without_its_training_dataset_is_declared_or_refused(
+    tmp_path: Path, llm: FakeOpenAI, learned: Path
+) -> None:
+    llm.default = lambda _body: completion(json.dumps({"fields": {DESCRIPTION: TEXT}}))
+    backend = {"kind": "e", "checkpoint": str(learned), "target_policy": POLICY}
+    run = revise(tmp_path, run_config(tmp_path, llm.base_url, UNITS, backend), 0)
+    assert run is not None
+    check = provenance(folder_of(run))["backend"]["target_policy_check"]
+    assert check["status"] == "declared-unverified"
+    # A real checkpoint whose training policy cannot be recovered is refused.
+    real = read_sealed(learned)
+    real["binding"]["config"]["test_only"] = False
+    with pytest.raises(PlanError, match="cannot be verified"):
+        inpainting.check_target_policy(
+            real,
+            ERevisionBackend.model_validate(
+                {"kind": "e", "checkpoint": learned, "target_policy": POLICY}
+            ),
+        )

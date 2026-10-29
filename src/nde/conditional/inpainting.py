@@ -4,8 +4,9 @@ import copy
 import hashlib
 import json
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic import ValidationError
@@ -29,6 +30,7 @@ from nde.conditional.training import (
 )
 from nde.corpus.channels import CHANNEL_FIELDS
 from nde.corpus.records_io import identity as record_identity
+from nde.corpus.records_io import read_sealed
 from nde.narrative.models import NarrativePlan
 from nde.narrative.workflow import PlanError
 from nde.plan.backends import ERevisionBackend
@@ -312,13 +314,76 @@ def _fill(structure: NarrativePlan, fields: dict[str, str]) -> NarrativePlan:
     return NarrativePlan.model_validate(content)
 
 
+def _effective(policy: Mapping[str, str]) -> dict[str, str]:
+    """A channel policy without its excluded channels, which the codec treats as absent."""
+    return {channel: value for channel, value in sorted(policy.items()) if value != "excluded"}
+
+
+def training_policy(checkpoint: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]] | None:
+    """The target policy of the checkpoint's bound training dataset, and that dataset.
+
+    The dataset is found among the checkpoint's bound inputs by its sealed identity;
+    None when it is no longer available unchanged.
+    """
+    binding = checkpoint["binding"]
+    for name in binding["inputs"]:
+        path = Path(name)
+        # The training config and base model are the binding's other inputs.
+        if name == binding["config_path"] or path.name in {"model.json", "weights.json"}:
+            continue
+        try:
+            dataset = read_sealed(path)
+        except (OSError, ValueError):
+            continue
+        if dataset.get("kind") != "conditional-dataset" or dataset["id"] != binding["dataset_id"]:
+            continue
+        policies = {
+            json.dumps(_effective(example["target"]["target_policy"]))
+            for example in dataset["examples"]
+        }
+        if len(policies) == 1:
+            return json.loads(policies.pop()), {"dataset_id": dataset["id"], "dataset": name}
+    return None
+
+
+def check_target_policy(checkpoint: dict[str, Any], backend: ERevisionBackend) -> dict[str, Any]:
+    """Verify the declared target policy is the one the checkpoint was trained on."""
+    declared = _effective(backend.target_policy)
+    found = training_policy(checkpoint)
+    if found is None:
+        if not checkpoint["binding"]["config"]["test_only"]:
+            raise PlanError(
+                "E target_policy cannot be verified: the checkpoint's training dataset "
+                "is unavailable or changed"
+            )
+        return {
+            "status": "declared-unverified",
+            "reason": "test-only checkpoint whose training dataset is unavailable or changed",
+        }
+    trained, dataset = found
+    if declared != trained:
+        raise PlanError(
+            f"E target_policy {declared} differs from the checkpoint's training policy {trained}"
+        )
+    return {"status": "verified", **dataset}
+
+
+@dataclass(frozen=True)
+class Preflight:
+    """What an E inpainting run was checked against before any call."""
+
+    observation: Observation
+    checkpoint: dict[str, Any]
+    target_policy_check: dict[str, Any]
+
+
 def inpainting_templates(backend: ERevisionBackend) -> list[TemplateNeed]:
     return [TemplateNeed(backend.text_prompt, frozenset({"brief", "plan", "revision", "fields"}))]
 
 
 def prepare_inpainting(
     plan: NarrativePlan, spec: RevisionSpec, backend: ERevisionBackend
-) -> tuple[Observation, dict[str, Any]]:
+) -> Preflight:
     """Reject unsupported authority, runtime, checkpoint or evidence before any call."""
     validate_selection(plan, spec)
     runtime()
@@ -327,10 +392,11 @@ def prepare_inpainting(
     candidate_cost(
         checkpoint, Conditions.model_validate(backend.conditions), backend.guidance_scale
     )
+    policy_check = check_target_policy(checkpoint, backend)
     observation = observe(plan, spec, backend, checkpoint)
     if not observation.editable and not observation.text_fields:
         raise PlanError("E cannot represent any selected structural or text unit")
-    return observation, checkpoint
+    return Preflight(observation, checkpoint, policy_check)
 
 
 @dataclass
@@ -351,6 +417,7 @@ class _Run:
     backend: ERevisionBackend
     observation: Observation
     checkpoint: dict[str, Any]
+    target_policy_check: dict[str, Any]
 
 
 def _attempt(run: _Run, work: _Work, number: int, deadline: float) -> NarrativePlan | None:
@@ -510,6 +577,7 @@ def _metadata(run: _Run | None, backend: ERevisionBackend, work: _Work) -> dict[
         "test_only": binding["config"]["test_only"],
         "scientific_evidence": binding["scientific_evidence"].get("status"),
         "target_policy": run.backend.target_policy,
+        "target_policy_check": run.target_policy_check,
         "conditions": Conditions.model_validate(run.backend.conditions).model_dump(mode="json"),
         "guidance_scale": run.backend.guidance_scale,
         "sampling_temperature": binding["config"]["sampling_temperature"],
@@ -558,10 +626,13 @@ def inpaint_plan(
     work = _Work()
     try:
         try:
-            observation, checkpoint = prepare_inpainting(before, spec, backend)
+            preflight = prepare_inpainting(before, spec, backend)
         except ValueError as error:
             raise StepFailedError(f"revision-{name}", str(error)) from error
-        run = _Run(ctx, record, backend, observation, checkpoint)
+        observation = preflight.observation
+        run = _Run(
+            ctx, record, backend, observation, preflight.checkpoint, preflight.target_policy_check
+        )
         ctx.keep(
             f"{record.folder}/inpainting/observation.json",
             json.dumps({"view": observation.view, **observation.summary()}, indent=2) + "\n",
