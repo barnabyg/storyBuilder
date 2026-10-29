@@ -21,8 +21,10 @@ never write anything a training loader accepts and never read held-out briefs.
 """
 
 import argparse
+import copy
 import hashlib
 import json
+import os
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
@@ -77,6 +79,8 @@ KIND = "conditional-evidence-report"
 REPORT_VERSION = "2"
 NO_OUTPUT = "no-output"
 REPORT = "report.json"
+# Unsealed locator of the request, so a moved report and its inputs can be replayed.
+LOCATION = "location.json"
 STRUCTURE_METRIC = "retained-structure-multiset-jaccard-v1"
 EDGE_METRIC = "ordinal-position-multiset-jaccard-v1"
 JUDGEMENT_CONDITIONS = ("genre", "themes", "ending_intent")
@@ -262,9 +266,31 @@ class _Context:
     request: ReportRequest
     files: set[Path] = field(default_factory=set[Path])
     problems: list[str] = field(default_factory=list[str])
+    # The request folder the report was built in, when replaying it from elsewhere.
+    origin: Path | None = None
 
     def resolve(self, path: Path) -> Path:
         return (self.base / path).resolve()
+
+    def locate(self, path: str | Path) -> Path:
+        """An absolute path recorded by a run, moved with the request when it was moved."""
+        recorded = Path(path)
+        if self.origin is None or not recorded.is_absolute():
+            return recorded
+        try:
+            # Same place relative to the request as when the report was built.
+            moved = Path(os.path.normpath(self.base / os.path.relpath(recorded, self.origin)))
+        except ValueError:
+            return recorded
+        return moved if moved.exists() else recorded
+
+    def rel(self, path: str | Path) -> str:
+        """A path as the report records it: relative to the request folder."""
+        try:
+            return Path(os.path.relpath(self.locate(path), self.base)).as_posix()
+        except ValueError:
+            # Another drive cannot be expressed relative to the request.
+            return Path(path).as_posix()
 
     def bind(self, *paths: Path) -> None:
         self.files.update(path for path in paths if path.is_file())
@@ -295,11 +321,12 @@ def _run(ctx: _Context, path: Path, label: str | None) -> _Run:
     except OSError as error:
         raise ValueError(f"run {folder} has no saved configuration: {error}") from error
     ctx.bind(folder / "manifest.json", saved)
-    return _Run(folder, label or folder.name, manifest, config, Path(manifest.config_path).parent)
+    config_dir = ctx.locate(manifest.config_path).parent
+    return _Run(folder, label or folder.name, manifest, config, config_dir)
 
 
 def _briefs(ctx: _Context, run: _Run, selection: Any, briefs_dir: str) -> list[Brief]:
-    folder = (run.config_dir / briefs_dir).resolve()
+    folder = ctx.locate((run.config_dir / briefs_dir).resolve())
     try:
         briefs = select_briefs(selection, folder)
     except (ConfigError, BriefError) as error:
@@ -373,7 +400,7 @@ def _story_unit(  # noqa: PLR0913 - one unit's run, request, brief, slot and sav
         conditions=brief_conditions(brief, params.condition_fields).model_dump(mode="json"),
         locks=dict(params.locks),
         tolerance=0.0 if stories is None else stories.length.tolerance,
-        checkpoint_path=str((run.config_dir / params.checkpoint).resolve()),
+        checkpoint_path=str(ctx.locate((run.config_dir / params.checkpoint).resolve())),
     )
     if rec is None:
         return unit
@@ -496,7 +523,7 @@ def _revision_unit(  # noqa: PLR0913 - one alternative's run, request, brief, sl
         spec=params.revision,
         # The registered request, known even for an alternative that left no record.
         conditions=Conditions.model_validate(backend.conditions).model_dump(mode="json"),
-        checkpoint_path=str((run.config_dir / backend.checkpoint).resolve()),
+        checkpoint_path=str(ctx.locate((run.config_dir / backend.checkpoint).resolve())),
     )
     if record is None:
         return unit
@@ -580,10 +607,12 @@ def _revision_units(ctx: _Context, ref: RevisionRunRef) -> tuple[_Run, list[_Uni
         for brief in briefs
         for repetition in range(plans.repeat)
     ]
+    source = dict(alternatives["source"])
+    source["path"] = ctx.rel(source["path"])
     summary = {
-        "run": str(run.path),
+        "run": ctx.rel(run.path),
         "label": run.label,
-        "source": alternatives["source"],
+        "source": source,
         "counts": alternatives["counts"],
         "consistent": alternatives["consistent"],
         "revision": params.revision.model_dump(mode="json"),
@@ -872,6 +901,18 @@ def _diversity(units: list[_Unit]) -> Record:
     }
 
 
+def _relocated(ctx: _Context, checkpoint: Record) -> Record:
+    """The checkpoint with the files its binding names located after any move."""
+    located = copy.deepcopy(checkpoint)
+    binding = located["binding"]
+    binding["inputs"] = {str(ctx.locate(name)): sha for name, sha in binding["inputs"].items()}
+    binding["config_path"] = str(ctx.locate(binding["config_path"]))
+    protocol = binding["config"].get("g3_protocol")
+    if protocol is not None:
+        binding["config"]["g3_protocol"] = str(ctx.locate(protocol))
+    return located
+
+
 @dataclass
 class _Identity:
     checkpoint: Record | None
@@ -887,7 +928,11 @@ def _identity(ctx: _Context, units: list[_Unit]) -> _Identity:
         raise ValueError(f"report covers one E checkpoint; found {sorted(ids)}")
     paths = sorted({unit.checkpoint_path for unit in units if unit.checkpoint_path})
     checkpoint: Record | None = None
-    summary: Record = {"id": next(iter(ids), None), "paths": paths, "available": False}
+    summary: Record = {
+        "id": next(iter(ids), None),
+        "paths": sorted(ctx.rel(path) for path in paths),
+        "available": False,
+    }
     for name in paths:
         path = Path(name)
         try:
@@ -899,7 +944,7 @@ def _identity(ctx: _Context, units: list[_Unit]) -> _Identity:
             ctx.problems.append(f"checkpoint file {path} no longer holds the recorded checkpoint")
             continue
         ctx.bind(path)
-        checkpoint = candidate
+        checkpoint = _relocated(ctx, candidate)
         binding = candidate["binding"]
         summary.update(
             id=candidate["id"],
@@ -952,7 +997,7 @@ def _population(ctx: _Context, name: str, origin: str, path: Path, role: str) ->
             "name": name,
             "origin": origin,
             "role": role,
-            "path": str(path),
+            "path": ctx.rel(path),
             "status": "verified",
             "id": view["id"],
             "kind": view.get("kind"),
@@ -978,7 +1023,7 @@ def _fine_tuning(ctx: _Context, dataset: Path | None) -> _Population:
     try:
         return _population(ctx, row["name"], row["origin"], dataset, "other")
     except (OSError, ValueError, KeyError) as error:
-        row.update(path=str(dataset), status="changed", reason=str(error))
+        row.update(path=ctx.rel(dataset), status="changed", reason=str(error))
         return _Population(row)
 
 
@@ -989,7 +1034,7 @@ def _protected(ctx: _Context, ref: PopulationRef) -> _Population:
         raise ValueError(f"protected population {ref.name} is not evaluator-only material")
     ctx.bind(path)
     rows = view_records(view)
-    row = {"name": ref.name, "path": str(path), "id": view["id"], "split": view.get("split")}
+    row = {"name": ref.name, "path": ctx.rel(path), "id": view["id"], "split": view.get("split")}
     return _Population({**row, "records": len(rows)}, rows)
 
 
@@ -1090,7 +1135,14 @@ def _audit(training: _Population, guarded: _Population) -> Record:
         "protected": guarded.row["name"],
         "protected_overlap": unresolved,
         "overlaps": [
-            {"protected_record": row["query_id"], **match}
+            {
+                "protected_record": row["query_id"],
+                **{key: value for key, value in match.items() if key != "provenance"},
+                **{
+                    key: _object(match.get("provenance")).get(key)
+                    for key in ("work_id", "author_id", "source_sha256")
+                },
+            }
             for row in rows
             for match in row["matches"]
             if match["exact_source"] or match["exact_work"] or match["author_overlap"]
@@ -1261,14 +1313,22 @@ def _gd(ctx: _Context) -> tuple[Literal["C", "D"], str, Record | None]:
         separate = _read(baseline_file) if baseline_file.is_file() else None
     except (OSError, ValueError, KeyError) as error:
         return "C", f"G-D decision unreadable: {error}", None
+    recorded = saved.get("reference_baseline")
     summary = {
-        "path": str(folder),
+        "path": ctx.rel(folder),
         "id": saved.get("id"),
         "outcome": saved.get("outcome"),
         "criteria_outcome": saved.get("criteria_outcome"),
         "test_only": saved.get("test_only"),
-        "reference_baseline": saved.get("reference_baseline"),
-        "replays": replayed == saved and separate == saved.get("reference_baseline"),
+        # The baseline record names files by their G-D locations; the report keeps its
+        # condition and identity, and checks its contents against reference runs.
+        "reference_baseline": None
+        if recorded is None
+        else {
+            "condition": _object(recorded).get("condition"),
+            "sha256": hashlib.sha256(json.dumps(recorded, sort_keys=True).encode()).hexdigest(),
+        },
+        "replays": replayed == saved and separate == recorded,
     }
     if not summary["replays"]:
         return "C", "G-D decision no longer replays from its bound evidence", summary
@@ -1342,7 +1402,7 @@ def _c_selection(
     chosen = load_selection(path)
     ctx.bind(path)
     selection: Record = {
-        "path": str(path),
+        "path": ctx.rel(path),
         "id": chosen.id,
         "tier": chosen.tier,
         "test_only": chosen.test_only,
@@ -1352,7 +1412,7 @@ def _c_selection(
     problems: list[str] = []
     for identity_ in identities:
         run = Path(identity_["run"])
-        config = Path(read_manifest(run).config_path)
+        config = ctx.locate(read_manifest(run).config_path)
         problems += [f"{run.name}: {item}" for item in selected_c_problems(chosen, config)]
     return selection, problems
 
@@ -1382,6 +1442,7 @@ def _reference(ctx: _Context, policy: dict[str, str], units: list[_Unit]) -> Rec
         identities.append(identity_)
         references.extend(rows)
     selection, selection_problems = _c_selection(ctx, identities, permitted)
+    recorded = [identity_ | {"run": ctx.rel(identity_["run"])} for identity_ in identities]
     identity_problems += selection_problems
     # Otherwise only the owner's frozen C selection identifies the C baseline.
     identified = (
@@ -1417,7 +1478,7 @@ def _reference(ctx: _Context, policy: dict[str, str], units: list[_Unit]) -> Rec
         "permitted": permitted,
         "reason": reason,
         "gd_decision": gd,
-        "identities": identities,
+        "identities": recorded,
         "c_selection": selection,
         "identified": identified,
         "identity_problems": identity_problems,
@@ -1445,19 +1506,19 @@ def _realisation(ctx: _Context, units: list[_Unit]) -> Record:
                 unit
                 for unit in stories
                 if unit.record is not None
-                and Path(packet.run).resolve() == unit.run
+                and ctx.locate(Path(packet.run).resolve()) == unit.run
                 and (packet.story.condition, packet.story.brief, packet.story.repetition)
                 == (unit.record.condition, unit.brief.id, unit.repetition)
             ),
             None,
         )
         if match is None:
-            ctx.problems.append(f"realisation packet {path} binds no reported E story")
+            ctx.problems.append(f"realisation packet {ctx.rel(path)} binds no reported E story")
             continue
         summary = realisation.summarise(path)
         if summary["story_sha256"] != match.output_sha256:
             summary["stale"] = [*summary["stale"], "packet prose is not the final selected story"]
-        packets.setdefault(match.id, []).append({"packet": str(path), **summary})
+        packets.setdefault(match.id, []).append({"packet": ctx.rel(path), **summary})
     rows: list[Record] = []
     for unit in stories:
         evidence = packets.get(unit.id, [])
@@ -1483,14 +1544,19 @@ def _realisation(ctx: _Context, units: list[_Unit]) -> Record:
     }
 
 
-def build(manifest: Path) -> Record:
-    """Recompute the complete report content from a request; raises ValueError or OSError."""
+def build(manifest: Path, *, origin: Path | None = None) -> Record:
+    """Recompute the complete report content from a request; raises ValueError or OSError.
+
+    Every recorded path is relative to the request's folder, so the content and its
+    identity do not depend on where the evidence lives. `origin` is the folder the
+    request was in when a report was built, for replaying it after a move.
+    """
     manifest = manifest.resolve()
     try:
         request = ReportRequest.model_validate_json(manifest.read_text(encoding="utf-8"))
     except ValidationError as error:
         raise ValueError(f"invalid report request: {error}") from error
-    ctx = _Context(manifest.parent, request, {manifest})
+    ctx = _Context(manifest.parent, request, {manifest}, origin=origin)
     units: list[_Unit] = []
     runs: list[Record] = []
     labels: list[str] = []
@@ -1500,7 +1566,12 @@ def build(manifest: Path) -> Record:
         comparison = run.path / "comparison.json"
         policy = _read(comparison).get("resource_policy") if comparison.is_file() else None
         runs.append(
-            {"kind": "story", "label": run.label, "run": str(run.path), "resource_policy": policy}
+            {
+                "kind": "story",
+                "label": run.label,
+                "run": ctx.rel(run.path),
+                "resource_policy": policy,
+            }
         )
         units.extend(rows)
     revisions: list[Record] = []
@@ -1518,7 +1589,7 @@ def build(manifest: Path) -> Record:
         "kind": KIND,
         "report_version": REPORT_VERSION,
         "scope": "development evidence; not a G-E decision",
-        "request": {"path": str(manifest), **request.model_dump(mode="json")},
+        "request": request.model_dump(mode="json"),
         "e_identity": {
             "checkpoint": identity_.summary,
             "target_policy": identity_.policy,
@@ -1527,7 +1598,7 @@ def build(manifest: Path) -> Record:
         "test_only": bool(identity_.summary.get("test_only", True)),
         "runs": runs,
         "revision_runs": revisions,
-        "units": [_unit_summary(unit) for unit in units],
+        "units": [_unit_summary(unit) | {"run": ctx.rel(unit.run)} for unit in units],
         "adherence": {
             "deterministic": _deterministic(units),
             "judgement": _judgements(ctx, units),
@@ -1545,7 +1616,7 @@ def build(manifest: Path) -> Record:
     content["problems"] = ctx.problems
     content["consistent"] = not ctx.problems
     content["statement"] = NOT_A_DECISION
-    content["inputs"] = snapshot(sorted(ctx.files))
+    content["inputs"] = {ctx.rel(name): sha for name, sha in snapshot(sorted(ctx.files)).items()}
     return content
 
 
@@ -1553,7 +1624,6 @@ def _unit_summary(unit: _Unit) -> Record:
     return {
         "unit": unit.id,
         "kind": unit.kind,
-        "run": str(unit.run),
         "path": unit.path,
         "brief": unit.brief.id,
         "brief_sha256": _brief_sha256(unit.brief),
@@ -1695,21 +1765,35 @@ def write(manifest: Path, out: Path) -> Record:
         raise ValueError("report folder already exists; choose a new folder to keep history")
     report = create_record(out / REPORT, build(manifest))
     write_text_lf(out / "report.md", _markdown(report))
+    # Unsealed: where the request is from this folder, and where it was when built.
+    request = manifest.resolve()
+    locator = {
+        "request": Path(os.path.relpath(request, out.resolve())).as_posix(),
+        "built_in": str(request.parent),
+    }
+    write_text_lf(out / LOCATION, json.dumps(locator, indent=2) + "\n")
     return report
 
 
-def check(folder: Path) -> tuple[Record, list[str]]:
-    """Replay a saved report from its request; the reasons it no longer holds, if any."""
+def check(folder: Path, request: Path | None = None) -> tuple[Record, list[str]]:
+    """Replay a saved report from its request; the reasons it no longer holds, if any.
+
+    The request is found beside the report as it was when built, unless given
+    explicitly, so a report moved with its request and inputs still replays.
+    """
     saved = read_sealed(folder / REPORT)
     if saved.get("kind") != KIND:
         raise ValueError(f"not a {KIND}: {folder}")
+    locator = _read(folder / LOCATION)
+    manifest = (request or folder / str(locator["request"])).resolve()
+    base = manifest.parent
     changed = [
         f"input changed or missing: {name}"
         for name, checksum in saved["inputs"].items()
-        if not Path(name).is_file() or file_sha(Path(name)) != checksum
+        if not (base / name).is_file() or file_sha(base / name) != checksum
     ]
     try:
-        current = build(Path(saved["request"]["path"]))
+        current = build(manifest, origin=Path(str(locator["built_in"])))
     except (OSError, ValueError) as error:
         return saved, [*changed, f"report can no longer be rebuilt: {error}"]
     expected = {key: value for key, value in saved.items() if key not in {"id", "version"}}
@@ -1728,6 +1812,7 @@ def configure(parser: argparse.ArgumentParser) -> None:
     create.add_argument("--out", type=Path, required=True)
     replay = commands.add_parser("check", help="replay a saved report against current evidence")
     replay.add_argument("report", type=Path)
+    replay.add_argument("--request", type=Path, help="the request, if not where it was")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -1736,7 +1821,7 @@ def run(args: argparse.Namespace) -> int:
             report = write(args.request, args.out)
             print(f"conditional-report {report['id']}: {args.out}")
             return 0
-        _, reasons = check(args.report)
+        _, reasons = check(args.report, args.request)
     except (OSError, ValueError, KeyError) as error:
         print(f"nde conditional-report: {error}", file=sys.stderr)
         return 2

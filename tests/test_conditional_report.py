@@ -125,6 +125,7 @@ def runs(tmp_path_factory: pytest.TempPathFactory) -> Evidence:
             folder = root / "revision"
             folder.mkdir()
             value = run_config(folder, fake.base_url, UNITS, backend)
+            value["plans"]["briefs_dir"] = str(root / "benchmark")
             value["plans"]["repeat"] = 3
             revisions = revise(folder, value, 0)
             assert revisions is not None
@@ -246,8 +247,9 @@ def test_report_binds_inputs_and_evaluates_predicates_with_complete_denominators
     checkpoint = read_sealed(runs.checkpoint)
     assert report["e_identity"]["checkpoint"]["id"] == checkpoint["id"]
     assert report["e_identity"]["target_policy_status"] == "verified"
-    # Briefs, constraints, checkpoint, histories, final plans/stories are all bound.
-    bound = set(report["inputs"])
+    # Briefs, constraints, checkpoint, histories, final plans/stories are all bound,
+    # recorded relative to the request's folder.
+    bound = {str((tmp_path / name).resolve()) for name in report["inputs"]}
     story = runs.stories / "stories/E/brief-01/r1"
     alternative = runs.revisions / "plans/brief-01/r1"
     for path in (
@@ -422,6 +424,49 @@ def test_operational_failure_with_a_saved_plan_keeps_plan_adherence(
     assert summary["output_sha256"] is None
 
 
+@pytest.mark.ml
+def test_sealed_report_is_location_independent_and_replays_after_moving(
+    tmp_path: Path, runs: Evidence
+) -> None:
+    folder = runs.root / "requests" / tmp_path.name
+    folder.mkdir(parents=True)
+    path = folder / "request.json"
+    relative = {
+        "story_runs": [{"run": f"../../runs/{runs.stories.name}", "label": "e-stories"}],
+        "revision_runs": [
+            {"run": f"../../revision/runs/{runs.revisions.name}", "label": "e-revisions"}
+        ],
+        "reference": {"runs": [{"run": f"../../runs/{runs.stories.name}", "condition": "C"}]},
+    }
+    path.write_text(json.dumps(relative))
+    out = folder / "report"
+    report = build(path, out)
+    text = (out / "report.json").read_text()
+    for root in (runs.root, runs.root.resolve()):
+        for spelling in (str(root), root.as_posix(), json.dumps(str(root))[1:-1]):
+            assert spelling not in text
+    assert all(not Path(name).is_absolute() for name in report["inputs"])
+    assert f"runs/{runs.stories.name}/stories.jsonl" in {
+        Path(name).as_posix().removeprefix("../../") for name in report["inputs"]
+    }
+    assert check(out) == 0
+    # The request, its report and every input moved together keep their identity.
+    moved = tmp_path / "moved"
+    shutil.copytree(runs.root, moved, ignore=shutil.ignore_patterns("requests"))
+    shutil.copytree(folder, moved / "requests" / tmp_path.name)
+    relocated = moved / "requests" / tmp_path.name / "report"
+    assert check(relocated) == 0
+    saved, reasons = evidence.check(relocated)
+    assert (saved["id"], reasons) == (report["id"], [])
+    # An explicit request path replays the same report.
+    request_copy = relocated.parent / "request.json"
+    arguments = ["conditional-report", "check", str(relocated), "--request", str(request_copy)]
+    assert main(arguments) == 0
+    # A moved input that changed still makes the replay stale.
+    (moved / "runs" / runs.stories.name / "stories.jsonl").write_text("")
+    assert check(relocated) == 1
+
+
 def judgement_file(path: Path, **review: Any) -> Path:
     path.write_text(json.dumps({"reviewer": "Owner", **review}))
     return path
@@ -542,7 +587,7 @@ def test_training_similarity_reports_complete_lineage_and_renamed_reproduction(
         "name": "conditional-fine-tuning",
         "origin": "checkpoint binding",
         "role": "other",
-        "path": str(runs.dataset.resolve()),
+        "path": Path(os.path.relpath(runs.dataset, tmp_path)).as_posix(),
         "status": "verified",
         "id": dataset["id"],
         "kind": "conditional-dataset",

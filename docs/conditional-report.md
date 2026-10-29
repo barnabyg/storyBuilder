@@ -37,8 +37,10 @@ is unavailable, and is then recorded as declared and unverified.
 
 The output folder must be new. It holds `report.json` (kind
 `conditional-evidence-report`, record version 1 with `report_version` 2, sealed with a
-content `id`) and a
-readable `report.md`. Build exits 0 when a report is written, including one
+content `id`), a readable `report.md` and an unsealed `location.json` locating the
+request. Every path in `report.json`, including the `inputs` checksums, is relative
+to the request file's folder, so the content and its `id` do not depend on where the
+evidence lives. Write the request's own paths relative to it as well. Build exits 0 when a report is written, including one
 with failures, unknowns, problems or pending review, and 2 for malformed or
 unsupported inputs.
 
@@ -203,10 +205,21 @@ incomplete owner review stays `pending`.
 
 ## Checking a saved report
 
-`check` rebuilds the report from its saved request and compares it with the
-saved content. It exits 0 when the report is current, 1 when any bound input or
-section has changed (each reason is printed), and 2 when the saved report is
-unreadable. Stale reports are never edited; build a new folder.
+`nde conditional-report check FOLDER [--request REQUEST.json]` rebuilds the report
+from its request and compares it with the saved content. The request is found from
+`location.json` (relative to the report folder) unless `--request` names it. It exits
+0 when the report is current, 1 when any bound input or section has changed (each
+reason is printed), and 2 when the saved report is unreadable. Stale reports are
+never edited; build a new folder.
+
+A report can be committed and replayed elsewhere when the request, the report and
+every input move together with their relative layout preserved. Absolute paths that
+runs recorded (configuration, brief, checkpoint and dataset locations) are then
+found at the same place relative to the request. Upstream sealed records keep their
+own absolute bindings, however: a conditional dataset rechecks its export, cohort
+and annotations, a realisation packet its run, a G-D decision its batch and a G3
+protocol its evidence at the paths they recorded. Where those are not available,
+`check` reports the affected sections as changed rather than assuming they hold.
 
 ## Use in the G-E comparison
 
