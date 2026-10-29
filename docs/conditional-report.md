@@ -145,8 +145,13 @@ retained structure is compared with every record (nearest `neighbours`, with
 distance, work and uncertainty). `exact_structural_matches` counts distance 0.
 
 `lineage` is complete only when the fine-tuning dataset is verified and, for a
-checkpoint with passed G3 evidence, a `g3` population is supplied. A missing or
-changed population is listed, not omitted. The base model's pretraining data is
+checkpoint with passed G3 evidence, a supplied `g3` population is verified against
+that evidence: the checkpoint's G3 protocol must still assess as the genuine pass
+whose decision ID the checkpoint recorded, and the population's identity must be the
+protocol's registered training population. Any other population tagged `g3` makes
+`g3_population` a `mismatch`. A checkpoint without passed G3 evidence leaves supplied
+`g3` populations `unverified` and does not require one. A missing or changed
+population is listed, not omitted. The base model's pretraining data is
 reported as `none` only for a random fixture initialization; otherwise overlap
 with pretraining material is an explicit unknown limitation. Structural similarity
 is a candidate match, not proof of memorisation or its absence.

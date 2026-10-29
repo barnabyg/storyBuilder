@@ -58,6 +58,7 @@ from nde.plan.revision import (
     selector_value,
 )
 from nde.plan.revision import identity as plan_sha256
+from nde.reconstruction import g3
 from nde.reconstruction.codec import CODEC_ID, encode_plan
 from nde.reconstruction.overlap import check_index, load_view, neighbour_rows, view_distance
 from nde.reconstruction.overlap import records as view_records
@@ -1086,13 +1087,72 @@ def _audit(training: _Population, guarded: _Population) -> Record:
     }
 
 
-def _g3(populations: list[_Population], evidence: Any) -> Record:
-    supplied = [p.row["name"] for p in populations if p.row.get("role") == "g3"]
-    if supplied:
-        return {"status": "supplied", "populations": supplied}
-    if evidence == "passed":
-        return {"status": "missing", "reason": "checkpoint has G3 evidence; supply its population"}
-    return {"status": "not-applicable", "reason": f"scientific evidence: {evidence}"}
+def g3_population_status(supplied: list[Record], training_id: str) -> Record:
+    """Which supplied g3 populations are the G3 protocol's registered training population."""
+    matched = [row["name"] for row in supplied if row.get("id") == training_id]
+    mismatched = [row["name"] for row in supplied if row.get("id") != training_id]
+    status = "mismatch" if mismatched else "verified" if matched else "missing"
+    return {
+        "status": status,
+        "training_id": training_id,
+        "populations": matched,
+        "mismatched": mismatched,
+    }
+
+
+def g3_lineage(supplied: list[Record], checkpoint: Record | None) -> Record:
+    """Verify supplied g3 populations against the checkpoint's own G3 evidence.
+
+    A `g3` role is a claim. It is accepted only when the checkpoint's G3 decision
+    still replays as the genuine pass it recorded and the population is that
+    protocol's registered training population.
+    """
+    names = [row["name"] for row in supplied]
+    if checkpoint is None:
+        return {
+            "status": "missing",
+            "required": True,
+            "reason": "checkpoint unavailable; its G3 evidence cannot be checked",
+            "populations": names,
+        }
+    binding = checkpoint["binding"]
+    evidence = _object(binding.get("scientific_evidence"))
+    if evidence.get("status") != "passed":
+        reason = f"checkpoint scientific evidence: {evidence.get('status')}"
+        if names:
+            return {
+                "status": "unverified",
+                "required": False,
+                "reason": f"{reason}; no G3 decision to verify supplied populations against",
+                "populations": names,
+            }
+        return {"status": "not-applicable", "required": False, "reason": reason}
+    try:
+        protocol = Path(binding["config"]["g3_protocol"])
+        registered = read_sealed(protocol)
+        decision = g3.assess(protocol)
+        training_id = str(registered["readiness"]["training_id"])
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return {
+            "status": "missing",
+            "required": True,
+            "reason": f"G3 evidence unavailable: {error}",
+            "populations": names,
+        }
+    if (
+        decision["test_only"]
+        or decision["outcome"] != "passed"
+        or decision["id"] != evidence.get("decision_id")
+    ):
+        return {
+            "status": "missing",
+            "required": True,
+            "reason": "the checkpoint's G3 decision no longer replays as its recorded pass",
+            "populations": names,
+        }
+    return {"required": True, "decision_id": decision["id"]} | g3_population_status(
+        supplied, training_id
+    )
 
 
 def _training(ctx: _Context, identity_: _Identity, units: list[_Unit]) -> Record:
@@ -1117,10 +1177,16 @@ def _training(ctx: _Context, identity_: _Identity, units: list[_Unit]) -> Record
         for training in populations
         if training.records is not None
     ]
-    g3 = _g3(populations, _object(identity_.summary.get("scientific_evidence")).get("status"))
+    g3_rows = [
+        {"name": p.row["name"], "id": p.row.get("id")}
+        for p in populations
+        if p.row.get("role") == "g3"
+    ]
+    g3_status = g3_lineage(g3_rows, identity_.checkpoint)
     pretraining = _pretraining(identity_.checkpoint)
     missing = [p.row["name"] for p in populations if p.row["status"] != "verified"]
-    missing += ["g3-population"] if g3["status"] == "missing" else []
+    if g3_status["required"] and g3_status["status"] != "verified":
+        missing.append("g3-population")
     limitations = list(SIMILARITY_LIMITATIONS)
     if pretraining["status"] != "none":
         limitations.append(
@@ -1130,7 +1196,7 @@ def _training(ctx: _Context, identity_: _Identity, units: list[_Unit]) -> Record
     return {
         "metric": {"name": STRUCTURE_METRIC, "definition": STRUCTURE},
         "populations": [p.row for p in populations],
-        "g3_population": g3,
+        "g3_population": g3_status,
         "pretraining": pretraining,
         "lineage": {"complete": not missing, "missing": missing},
         "protected_populations": [p.row for p in protected],

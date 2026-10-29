@@ -580,6 +580,40 @@ def test_training_similarity_reports_complete_lineage_and_renamed_reproduction(
     assert any("training lineage incomplete" in item for item in declared["pending"])
 
 
+@pytest.mark.ml
+def test_g3_lineage_is_verified_against_the_checkpoints_g3_evidence(
+    tmp_path: Path, runs: Evidence
+) -> None:
+    supplied = [{"name": "g3", "id": "a" * 64}]
+    checkpoint = read_sealed(runs.checkpoint)
+    assert evidence.g3_lineage(supplied, checkpoint)["status"] == "unverified"
+    assert evidence.g3_lineage([], checkpoint)["status"] == "not-applicable"
+    # A checkpoint claiming passed G3 evidence that does not replay cannot be completed
+    # by declaring any population to be its G3 population.
+    claimed = copy.deepcopy(checkpoint)
+    claimed["binding"]["config"]["g3_protocol"] = str(tmp_path / "missing-protocol.json")
+    claimed["binding"]["scientific_evidence"] = {
+        "status": "passed",
+        "decision_id": "b" * 64,
+        "inputs": {},
+    }
+    lineage = evidence.g3_lineage(supplied, claimed)
+    assert lineage["status"] == "missing"
+    assert lineage["required"] is True
+    assert "G3 evidence unavailable" in lineage["reason"]
+    # Matching is by the G3 protocol's registered training population identity.
+    assert evidence.g3_population_status(supplied, "a" * 64) == {
+        "status": "verified",
+        "training_id": "a" * 64,
+        "populations": ["g3"],
+        "mismatched": [],
+    }
+    other = [*supplied, {"name": "relabelled", "id": "c" * 64}]
+    mismatch = evidence.g3_population_status(other, "a" * 64)
+    assert (mismatch["status"], mismatch["mismatched"]) == ("mismatch", ["relabelled"])
+    assert evidence.g3_population_status([], "a" * 64)["status"] == "missing"
+
+
 def population(path: Path, records: list[dict[str, Any]], **fields: Any) -> Path:
     create_record(
         path,
@@ -621,7 +655,10 @@ def test_protected_material_is_audited_against_every_training_population(
     )
     training = build(path, tmp_path / "report")["training_similarity"]
     assert [p["name"] for p in training["populations"]] == ["conditional-fine-tuning", "g3"]
-    assert training["g3_population"] == {"status": "supplied", "populations": ["g3"]}
+    # A test-only checkpoint has no G3 decision, so a population tagged g3 stays unverified.
+    assert training["g3_population"]["status"] == "unverified"
+    assert training["g3_population"]["populations"] == ["g3"]
+    assert training["lineage"] == {"complete": True, "missing": []}
     audits = {(a["training"], a["protected"]): a for a in training["protected_audits"]}
     leak = audits["conditional-fine-tuning", "held-out"]
     assert leak["protected_overlap"] is True
