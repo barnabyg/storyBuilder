@@ -76,6 +76,8 @@ EDGE_METRIC = "ordinal-position-multiset-jaccard-v1"
 JUDGEMENT_CONDITIONS = ("genre", "themes", "ending_intent")
 # A unit whose saved evidence cannot be read: unknown, never failure.
 UNREADABLE = "unreadable"
+# A unit whose saved evidence contradicts its recorded inputs: also unknown.
+UNVERIFIED = "unverified"
 PREDICATES = {
     "scene_range": "success iff the selected plan's scene count lies in the requested "
     "inclusive scene_range condition",
@@ -92,6 +94,7 @@ PREDICATES = {
     "no-output": "a failed unit fails every requested predicate: nothing realised the request",
     "missing": "an expected unit without any record is unknown, never success",
     "unreadable": "a unit whose saved provenance, plan or story cannot be read is unknown",
+    "unverified": "a revision whose saved source plan is not the recorded original is unknown",
 }
 STRUCTURE = (
     "The checkpoint's retained codec view (target policy channels; identities and references "
@@ -441,6 +444,7 @@ def _revision_unit(  # noqa: PLR0913 - one alternative's run, request, brief, sl
     brief: Brief,
     repetition: int,
     record: Record | None,
+    source_sha256: str,
 ) -> _Unit:
     backend = cast(ERevisionBackend, params.backend)
     unit = _Unit(
@@ -470,6 +474,11 @@ def _revision_unit(  # noqa: PLR0913 - one alternative's run, request, brief, sl
         unit.status = UNREADABLE
         return unit
     ctx.bind(revision / "provenance.json", revision / "source-plan.json")
+    if {plan_sha256(unit.before), str(provenance.get("before_sha256"))} != {source_sha256}:
+        # Locks and scope are judged against the source; a substituted one proves nothing.
+        ctx.problems.append(f"{unit.id}: source plan differs from the recorded original")
+        unit.status, unit.before = UNVERIFIED, None
+        return unit
     if provenance.get("brief") != brief.model_dump(mode="json"):
         ctx.problems.append(f"{unit.id}: brief differs from the one the revision was made for")
     saved = _object(provenance.get("backend"))
@@ -528,6 +537,7 @@ def _revision_units(ctx: _Context, ref: RevisionRunRef) -> tuple[_Run, list[_Uni
             brief=brief,
             repetition=repetition,
             record=records.get((brief.id, repetition)),
+            source_sha256=str(alternatives["source"]["plan_sha256"]),
         )
         for brief in briefs
         for repetition in range(plans.repeat)
@@ -558,6 +568,8 @@ def _evaluate(unit: _Unit, predicate: str, request: Any) -> tuple[Status, str]: 
         return "unknown", "expected output is missing"
     if unit.status == UNREADABLE:
         return "unknown", "the unit's saved evidence is unreadable"
+    if unit.status == UNVERIFIED:
+        return "unknown", "the unit's saved evidence does not bind its recorded inputs"
     plan = unit.plan
     if plan is None:
         return "failure", "no selected output realised the request"
@@ -647,7 +659,7 @@ def _judgement_request(unit: _Unit, condition: str) -> Any:
 def _judgement_status(unit: _Unit) -> str:
     if unit.plan is not None:
         return "pending"
-    return "missing" if unit.status in {"missing", UNREADABLE} else "no-output"
+    return "missing" if unit.status in {"missing", UNREADABLE, UNVERIFIED} else "no-output"
 
 
 def _judgements(ctx: _Context, units: list[_Unit]) -> Record:

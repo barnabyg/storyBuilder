@@ -361,6 +361,25 @@ def test_unreadable_evidence_is_unknown_not_failure(tmp_path: Path, runs: Eviden
     assert any("provenance unavailable" in problem for problem in report["problems"])
 
 
+@pytest.mark.ml
+def test_revision_predicates_need_the_recorded_source_plan(tmp_path: Path, runs: Evidence) -> None:
+    source = runs.revisions / "plans/brief-01/r3/revisions/revision/source-plan.json"
+    with restored(source):
+        plan = json.loads(source.read_text())
+        plan["states"][0]["after"]["value"] = "carry the lamp"
+        source.write_text(json.dumps(plan))
+        report = build(request(tmp_path, runs), tmp_path / "report")
+    unit = "revision/e-revisions/brief-01/r3"
+    assert {u["unit"]: u["status"] for u in report["units"]}[unit] == "unverified"
+    # A substituted baseline would make the lock and scope predicates meaningless.
+    assert {row["status"] for row in rows(report, "deterministic", unit=unit)} == {"unknown"}
+    assert any(
+        f"{unit}: source plan differs from the recorded original" in problem
+        for problem in report["problems"]
+    )
+    assert report["consistent"] is False
+
+
 def judgement_file(path: Path, **review: Any) -> Path:
     path.write_text(json.dumps({"reviewer": "Owner", **review}))
     return path

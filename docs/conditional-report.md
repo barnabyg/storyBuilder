@@ -75,8 +75,10 @@ expected unit.
 
 A failed unit fails every predicate it requested, because nothing realised the
 request. A missing unit, or one whose saved provenance, plan or story cannot be
-read (status `unreadable`, also listed under `problems`), is `unknown`, never
-success or failure. Model diagnostics (attempts,
+read (status `unreadable`), is `unknown`, never success or failure. So is a
+revision alternative whose saved source plan or recorded `before_sha256` is not the
+run's recorded original (status `unverified`): locks and scope cannot be judged
+against a substituted baseline. Both are also listed under `problems`. Model diagnostics (attempts,
 rejections, guidance, local work and completion calls) are reported separately and
 never count as adherence.
 
