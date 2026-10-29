@@ -17,6 +17,7 @@ every owner review in this repository. Applying the criterion is the G-E decisio
 import hashlib
 import json
 import secrets
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -331,16 +332,28 @@ def _outcome(item: Record, rating: Record | None, key: dict[str, dict[str, str]]
     )
 
 
-def status(folder: Path) -> Record:
+def status(folder: Path, frozen: Mapping[str, str] | None = None) -> Record:
     """The packet's review completeness, and for #85 the unblinded item outcomes.
 
     `complete` requires the registered reviewer's actual ratings for every owner
     item of a current, non-synthetic packet with no missing evidence. A synthetic
     review can finish the mechanics (`evidence: synthetic`) but never completes it.
+    `frozen` (saved review file name to review ID) restricts it to a frozen set of
+    saved reviews: one missing or changed makes the packet stale, and later reviews
+    are listed as `unused`, never applied.
     """
     packet = read_packet(folder)
     stale = stale_reasons(folder, packet)
-    reviews = [read_sealed(path) for path in sorted((folder / REVIEWS).glob("review-*.json"))]
+    saved = {
+        path.name: read_sealed(path) for path in sorted((folder / REVIEWS).glob("review-*.json"))
+    }
+    used = {name: review for name, review in saved.items() if frozen is None or name in frozen}
+    stale += [
+        f"frozen review missing or changed: {name}"
+        for name, review_id in sorted((frozen or {}).items())
+        if name not in saved or saved[name]["id"] != review_id
+    ]
+    reviews = list(used.values())
     latest: dict[str, dict[str, Record]] = {
         name: {} for name in ("actual", "synthetic", "diagnostic", "other-reviewer")
     }
@@ -387,6 +400,8 @@ def status(folder: Path) -> Record:
         "rated": {name: len(rows) for name, rows in latest.items()},
         "awaiting_owner": pending,
         "reviews": len(reviews),
+        "review_files": {name: review["id"] for name, review in used.items()},
+        "unused": sorted(saved.keys() - used.keys()),
         "outcomes": outcomes,
         "rule": "Only the registered reviewer's actual ratings complete review. Model "
         "judges are diagnostic and synthetic reviews are test-only; their agreement "

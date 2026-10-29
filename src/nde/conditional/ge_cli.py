@@ -88,9 +88,13 @@ def _decide(args: argparse.Namespace) -> int:
         f"G-E decision {record['outcome']} (criteria {record['criteria_outcome']}), action "
         f"{record['action']['result']}: {args.out / 'decision.md'}"
     )
+    ratings = ge_decision.ratings_path(args.protocol)
+    if ratings.is_file():
+        print(f"owner ratings frozen: commit {ratings} with the protocol")
     if ge_decision.settles(record):
         claim = ge_decision.settlement_path(args.protocol)
         print(f"settled: commit {claim} and {args.out} with the protocol")
+
     return 0 if record["outcome"] in ge_decision.COMPLETE else 1
 
 

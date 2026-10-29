@@ -15,8 +15,12 @@ protocols. A comparison is the reference identity and dev briefs a protocol
 freezes; it may have one run first attempt and one run development iteration,
 which is decided only against the first attempt's settled, replayable failure.
 
-A complete decision settles its protocol: a sealed decision claim beside the
-protocol names it, and no other decision of that protocol is ever written.
+The first decision that applies the structural criterion freezes the owner
+ratings it used in a sealed review claim beside the protocol; every later
+decision uses exactly those reviews, and later reviews are reported, never
+applied. Inconsistent evidence never unblinds owner ratings. A complete decision
+settles its protocol: a sealed decision claim beside the protocol names it, and
+no other decision of that protocol is ever written.
 Nothing here trains, generates, spends, launches another gate or starts Phase 8.
 """
 
@@ -38,6 +42,8 @@ DECISION_KIND = "ge-decision"
 DECISION_VERSION = "1"
 DECISION = "decision.json"
 SETTLEMENT_KIND = "ge-decision-claim"
+RATINGS_KIND = "ge-review-claim"
+WITHHELD = "withheld: the evidence is inconsistent, so no owner rating is unblinded"
 COMPLETE = ("passed", "failed")
 FIRST, ITERATION = 1, 2
 # Boundaries are inclusive; a floating-point rate this close to a threshold meets it.
@@ -233,12 +239,26 @@ def conclude(content: Record) -> Record:
     }
 
 
+def _applies_ratings(record: Record) -> bool:
+    """Whether a decision applied the structural criterion to owner ratings."""
+    return not record["problems"] and record["structural"]["status"] in COMPLETE
+
+
 def settles(record: Record) -> bool:
     """Whether a decision is complete enough to settle its protocol for good."""
     return not record["problems"] and record["criteria_outcome"] in COMPLETE
 
 
 # History: the repository's G-E records, for the one-iteration rule across protocols.
+
+
+# A frozen rating set: the packet ID and its saved review files with their IDs.
+type Frozen = tuple[str, tuple[tuple[str, str], ...]]
+
+
+def _frozen(record: Record) -> Frozen:
+    reviews: dict[str, str] = record["reviews"]
+    return str(record["packet_id"]), tuple(sorted(reviews.items()))
 
 
 @dataclass
@@ -250,6 +270,8 @@ class History:
     settlements: dict[str, set[str]] = field(default_factory=dict[str, set[str]])
     # Protocol ID to the IDs of committed review packets.
     packets: dict[str, set[str]] = field(default_factory=dict[str, set[str]])
+    # Protocol ID to the frozen rating sets (packet ID and review files) review claims name.
+    ratings: dict[str, set[Frozen]] = field(default_factory=dict[str, set[Frozen]])
 
     def add(self, record: Record) -> None:
         kind = record.get("kind")
@@ -263,6 +285,8 @@ class History:
             )
         elif kind == ge_review.PACKET_KIND:
             self.packets.setdefault(str(record["protocol_id"]), set()).add(str(record["id"]))
+        elif kind == RATINGS_KIND:
+            self.ratings.setdefault(str(record["protocol_id"]), set()).add(_frozen(record))
 
 
 def _sealed(text: str | None) -> Record | None:
@@ -286,6 +310,11 @@ def settlement_path(protocol: Path) -> Path:
     return protocol.with_name(f"{protocol.stem}.decision-claim.json")
 
 
+def ratings_path(protocol: Path) -> Path:
+    """Where the owner ratings a decision first applied are frozen: beside the protocol."""
+    return protocol.with_name(f"{protocol.stem}.review-claim.json")
+
+
 def history(protocol: Path) -> History:
     """Every G-E record the protocol's repository has committed, plus claims beside protocols.
 
@@ -306,7 +335,7 @@ def history(protocol: Path) -> History:
             protocols.append(root / name)
     # Claims are kept beside protocols and need not be committed; the files there now count.
     for path in protocols:
-        for name in (path, ge.claim_path(path), settlement_path(path)):
+        for name in (path, ge.claim_path(path), settlement_path(path), ratings_path(path)):
             if name.is_file():
                 texts.append(name.read_text(encoding="utf-8"))
     for text in texts:
@@ -509,12 +538,14 @@ def _packet_problems(  # noqa: PLR0913 - the packet, its folder and what it must
     return problems
 
 
-def _reviews(folder: Path) -> list[Record]:
+def _reviews(folder: Path, used: dict[str, str]) -> list[Record]:
+    """The identities of the saved reviews a decision applies."""
     rows: list[Record] = []
-    for path in sorted((folder / ge_review.REVIEWS).glob("review-*.json")):
-        review = read_sealed(path)
+    for name in sorted(used):
+        review = read_sealed(folder / ge_review.REVIEWS / name)
         rows.append(
             {
+                "file": name,
                 "id": review["id"],
                 "classification": review["classification"],
                 "reviewer": review["review"]["reviewer"],
@@ -535,7 +566,10 @@ def _owner_review(  # noqa: PLR0913 - the packet folder and everything it must b
     out: Path,
     found: History,
 ) -> tuple[Record, list[Record] | None, str, list[str]]:
-    """The owner review section, usable item outcomes (or why not) and problems."""
+    """The owner review section, usable item outcomes (or why not) and problems.
+
+    Once ratings are frozen for the protocol, only those reviews are applied.
+    """
     section: Record = {
         "packet": None,
         "status": "pending",
@@ -545,16 +579,20 @@ def _owner_review(  # noqa: PLR0913 - the packet folder and everything it must b
     }
     if folder is None:
         return section, None, "no owner review packet was supplied", []
+    frozen, problems = _frozen_ratings(path, protocol, found)
     try:
         packet = ge_review.read_packet(folder)
-        problems = _packet_problems(
+        problems += _packet_problems(
             folder, packet, protocol=protocol, path=path, run=run, record=record
         )
-        status = ge_review.status(folder)
-        reviews = _reviews(folder)
+        if frozen is not None and frozen[0] != packet["id"]:
+            problems.append("the owner ratings were frozen for another review packet")
+        status = ge_review.status(folder, None if frozen is None else dict(frozen[1]))
+        reviews = _reviews(folder, status["review_files"])
     except (OSError, ValueError, KeyError, StopIteration) as error:
         section["packet"] = {"path": ge.relative(folder.resolve(), out)}
-        return section, None, "the review packet cannot be read", [f"review packet: {error}"]
+        reason = "the review packet cannot be read"
+        return section, None, reason, [*problems, f"review packet: {error}"]
     problems += [f"review packet stale: {reason}" for reason in status["stale"]]
     others = found.packets.get(str(protocol["id"]), set()) - {packet["id"]}
     if others:
@@ -593,6 +631,32 @@ def _owner_review(  # noqa: PLR0913 - the packet folder and everything it must b
         )
         return section, None, reason, problems
     return section, status["outcomes"], "", problems
+
+
+def _frozen_ratings(
+    path: Path, protocol: Record, found: History
+) -> tuple[Frozen | None, list[str]]:
+    """The protocol's frozen rating set, if any, and why it cannot be relied on."""
+    claim = ratings_path(path)
+    sets = set(found.ratings.get(str(protocol["id"]), set()))
+    if claim.is_file():
+        record = read_sealed(claim)
+        if record.get("kind") != RATINGS_KIND or record.get("protocol_id") != protocol["id"]:
+            raise ValueError(f"not this protocol's G-E review claim: {claim}")
+        sets.add(_frozen(record))
+    if not sets:
+        return None, []
+    problems: list[str] = []
+    if len(sets) > 1:
+        problems.append("more than one owner rating set was frozen for this protocol")
+    try:
+        ge.committed(claim)
+    except ValueError:
+        problems.append(
+            "the frozen owner ratings are not committed: commit the review claim beside "
+            "the protocol"
+        )
+    return min(sets), problems
 
 
 def _run_section(run: Path, record: Record | None, out: Path) -> Record:
@@ -636,6 +700,9 @@ def assess(path: Path, run: Path, packet: Path | None, out: Path) -> Record:
     problems += review_problems
     iteration, history_issues = _history_section(path, protocol, out, found)
     problems += history_issues
+    if problems and outcomes is not None:
+        # Owner ratings are never unblinded on inconsistent evidence.
+        outcomes, reason = None, WITHHELD
     criteria = protocol["criteria"]
     frozen = protocol["frozen"]
     content: Record = {
@@ -700,6 +767,12 @@ def replay(folder: Path) -> tuple[Record, list[str]]:
         for section in sorted((saved.keys() | current.keys()) - {"id", "version"})
         if saved.get(section) != current.get(section)
     ]
+    reasons += [
+        f"new problem: {problem}"
+        for problem in current["problems"]
+        if problem not in saved["problems"]
+    ]
+
     if settles(saved):
         settled = _settled(protocol, saved["protocol"]["id"], history(protocol))
         if settled != {saved["id"]}:
@@ -722,6 +795,17 @@ def decide(path: Path, run: Path, packet: Path | None, out: Path) -> Record:
     out.mkdir(parents=True)
     record = create_record(out / DECISION, content)
     write_text_lf(out / "decision.md", markdown(record))
+    if _applies_ratings(record) and not ratings_path(path).exists():
+        create_record(
+            ratings_path(path),
+            {
+                "kind": RATINGS_KIND,
+                "protocol_id": protocol["id"],
+                "packet_id": record["owner_review"]["packet"]["id"],
+                "reviews": {row["file"]: row["id"] for row in record["owner_review"]["reviews"]},
+                "first_decision_id": record["id"],
+            },
+        )
     if settles(record):
         create_record(
             settlement_path(path),

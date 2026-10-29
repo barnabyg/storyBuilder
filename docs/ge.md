@@ -18,6 +18,7 @@ uv run nde ge packet prereg/ge-1.json runs/RUN --out review/ge-1
 uv run nde ge review review/ge-1 owner-review.json
 git add prereg/ge-1.run-claim.json; git commit -m "research: record the G-E dev run"
 uv run nde ge decide prereg/ge-1.json runs/RUN --packet review/ge-1 --out decisions/ge-1
+git add prereg/ge-1.*-claim.json decisions/ge-1; git commit -m "research: decide G-E"
 uv run nde ge replay decisions/ge-1
 ```
 
@@ -272,7 +273,9 @@ everything, with no provider call:
   item as the run's outputs require, and its key must map each owner item's A and
   B to that slot's E and reference plans. Its review status must be current.
 
-Any failure makes the decision **inconsistent**.
+Any failure makes the decision **inconsistent**. An inconsistent decision never
+applies the structural criterion: its item outcomes and share are withheld, so no
+owner rating is unblinded until the evidence is consistent.
 
 The criteria are applied in the candidate direction, E against the identified
 reference:
@@ -298,6 +301,20 @@ every owner item of a current packet. Diagnostic (model) ratings never count.
 Synthetic ratings count only for a test-only packet, and then only as software
 evidence. A test-only protocol, run or packet keeps the `outcome` **pending**
 even when its `criteria_outcome` is passed or failed.
+
+### Frozen owner ratings
+
+The first decision that applies the structural criterion (consistent evidence and
+a complete owner review) freezes the ratings it used. `decide` creates the sealed
+`PROTOCOL.review-claim.json` (kind `ge-review-claim`) beside the protocol, naming
+the packet and each saved review file with its ID. From then on every decision
+and replay applies exactly those reviews: a later review, superseding or
+diagnostic, is reported but never applied, and a frozen review that is missing or
+changed makes the packet stale. Commit the review claim straight away: until it
+is committed, decisions that rely on it are inconsistent. Any other frozen set for
+the protocol, beside it or in history, is inconsistent too. Before a structural
+outcome has been shown, the owner may still revise ratings; afterwards the
+decision cannot be changed by re-rating.
 
 | `outcome` | Meaning | `action.result` |
 | --- | --- | --- |
@@ -334,10 +351,10 @@ folders once the evidence changes. Commit the decision claim and the decision
 folder.
 
 `nde ge replay DECISION` recomputes the decision from the recorded protocol, run
-and packet, and lists every section that differs. A settled decision must also be
-its protocol's only settled decision. A later superseding review, a changed plan
-or story, or a history violation makes a settled decision stale, and replay
-exits 1.
+and packet, and lists every section that differs and every new problem. A settled
+decision must also be its protocol's only settled decision. A changed plan, story
+or frozen review, or a history violation, makes a decision stale, and replay
+exits 1. Reviews saved after the ratings were frozen do not.
 
 ### Development iteration history
 
@@ -370,7 +387,8 @@ History cannot see records that were never committed here: a run claim deleted
 before it was committed, packets kept outside the repository, or protocols in
 another clone. Like reviewer identity, this rests on following the procedure:
 commit each protocol before running, its run claim after running, and the
-decision claim after deciding.
+review and decision claims after deciding.
+
 
 ## Limits and evidence status
 

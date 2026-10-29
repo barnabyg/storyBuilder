@@ -143,6 +143,18 @@ def decide(
     return code, read_sealed(out / "decision.json")
 
 
+def preserved(record: dict[str, Any], protocol: Path, run: Path) -> None:
+    """Evidence, costs, failures and identities are carried over from the verified run."""
+    saved = ge.read_run(run)
+    assert record["evidence"] == saved["evidence"]
+    assert record["costs"] == saved["costs"]
+    assert record["failures"] == saved["failures"]
+    assert record["units"] == saved["units"]
+    assert record["run"]["record_id"] == saved["id"]
+    assert record["run"]["claim_id"] == read_sealed(ge.claim_path(protocol))["id"]
+    assert record["judges"] == "diagnostic_only"
+
+
 def no_launch(patch: pytest.MonkeyPatch) -> None:
     """Fail the test if reporting generates, builds evidence or trains anything."""
 
@@ -240,15 +252,8 @@ def test_complete_synthetic_evidence_meets_inclusive_boundaries_settles_and_stay
         "identification": "owner C selection",
         "status": "retained",
     }
-    # Evidence, costs, failures and identities are preserved from the verified run.
-    saved = ge.read_run(run)
-    assert record["evidence"] == saved["evidence"]
-    assert record["costs"] == saved["costs"]
-    assert record["failures"] == saved["failures"]
-    assert record["run"]["record_id"] == saved["id"]
-    assert record["run"]["claim_id"] == read_sealed(ge.claim_path(protocol))["id"]
+    preserved(record, protocol, run)
     assert record["g3"]["status"] == "test-only"
-    assert record["judges"] == "diagnostic_only"
     assert record["history"]["first_attempt"] is None
     markdown = (out / "decision.md").read_text()
     assert markdown.startswith("# G-E decision: pending (test-only)")
@@ -261,15 +266,63 @@ def test_complete_synthetic_evidence_meets_inclusive_boundaries_settles_and_stay
     settlement = read_sealed(ge_decision.settlement_path(protocol))
     assert settlement["decision_id"] == record["id"]
     assert settlement["criteria_outcome"] == "passed"
+    # The owner ratings it applied are frozen beside the protocol, to be committed.
+    frozen = read_sealed(ge_decision.ratings_path(protocol))
+    assert frozen["reviews"] == {
+        row["file"]: row["id"] for row in record["owner_review"]["reviews"]
+    }
+    assert frozen["packet_id"] == record["owner_review"]["packet"]["id"]
+    capsys.readouterr()
+    assert ge_command("replay", out) == 1
+    assert "frozen owner ratings are not committed" in capsys.readouterr().err
+    commit(repo, "first/protocol.review-claim.json", "first/protocol.decision-claim.json")
     assert ge_command("replay", out) == 0
     assert ge_command("decide", protocol, run, "--packet", folder, "--out", repo / "again") == 2
     assert not (repo / "again").exists()
-    # A later superseding review changes the evidence: the settled decision is now stale.
+    # A later superseding review is never applied; a changed plan makes the decision stale.
     review(folder, "C")
-    capsys.readouterr()
-    assert ge_command("replay", out) == 1
-    assert "decision structural differs from current evidence" in capsys.readouterr().err
+    assert ge_command("replay", out) == 0
+    plan = run / "stories/E/brief-01/r1/plan.json"
+    with restored(plan):
+        plan.write_text(plan.read_text() + " ")
+        assert ge_command("replay", out) == 1
     assert sorted(run.parent.iterdir()) == runs
+
+
+@pytest.mark.ml
+def test_inconsistent_evidence_never_unblinds_and_the_first_applied_ratings_are_frozen(
+    tmp_path: Path, registered: Fixture
+) -> None:
+    repo = new_repo(tmp_path / "a")
+    protocol, run = attempt(
+        repo, registered, "first", source=registered.run, claim=False, **BOUNDARY
+    )
+    folder = packet(protocol, run, repo / "packet")
+    review(folder, "C")
+    # Complete ratings on inconsistent evidence (an uncommitted run claim) stay blinded.
+    _, record = decide(protocol, run, repo / "d-inconsistent", folder)
+    assert record["outcome"] == "inconsistent"
+    structural = record["structural"]
+    assert (structural["status"], structural["reason"]) == ("pending", ge_decision.WITHHELD)
+    assert (structural["items"], structural["share"], structural["competitive"]) == ([], None, 0)
+    assert not ge_decision.ratings_path(protocol).exists()
+    # Nothing was unblinded, so the owner may still revise; the first application freezes.
+    review(folder, "equivalent")
+    commit(repo, "first/protocol.run-claim.json")
+    _, record = decide(protocol, run, repo / "d-applied", folder)
+    assert record["criteria_outcome"] == "passed"
+    used = {row["file"]: row["id"] for row in record["owner_review"]["reviews"]}
+    assert len(used) == 2
+    assert read_sealed(ge_decision.ratings_path(protocol))["reviews"] == used
+    commit(repo, "first/protocol.review-claim.json")
+    # Even without the (uncommitted) settlement, a later decision applies only the frozen
+    # ratings: re-rating after the outcomes were shown changes nothing.
+    ge_decision.settlement_path(protocol).unlink()
+    review(folder, "C")
+    _, again = decide(protocol, run, repo / "d-again", folder)
+    assert {row["file"]: row["id"] for row in again["owner_review"]["reviews"]} == used
+
+    assert (again["criteria_outcome"], again["structural"]["share"]) == ("passed", 0.5)
 
 
 def content(
@@ -423,7 +476,12 @@ def test_the_single_iteration_is_bound_to_the_settled_first_attempt_and_history_
     assert (decided["criteria_outcome"], decided["outcome"]) == ("failed", "pending")
     assert decided["validator"]["meets_margin"] is False
     assert decided["structural"]["share"] == 0
-    commit(repo, "first/protocol.decision-claim.json", "first-decision")
+    commit(
+        repo,
+        "first/protocol.decision-claim.json",
+        "first/protocol.review-claim.json",
+        "first-decision",
+    )
     out = repo / "second-decision"
     code, record = decide(second, second_run, out, second_packet)
     assert code == 1
@@ -434,7 +492,12 @@ def test_the_single_iteration_is_bound_to_the_settled_first_attempt_and_history_
     assert first_attempt["protocol_id"] == read_sealed(first)["id"]
     assert first_attempt["claim_id"] == read_sealed(ge.claim_path(first))["id"]
     assert first_attempt["decision"] == "../first-decision"
-    commit(repo, "second/protocol.decision-claim.json", "second-decision")
+    commit(
+        repo,
+        "second/protocol.decision-claim.json",
+        "second/protocol.review-claim.json",
+        "second-decision",
+    )
     # Promoted in memory, the failed iteration stops and keeps the identified reference.
     promoted = record | {"test_only": False, "owner_review": {"evidence": "actual"}}
     result = ge_decision.conclude(promoted)
@@ -474,7 +537,13 @@ def test_no_iteration_follows_a_passed_first_attempt(
     review(folder, "equivalent")
     _, decided = decide(first, first_run, repo / "first-decision", folder)
     assert decided["criteria_outcome"] == "passed"
-    commit(repo, "first/protocol.decision-claim.json", "first-decision")
+    commit(
+        repo,
+        "first/protocol.decision-claim.json",
+        "first/protocol.review-claim.json",
+        "first-decision",
+    )
+
     fake_llm.default = GEProvider()
     iteration_config(repo / "second", registered, fake_llm)
     bound = {"attempt": 2, "previous_protocol": "../first/protocol.json", "change": "Guidance."}
