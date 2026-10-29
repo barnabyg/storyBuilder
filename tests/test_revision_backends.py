@@ -13,11 +13,21 @@ import pytest
 
 from nde.cli import main
 from nde.conditional import inpainting
+from nde.conditional.data import Conditions
 from nde.conditional.layout import textless
+from nde.conditional.training import inspect_checkpoint, sample_candidate
 from nde.corpus.records_io import create_record, read_sealed
 from nde.narrative.models import NarrativePlan
-from nde.plan.revision import RevisionPlanningParams, identity
-from nde.reconstruction.codec import PAD, encode_plan, tokenize
+from nde.plan.backends import ERevisionBackend
+from nde.plan.revision import RevisionPlanningParams, RevisionSpec, identity
+from nde.reconstruction.codec import (
+    BYTE_OFFSET,
+    MASK,
+    PAD,
+    canonical_json,
+    encode_plan,
+    tokenize,
+)
 from tests.conditional_support import trained_checkpoint
 from tests.conftest import REPO, write_config
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion, error
@@ -705,3 +715,43 @@ def test_plan_command_reports_bad_evidence_but_not_internal_faults(
     monkeypatch.setattr("nde.narrative.cli.validate_plan", fault)
     with pytest.raises(KeyError, match="internal"):
         main(["plan", "validate", str(tmp_path / "source.json")])
+
+
+@pytest.mark.ml
+def test_observation_masks_exactly_the_editable_spans_and_sampling_fills_only_them(
+    learned: Path,
+) -> None:
+    checkpoint = inspect_checkpoint(learned)
+    spec = RevisionSpec.model_validate({**UNITS, "instruction": "x"})
+    backend = ERevisionBackend.model_validate(
+        {"kind": "e", "checkpoint": learned, "target_policy": POLICY}
+    )
+    observation = inpainting.observe(
+        NarrativePlan.model_validate(SOURCE), spec, backend, checkpoint
+    )
+    clear = tokenize(observation.view)
+    clear += [PAD] * (len(observation.tokens) - len(clear))
+    spans = [observation.leaves[path] for path in observation.editable]
+    assert [leaf.selector for leaf in spans] == ["states/belief/key"]
+    expected = {index for leaf in spans for index in range(leaf.start, leaf.end)}
+    assert {i for i, token in enumerate(observation.tokens) if token == MASK} == expected
+    for leaf, path in zip(spans, observation.editable, strict=True):
+        # Each masked span is exactly the leaf's serialized value, at its full width.
+        value = bytes(token - BYTE_OFFSET for token in clear[leaf.start : leaf.end])
+        source: Any = observation.view
+        for part in path:
+            source = source[part]
+        assert value.decode() == canonical_json(source)
+    assert all(token == clear[i] for i, token in enumerate(observation.tokens) if i not in expected)
+    result = sample_candidate(
+        learned, Conditions(), seed=11, guidance_scale=0, observed=observation.tokens
+    )
+    generated = result["generated_tokens"]
+    assert result["work"]["passes"] == 1
+    assert len(generated) == len(observation.tokens)
+    assert all(
+        token == known
+        for token, known in zip(generated, observation.tokens, strict=True)
+        if known != MASK
+    )
+    assert all(generated[index] != MASK for index in expected)
