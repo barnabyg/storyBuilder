@@ -1,0 +1,61 @@
+{
+  "concurrency_scope": "one machine, all worktrees sharing the Git common directory",
+  "default_branch": "main",
+  "eligibility": {
+    "closed_reason": "completed",
+    "excluded_labels": [
+      "project-hygiene",
+      "hygiene",
+      "control",
+      "duplicate",
+      "invalid",
+      "wontfix",
+      "cancelled",
+      "wayfinder:map",
+      "wayfinder:research",
+      "wayfinder:prototype",
+      "wayfinder:grilling"
+    ],
+    "excluded_title_pattern": "(?:project[ -]hygiene|hygiene (?:audit|cycle|setup))",
+    "implementation_labels": [
+      "ready-for-agent"
+    ],
+    "require_merged_pr": false
+  },
+  "enabled": true,
+  "host": "github.com",
+  "issue_labels": [
+    "project-hygiene",
+    "needs-triage"
+  ],
+  "limits": {
+    "new_issue_cap": 3,
+    "seconds": 1200
+  },
+  "reports": "<git-common-dir>/project-hygiene/runs/<run-id>/report.md",
+  "repository": "barnabyg/storyBuilder",
+  "runner": {
+    "agent": "codex exec --ephemeral --sandbox workspace-write --config approval_policy=never",
+    "authentication": "host Codex login and gh keyring; no project credentials",
+    "command": "python tools/hygiene.py check",
+    "kind": "local-codex-cli",
+    "recursion_guard": "STORYBUILDER_HYGIENE_WORKER",
+    "skill": "project-hygiene",
+    "skill_discovery": "CODEX_HOME/skills; defaults to ~/.codex/skills"
+  },
+  "state_backend": "Git common directory, atomic JSON, kernel lock held throughout each run",
+  "state_directory": "project-hygiene",
+  "test_commands": {
+    "cpu_ml": "uv run --locked --group ml nde-verify --no-dashboard",
+    "focused": "uv run --locked pytest tests/test_hygiene.py",
+    "full": "uv run --locked nde-verify --no-dashboard",
+    "timings": "No recorded suite timing baseline; measure diagnostic commands in the audit checkout."
+  },
+  "threshold": 5,
+  "trigger": {
+    "command": "python tools/hygiene.py hook",
+    "event": "SessionStart",
+    "matcher": "^(startup|resume)$"
+  },
+  "version": 1
+}

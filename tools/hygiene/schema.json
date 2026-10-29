@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["completed", "report", "findings"],
+  "properties": {
+    "completed": {"type": "boolean"},
+    "report": {"type": "string"},
+    "findings": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "area", "problem", "title", "body", "existing_issue"],
+        "properties": {
+          "category": {"type": "string", "enum": ["documentation", "tests", "onboarding"]},
+          "area": {"type": "string"},
+          "problem": {"type": "string"},
+          "title": {"type": "string"},
+          "body": {"type": "string"},
+          "existing_issue": {"type": "integer"}
+        }
+      }
+    }
+  }
+}
