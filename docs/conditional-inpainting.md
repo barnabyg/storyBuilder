@@ -65,7 +65,12 @@ Preflight hashes the checkpoint file once and binds its identity. Each attempt
 uses its own derived seed and is reserved before inference, and must run on that
 same checkpoint: if the file becomes unreadable or its identity changes, the
 attempt is recorded as rejected, the alternative fails with status
-`checkpoint-changed` and its provenance and boundary are still saved. The
+`checkpoint-changed` and its provenance and boundary are still saved. Any other
+sampler failure, such as the local model running out of memory, marks the
+attempt `failed` with the exception named in its diagnostics and fails the
+alternative with status `sampler-failed`; the traceback is kept as
+`inpainting/sampler-error.txt` beside the same provenance, boundary and
+`last-accepted` plan, and the run continues with its remaining alternatives. The
 complete learned layout is mapped back onto the source by record identity, and
 selected unlocked text (titles, summaries, descriptions and interpretive reading
 text, including channels outside E's representation) is reset for completion.

@@ -882,6 +882,60 @@ def test_e_checkpoint_drift_during_inference_is_a_recorded_rejection(
 
 
 @pytest.mark.ml
+def test_unexpected_e_sampler_failures_are_recorded_and_later_alternatives_still_run(
+    tmp_path: Path, llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch, learned: Path
+) -> None:
+    llm.default = responder(mutated(accepted_plan))
+    real = inpainting.sample_candidate
+    calls: list[int] = []
+
+    def exhausted(*args: Any, **options: Any) -> dict[str, Any]:
+        calls.append(options["seed"])
+        if len(calls) == 1:
+            # What torch raises when a local device runs out of memory.
+            raise RuntimeError("out of memory: tried to allocate 2.00 GiB")
+        return real(*args, **options)
+
+    monkeypatch.setattr(inpainting, "sample_candidate", exhausted)
+    backend = {"kind": "e", "checkpoint": str(learned), "target_policy": POLICY}
+    value = run_config(tmp_path, llm.base_url, UNITS, backend)
+    value["plans"]["repeat"] = 2
+    run = revise(tmp_path, value, 1)
+    assert run is not None
+    records = jsonl(run / "plans.jsonl")
+    assert [r["status"] for r in records] == ["failed", "succeeded"]
+    assert "unexpected RuntimeError: out of memory" in records[0]["error"]
+    first = run / records[0]["path"]
+    record = provenance(first)
+    assert record["status"] == "failed"
+    assert "unexpected RuntimeError" in record["error"]
+    assert record["backend"]["status"] == "sampler-failed"
+    assert record["backend"]["checkpoint_id"] == inspect_checkpoint(learned)["id"]
+    [attempt] = record["backend"]["attempts"]
+    assert attempt["status"] == "failed"
+    assert attempt["seed"] == calls[0]
+    assert attempt["reserved_work"]["tokens"] > 0
+    assert attempt["diagnostics"] == [
+        "unexpected RuntimeError: out of memory: tried to allocate 2.00 GiB"
+    ]
+    saved = json.loads((first / "revisions/revision/inpainting/attempt-001.json").read_text())
+    assert saved == attempt
+    # No inference result came back, so no completed work is claimed.
+    assert record["backend"]["work"]["tokens"] == 0
+    trace = (first / "revisions/revision/inpainting/sampler-error.txt").read_text()
+    assert "RuntimeError: out of memory" in trace
+    assert (first / "revisions/revision/boundary.json").is_file()
+    assert (first / "revisions/revision/source-plan.json").is_file()
+    assert (first / "revisions/revision/last-accepted/plan.json").is_file()
+    assert not (first / "plan.json").exists()
+    assert record["calls"] == []
+    # The run continues: the next alternative is recorded and reported.
+    assert provenance(run / records[1]["path"])["backend"]["status"] == "selected"
+    report = json.loads((run / "alternatives.json").read_text())
+    assert [a["status"] for a in report["alternatives"]] == ["failed", "accepted"]
+
+
+@pytest.mark.ml
 def test_e_text_only_masks_run_no_learned_inference(
     tmp_path: Path, llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch, learned: Path
 ) -> None:

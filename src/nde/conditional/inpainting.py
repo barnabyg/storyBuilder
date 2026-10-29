@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import time
+import traceback
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -70,6 +71,8 @@ SPECIFICATION = {
     "check": "complete candidate: whole-plan validation plus the D scope/lock/identity boundary",
 }
 INPAINTING_ID = record_identity(SPECIFICATION)
+# The traceback of a sampler failure no established error type describes.
+SAMPLER_ERROR = "sampler-error.txt"
 IMMUTABLE_ROOTS = frozenset({"id", "schema_version", "tier", "title", "characters", "sources"})
 REPRESENTED_POLICY = frozenset({*CHANNEL_FIELDS, "goal", "belief"})
 type ViewPath = tuple[str | int, ...]
@@ -503,6 +506,25 @@ def _drift(run: _Run, work: _Work, row: dict[str, Any], diagnostic: str) -> Step
     )
 
 
+def _sampler_failure(
+    run: _Run, work: _Work, row: dict[str, Any], error: Exception
+) -> StepFailedError:
+    """Any other sampler failure, such as torch running out of memory, fails explicitly.
+
+    The attempt and the traceback are kept beside the alternative's other records.
+    """
+    diagnostic = f"unexpected {type(error).__name__}: {error}"
+    row["status"] = "failed"
+    row["diagnostics"].append(diagnostic)
+    work.status = "sampler-failed"
+    folder = f"{run.record.folder}/inpainting"
+    run.ctx.keep(f"{folder}/attempt-{row['attempt']:03d}.json", json.dumps(row, indent=2) + "\n")
+    run.ctx.keep(f"{folder}/{SAMPLER_ERROR}", traceback.format_exc())
+    return StepFailedError(
+        f"revision-{run.record.name}", f"{diagnostic} (see inpainting/{SAMPLER_ERROR})"
+    )
+
+
 def _attempt(run: _Run, work: _Work, number: int, deadline: float) -> NarrativePlan | None:
     backend, conditions = run.backend, Conditions.model_validate(run.backend.conditions)
     tokens, cells = candidate_cost(run.checkpoint, conditions, backend.guidance_scale)
@@ -539,6 +561,8 @@ def _attempt(run: _Run, work: _Work, number: int, deadline: float) -> NarrativeP
         failure = _drift(run, work, row, f"checkpoint unusable: {type(error).__name__}: {error}")
         run.ctx.keep(path, json.dumps(row, indent=2) + "\n")
         raise failure from error
+    except Exception as error:
+        raise _sampler_failure(run, work, row, error) from error
     work.tokens += result["work"]["tokens"]
     work.attention_cells += result["work"]["attention_cells"]
     work.passes += result["work"]["passes"]
