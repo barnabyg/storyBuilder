@@ -112,7 +112,8 @@ def _format(error: ValidationError) -> str:
     )
 
 
-def _select_briefs(selection: BriefSelection, briefs_dir: Path) -> list[Brief]:
+def select_briefs(selection: BriefSelection, briefs_dir: Path) -> list[Brief]:
+    """The briefs a stories selection names, in order; raises ConfigError."""
     try:
         available = load_briefs(briefs_dir)
     except BriefError as error:
@@ -179,7 +180,7 @@ def prepare_stories(
     briefs_dir = loaded.briefs_dir
     if stories is None or briefs_dir is None:
         return None
-    briefs = _select_briefs(stories.briefs, briefs_dir)
+    briefs = select_briefs(stories.briefs, briefs_dir)
     conditions = [_condition(loaded, spec) for spec in stories.conditions]
     _check_resource_policy(conditions, stories.equal_budget)
     if any(condition.spec.params.get("exemplars") for condition in conditions) and any(

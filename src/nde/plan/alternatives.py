@@ -28,8 +28,8 @@ DIVERSITY = (
 )
 
 
-def structure_identity(plan: NarrativePlan) -> str:
-    """Plan identity with descriptive and interpretive reading text replaced by null."""
+def structural_content(content: dict[str, Any]) -> dict[str, Any]:
+    """Plan-shaped JSON with descriptive and interpretive reading text replaced by null."""
 
     def strip(value: Any, collection: str, key: str) -> Any:
         if isinstance(value, dict):
@@ -40,7 +40,12 @@ def structure_identity(plan: NarrativePlan) -> str:
         reading = collection in INTERPRETIVE and key in {"value", "alternatives"}
         return None if isinstance(value, str) and (key in DESCRIPTIVE or reading) else value
 
-    return identity(strip(plan.model_dump(mode="json"), "", ""))
+    return cast(dict[str, Any], strip(content, "", ""))
+
+
+def structure_identity(plan: NarrativePlan) -> str:
+    """Plan identity with descriptive and interpretive reading text replaced by null."""
+    return identity(structural_content(plan.model_dump(mode="json")))
 
 
 class AlternativesError(Exception):

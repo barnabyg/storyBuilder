@@ -82,9 +82,13 @@ structure and saving validated plans and cards. [Candidate E story runs](docs/ca
 use both in an ordinary `nde run` experiment, then C/D's shared prose, ledger and
 final-story selection, recording local model work separately from provider calls.
 [Inpainting](docs/conditional-inpainting.md) offers E behind D's `nde plan revise`
-mask/lock contract, with honest reporting of duplicate alternatives. Real E
-experiments require genuine passed G3 evidence; tiny fixtures establish software
-mechanics only.
+mask/lock contract, with honest reporting of duplicate alternatives.
+[`nde conditional-report`](docs/conditional-report.md) reports E's requested versus
+realised conditions with documented predicates and complete denominators, keeps
+genre, theme and ending adherence pending until the owner assesses it, and measures
+ID-independent structural diversity across seeds and similarity to known training
+populations and the permitted reference baseline. Real E experiments require
+genuine passed G3 evidence; tiny fixtures establish software mechanics only.
 
 ## Verification
 

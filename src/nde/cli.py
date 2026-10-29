@@ -22,6 +22,7 @@ from nde.conditional import completion as conditional_complete
 from nde.conditional import data as conditional_data
 from nde.conditional import generation as conditional_generate
 from nde.conditional import layout as conditional_layout
+from nde.conditional import report as conditional_report
 from nde.conditional import training as conditional_train
 from nde.corpus import cli as corpus_cli
 from nde.corpus import exemplars, extraction_cli, provenance
@@ -93,6 +94,11 @@ def build_parser() -> argparse.ArgumentParser:
             "conditional-complete",
             conditional_complete.configure,
             "complete authorized proposal text",
+        ),
+        (
+            "conditional-report",
+            conditional_report.configure,
+            "report E condition adherence, diversity and training similarity",
         ),
         ("exemplars", exemplars.configure, "compare approved plan exemplars on dev briefs"),
         (
@@ -356,6 +362,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "conditional-train": conditional_train.run,
     "conditional-generate": conditional_generate.run,
     "conditional-complete": conditional_complete.run,
+    "conditional-report": conditional_report.run,
     "exemplars": exemplars.run,
     "extract": extraction_cli.run,
     "corpus-review": corpus_review.run,

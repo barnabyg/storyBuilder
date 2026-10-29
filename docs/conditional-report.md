@@ -1,0 +1,178 @@
+# Condition adherence, diversity and training similarity
+
+`nde conditional-report build REQUEST.json --out NEW_FOLDER` reports what Candidate E
+was asked for against what it produced, how different its outputs are across
+seeds, and how close they are to known training plans and to the reference
+baseline. `nde conditional-report check FOLDER` replays a saved report against the
+current evidence. Neither command calls a provider, runs a model, writes training
+data or decides G-E.
+
+```json
+{
+  "story_runs": [{"run": "runs/e-dev", "condition": "E", "label": "e-dev"}],
+  "revision_runs": [{"run": "runs/e-alternatives", "label": "e-alternatives"}],
+  "reference": {
+    "gd_decision": "gd/decision-1",
+    "runs": [{"run": "runs/cd-dev", "condition": "C"}],
+    "c_selection": "selection-1.json"
+  },
+  "training_populations": [{"name": "g3", "path": "data/g3-train", "role": "g3"}],
+  "protected_populations": [{"name": "test", "path": "data/g3-test"}],
+  "realisation": ["review/e-dev-brief-01"],
+  "judgements": ["owner-adherence.json"],
+  "neighbours": 3
+}
+```
+
+Paths resolve relative to the request file. `story_runs` are ordinary `nde run`
+folders with a `candidate_e` condition ([E story runs](candidate-e.md));
+`revision_runs` are `nde plan revise` folders using the E backend
+([inpainting](conditional-inpainting.md)). Every unit is a story repetition or
+revision alternative, with ID `story/LABEL/BRIEF/rN` or `revision/LABEL/BRIEF/rN`;
+`label` defaults to the run folder name and must be distinct. All other fields
+are optional. `target_policy` is only used when the checkpoint's training dataset
+is unavailable, and is then recorded as declared and unverified.
+
+The output folder must be new. It holds `report.json` (kind
+`conditional-evidence-report`, version 1, sealed with a content `id`) and a
+readable `report.md`. Build exits 0 when a report is written, including one
+with failures, unknowns, problems or pending review, and 2 for malformed or
+unsupported inputs.
+
+## What the report binds
+
+The expected units come from each run's saved configuration: every selected
+brief times `repeat`, so a story or alternative that left no record is still
+counted as `missing`. Runs that select held-out (`test`) briefs are refused; this
+report reads development evidence only. All units must use one E checkpoint.
+
+For each unit the report records the brief and its checksum, the registered
+conditions and allowed constraints (E story locks, or the revision mask and
+locks), checkpoint identity, generation or revision history, seed, status and the
+final plan and story identities. It checks that the plan matches its
+`conditional-selection.json`/planning provenance or revision provenance, the
+final story matches the run's selection and the revision run's `alternatives.json`
+still rebuilds; any mismatch is listed under `problems` and makes `consistent`
+false. `inputs` holds the checksum of every file read, including run
+configurations, briefs, `stories.jsonl`, `local-work.jsonl`, `comparison.json`
+(whose `resource_policy` is carried into `runs`), plans, stories, provenance,
+the checkpoint and the training datasets.
+
+## Deterministic compliance
+
+Only explicitly representable requests are evaluated mechanically. Each row is
+`success`, `failure` or `unknown` with its reason; the denominators include every
+expected unit.
+
+| Predicate | Success when |
+| --- | --- |
+| `scene_range` | the selected plan's scene count is in the requested inclusive range |
+| `target_words` | the final selected prose's word count is in the requested range widened by the run's `length.tolerance`; `unknown` for plan-only revisions |
+| `lock` | an E story lock's ID-keyed selector holds exactly the locked value; `failure` if absent |
+| `revision_lock` | a revision lock's canonical JSON is unchanged from the recorded source |
+| `revision_scope` | the plan changes only units the mask authorises (the shared revision boundary) |
+| `validity` | the selected plan passes complete plan validation |
+
+A failed unit fails every predicate it requested, because nothing realised the
+request. A missing unit is `unknown`, never success. Model diagnostics (attempts,
+rejections, guidance, local work and completion calls) are reported separately and
+never count as adherence.
+
+## Literary judgement
+
+Genre, themes and the natural-language ending (`ending_intent`) need actual
+judgement. They stay `pending` until the owner assesses the current final output;
+units without output are `no-output` or `missing`. A judgement file is:
+
+```json
+{
+  "reviewer": "Owner name",
+  "test_only": false,
+  "assessments": [{
+    "unit": "story/e-dev/brief-01/r1",
+    "output_sha256": "SHA-256 of the final selected story (the plan identity for a revision)",
+    "condition": "genre",
+    "rating": "adheres",
+    "note": "Why, in a sentence."
+  }]
+}
+```
+
+`rating` is `adheres`, `does_not_adhere` or `unknown`. A file with
+`diagnostic_provenance` (a model estimate) is counted as diagnostic only, a
+`test_only` file is counted as synthetic only, and an assessment of any other
+output identity is counted as stale. None of these changes the status. Units that
+request nothing for a condition have no row for it.
+
+## Structural diversity
+
+Each run and brief forms a group of seeds. The report compares every pair of
+units with output, so duplicates stay in the evidence as zero distances and are
+also marked `exact_duplicate_of` (same plan identity) or `structural_duplicate_of`
+(same retained structure).
+
+`retained-structure-multiset-jaccard-v1` uses the checkpoint's retained codec view
+under its training target policy. Identities and references become typed list
+positions, and titles, summaries, descriptions, names and interpretive reading
+text become null. Each channel's canonical records form a multiset; the distance
+is one minus shared over combined counts across the channels both views retain,
+as in the [overlap audit](reconstruction-evaluation.md). Renaming identities alone
+gives distance 0. Unknown and uncertain readings stay in the features, are counted
+per sample (`unknown_labels`) and mark the pair `uncertain`. The edge distance is
+the [diversity report's](controllability.md) ordinal typed-edge metric and is null
+for invalid plans.
+
+## Training similarity and lineage
+
+The checkpoint's conditional fine-tuning dataset is found from its binding and
+reloaded with its complete source lineage. Any `training_populations`, such as the
+reconstruction population behind the checkpoint's G3 evidence (`role: g3`), are
+added; each must be optimizer training records in the same codec. Every unit's
+retained structure is compared with every record (nearest `neighbours`, with
+distance, work and uncertainty). `exact_structural_matches` counts distance 0.
+
+`lineage` is complete only when the fine-tuning dataset is verified and, for a
+checkpoint with passed G3 evidence, a `g3` population is supplied. A missing or
+changed population is listed, not omitted. The base model's pretraining data is
+reported as `none` only for a random fixture initialization; otherwise overlap
+with pretraining material is an explicit unknown limitation. Structural similarity
+is a candidate match, not proof of memorisation or its absence.
+
+`protected_populations` must be evaluator-only or validation/test views. They are
+only ever queried: each one is audited against every training index for shared
+source, work or author (`protected_overlap`), and E outputs' nearest protected
+records are listed. A protected view cannot be supplied as a training population.
+
+## Reference baseline
+
+D is the reference only when `gd_decision` names a G-D decision folder whose
+`decision.json` replays exactly from its bound evidence as an actual (not
+test-only) pass naming D. Otherwise the identified C baseline is the reference and
+the reason is recorded. Reference runs of the other condition are not used and
+are listed under `reference.problems`. Each E story is compared with the
+reference outputs for the same brief and brief checksum. `c_selection`, when
+given, binds the owner's frozen C tier selection.
+
+## Realisation evidence
+
+Packets from the [realisation workflow](realisation.md) are matched to E stories
+by run, condition, brief and repetition. A packet counts only while it binds the
+current final selected prose and plan; changing the story makes it `stale`.
+Every successful E story without a current packet stays `missing`, and an
+incomplete owner review stays `pending`.
+
+## Checking a saved report
+
+`check` rebuilds the report from its saved request and compares it with the
+saved content. It exits 0 when the report is current, 1 when any bound input or
+section has changed (each reason is printed), and 2 when the saved report is
+unreadable. Stale reports are never edited; build a new folder.
+
+## Use in the G-E comparison
+
+A registered G-E comparison binds the report `id` and reads `adherence`,
+`diversity`, `training_similarity`, `reference`, `realisation`, `pending` and
+`test_only`. Reports from fixture checkpoints are software evidence only. The
+report records evidence; the G-E decision, owner structural review and any
+scientific claim remain separate. Tests in `tests/test_conditional_report.py`
+run a real tiny CPU checkpoint with fake-provider calls.
