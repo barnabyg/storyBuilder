@@ -40,6 +40,7 @@ from nde.conditional.inpainting import training_policy
 from nde.conditional.training import inspect_checkpoint
 from nde.corpus.records_io import create_record, file_sha, identity, read_sealed, snapshot
 from nde.diversity import multiset_distance, typed_edges
+from nde.eval.g1 import file_checksum
 from nde.files import checksum_lf, write_text_lf
 from nde.gd_report import decision as gd_decision
 from nde.llm.config import Strict
@@ -146,11 +147,20 @@ class ReferenceRunRef(Strict):
 
 
 class ReferenceRequest(Strict):
-    # A G-D decision folder; D is the reference only when it replays as an actual pass.
+    # A `nde gd-report` output folder; D is the reference only when it replays, from
+    # its closed batch and realisation packets, as an actual pass.
     gd_decision: Path | None = None
+    gd_batch: Path | None = None
+    gd_realisation: list[Path] = Field(default_factory=list[Path])
     runs: list[ReferenceRunRef] = Field(default_factory=list[ReferenceRunRef])
     # The owner's frozen C tier selection, identifying the C baseline.
     c_selection: Path | None = None
+
+    @model_validator(mode="after")
+    def _replayable(self) -> Self:
+        if (self.gd_decision is None) != (self.gd_batch is None):
+            raise ValueError("a G-D decision is replayed from its batch: give both or neither")
+        return self
 
 
 class PopulationRef(Strict):
@@ -1206,15 +1216,48 @@ def _training(ctx: _Context, identity_: _Identity, units: list[_Unit]) -> Record
     }
 
 
+def gd_permission(decision: Record) -> tuple[Literal["C", "D"], str]:
+    """The reference a replayed G-D decision permits: D only after an actual pass naming D."""
+    outcome, test_only = decision.get("outcome"), decision.get("test_only")
+    named = _object(decision.get("reference_baseline")).get("condition")
+    if outcome == "passed" and test_only is False and named == "D":
+        return "D", "an actual G-D pass replays and names D as the reference"
+    reason = f"G-D outcome {outcome}" + (" (synthetic test-only)" if test_only else "")
+    return "C", f"{reason} does not permit D; the identified C baseline is the reference"
+
+
+def baseline_problems(identity_: Record, baseline: Record, run: Path) -> list[str]:
+    """How a reference run differs from the baseline identity a G-D decision recorded."""
+    problems = [
+        f"reference run {field} differs from the G-D reference baseline"
+        for field, recorded in (
+            ("pipeline", baseline.get("pipeline")),
+            ("params", baseline.get("params")),
+            ("models", baseline.get("models")),
+            ("config_sha256", baseline.get("config_sha256")),
+        )
+        if identity_.get(field) != recorded
+    ]
+    for name, checksum in sorted(_object(baseline.get("planning_artifacts")).items()):
+        path = Path(name)
+        if path.is_relative_to(run) and (not path.is_file() or file_checksum(path) != checksum):
+            problems.append(f"reference planning artifact changed since G-D: {path.name}")
+    return problems
+
+
 def _gd(ctx: _Context) -> tuple[Literal["C", "D"], str, Record | None]:
-    if ctx.request.reference.gd_decision is None:
+    reference = ctx.request.reference
+    if reference.gd_decision is None or reference.gd_batch is None:
         return "C", "no G-D decision supplied; the identified C baseline is the reference", None
-    folder = ctx.resolve(ctx.request.reference.gd_decision)
-    path = folder / "decision.json"
+    folder = ctx.resolve(reference.gd_decision)
+    path, baseline_file = folder / "decision.json", folder / "reference-baseline.json"
+    packets = [ctx.resolve(packet) for packet in reference.gd_realisation]
     try:
         saved = _read(path)
-        ctx.bind(path, folder / "reference-baseline.json")
-        replayed = gd_decision(Path(saved["batch"]), [])
+        ctx.bind(path, baseline_file)
+        # The decision is rebuilt as `nde gd-report` built it and compared as saved JSON.
+        replayed = json.loads(json.dumps(gd_decision(ctx.resolve(reference.gd_batch), packets)))
+        separate = _read(baseline_file) if baseline_file.is_file() else None
     except (OSError, ValueError, KeyError) as error:
         return "C", f"G-D decision unreadable: {error}", None
     summary = {
@@ -1224,31 +1267,43 @@ def _gd(ctx: _Context) -> tuple[Literal["C", "D"], str, Record | None]:
         "criteria_outcome": saved.get("criteria_outcome"),
         "test_only": saved.get("test_only"),
         "reference_baseline": saved.get("reference_baseline"),
+        "replays": replayed == saved and separate == saved.get("reference_baseline"),
     }
-    ignored = {"id", "realisation"}
-    if {k: v for k, v in replayed.items() if k not in ignored} != {
-        k: v for k, v in saved.items() if k not in ignored
-    }:
+    if not summary["replays"]:
         return "C", "G-D decision no longer replays from its bound evidence", summary
-    named = _object(saved.get("reference_baseline")).get("condition")
-    if saved.get("outcome") == "passed" and saved.get("test_only") is False and named == "D":
-        return "D", "an actual G-D pass replays and names D as the reference", summary
-    reason = f"G-D outcome {saved.get('outcome')}"
-    reason += " (synthetic test-only)" if saved.get("test_only") else ""
-    return "C", f"{reason} does not permit D; the identified C baseline is the reference", summary
+    permitted, reason = gd_permission(saved)
+    return permitted, reason, summary
+
+
+def reference_identity(run: Path, condition: Literal["C", "D"]) -> Record:
+    """A C or D run's identity, in the fields a G-D reference baseline records."""
+    manifest = read_manifest(run)
+    config = ExperimentConfig.model_validate_json((run / "config.json").read_text("utf-8"))
+    pipeline = {"C": "baseline_c", "D": "baseline_d"}[condition]
+    stories = config.stories
+    spec = (
+        None
+        if stories is None
+        else next((c for c in stories.conditions if c.name == condition), None)
+    )
+    if spec is None or spec.pipeline != pipeline:
+        raise ValueError(f"reference run {run} has no {condition} {pipeline} condition")
+    return {
+        "condition": condition,
+        "pipeline": pipeline,
+        "params": spec.params,
+        "run": str(run),
+        "config_sha256": manifest.config_hash,
+        "models": {name: role.model_dump(mode="json") for name, role in config.roles.items()},
+    }
 
 
 def _reference_units(ctx: _Context, ref: ReferenceRunRef) -> tuple[Record, list[_Unit]]:
     run = _run(ctx, ref.run, None)
+    identity_ = reference_identity(run.path, ref.condition)
     stories = run.config.stories
-    pipeline = {"C": "baseline_c", "D": "baseline_d"}[ref.condition]
-    spec = (
-        None
-        if stories is None
-        else next((c for c in stories.conditions if c.name == ref.condition), None)
-    )
-    if stories is None or spec is None or spec.pipeline != pipeline:
-        raise ValueError(f"reference run {run.path} has no {ref.condition} {pipeline} condition")
+    if stories is None:
+        raise ValueError(f"reference run {run.path} is not a story run")
     briefs = {brief.id: brief for brief in _briefs(ctx, run, stories.briefs, stories.briefs_dir)}
     ctx.bind(run.path / "stories.jsonl")
     units: list[_Unit] = []
@@ -1273,14 +1328,6 @@ def _reference_units(ctx: _Context, ref: ReferenceRunRef) -> tuple[Record, list[
                 ctx.problems.append(f"{unit.id}: reference plan unavailable: {error}")
             ctx.bind(plan_file)
         units.append(unit)
-    identity_ = {
-        "condition": ref.condition,
-        "pipeline": pipeline,
-        "params": spec.params,
-        "run": str(run.path),
-        "config_sha256": run.manifest.config_hash,
-        "models": {name: role.model_dump(mode="json") for name, role in run.config.roles.items()},
-    }
     return identity_, units
 
 
@@ -1297,6 +1344,13 @@ def _reference(ctx: _Context, policy: dict[str, str], units: list[_Unit]) -> Rec
             )
             continue
         identity_, rows = _reference_units(ctx, ref)
+        baseline = _object(None if gd is None else gd.get("reference_baseline"))
+        if baseline.get("condition") == permitted and gd is not None and gd["replays"]:
+            # A replayed G-D decision fixed this reference's identity; runs must match it.
+            problems += [
+                f"{ref.run}: {problem}"
+                for problem in baseline_problems(identity_, baseline, Path(identity_["run"]))
+            ]
         identities.append(identity_)
         references.extend(rows)
     selection: Record | None = None

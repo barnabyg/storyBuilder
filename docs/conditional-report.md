@@ -13,6 +13,8 @@ data or decides G-E.
   "revision_runs": [{"run": "runs/e-alternatives", "label": "e-alternatives"}],
   "reference": {
     "gd_decision": "gd/decision-1",
+    "gd_batch": "eval/batches/gd-1",
+    "gd_realisation": [],
     "runs": [{"run": "runs/cd-dev", "condition": "C"}],
     "c_selection": "selection-1.json"
   },
@@ -164,13 +166,24 @@ nearest protected records are listed. A protected view cannot be supplied as a t
 
 ## Reference baseline
 
-D is the reference only when `gd_decision` names a G-D decision folder whose
-`decision.json` replays exactly from its bound evidence as an actual (not
-test-only) pass naming D. Otherwise the identified C baseline is the reference and
-the reason is recorded. Reference runs of the other condition are not used and
-are listed under `reference.problems`. Each E story is compared with the
-reference outputs for the same brief and brief checksum. `c_selection`, when
-given, binds the owner's frozen C tier selection.
+D is the reference only when an actual G-D pass permits it. `gd_decision` names the
+`nde gd-report` output folder and `gd_batch` the closed batch it was reported from
+(both or neither), with the same `--realisation` packets as `gd_realisation`. The
+report rebuilds the decision from that batch exactly as `gd-report` does; it must
+equal the saved `decision.json` (and `reference-baseline.json`), or the decision does
+not replay and C stays the reference. A replayed decision permits D only when its
+outcome is `passed`, it is not test-only and its reference baseline names D; a
+synthetic, pending or failed decision keeps the identified C baseline. The reason is
+always recorded under `reference.reason`, with the decision's identity, outcome and
+`replays` under `reference.gd_decision`.
+
+When a replayed decision names the permitted reference, each reference run must
+match its recorded baseline: pipeline, parameters, model bindings and configuration
+checksum, and any of the decision's planning artifacts inside the run must be
+unchanged. Each difference is listed under `reference.problems`. Reference runs of
+the other condition are not used and are also listed there. Each E story is
+compared with the reference outputs for the same brief and brief checksum.
+`c_selection`, when given, binds the owner's frozen C tier selection.
 
 ## Realisation evidence
 

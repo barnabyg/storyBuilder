@@ -20,16 +20,20 @@ from nde.conditional import report as evidence
 from nde.conditional.report import retained_structure
 from nde.corpus.records_io import create_record, read_sealed
 from nde.diversity import multiset_distance, typed_edges
+from nde.eval.gd_artifacts import read_gd_binding
 from nde.files import checksum_lf, write_text_lf
+from nde.gd_report import reference_record
 from nde.narrative.models import NarrativePlan
 from nde.reconstruction.codec import CODEC_ID
 from nde.reconstruction.overlap import view_distance
 from tests.conditional_support import trained_checkpoint
 from tests.conftest import REPO
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
+from tests.gd_fixtures import gd_batch, prepare_gd
 from tests.stories import jsonl, run, story_config
 from tests.test_baseline_c import BASELINE_C
 from tests.test_candidate_e import Provider, e_condition
+from tests.test_gd_report import score_and_close
 from tests.test_plan_generation import skeleton
 from tests.test_revision_backends import (
     POLICY,
@@ -41,6 +45,9 @@ from tests.test_revision_backends import (
     revise,
     run_config,
 )
+
+# G-D gate fixtures supply the closed batch the real `gd-report` writer decides.
+pytest_plugins = ("tests.test_g1",)
 
 # The E story lock and the conditions its fixture briefs request.
 LOCK = {"characters/characters.0/name": "Ann"}
@@ -685,45 +692,27 @@ def test_protected_material_is_audited_against_every_training_population(
         evidence.check_index(read_sealed(tmp_path / "report/report.json"))
 
 
-def relabelled_d(source: Path, out: Path) -> Path:
-    """A copy of the C outputs recorded as a D condition, standing in for D reference runs."""
-    shutil.copytree(source, out)
-    config = json.loads((out / "config.json").read_text())
-    config["stories"]["conditions"] = [
-        {**condition, "name": "D", "pipeline": "baseline_d"}
-        for condition in config["stories"]["conditions"]
-        if condition["name"] == "C"
-    ]
-    (out / "config.json").write_text(json.dumps(config))
-    records = [
-        row | {"condition": "D"} for row in jsonl(out / "stories.jsonl") if row["condition"] == "C"
-    ]
-    write_text_lf(out / "stories.jsonl", "".join(json.dumps(row) + "\n" for row in records))
-    return out
-
-
-def gd_folder(directory: Path, *, outcome: str, test_only: bool) -> Path:
-    directory.mkdir(parents=True)
-    condition = "D" if outcome == "passed" else "C"
-    decision: dict[str, Any] = {
-        "version": "1",
-        "outcome": "pending" if test_only else outcome,
-        "criteria_outcome": outcome,
-        "test_only": test_only,
-        "batch": str(directory / "batch"),
-        "reference_baseline": None if test_only else {"condition": condition},
-        "realisation": [],
-    }
-    decision["id"] = digest(json.dumps(decision, sort_keys=True))
-    (directory / "decision.json").write_text(json.dumps(decision))
-    return directory
+def gd_reference(
+    tmp_path: Path, registered: dict[str, Path], fake: FakeOpenAI, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, Path]:
+    """A closed synthetic G-D gate, its run and its decision from the real `gd-report` writer."""
+    common, _ = prepare_gd(registered, tmp_path, fake, monkeypatch)
+    batch, run, _ = gd_batch(common, tmp_path)
+    score_and_close(batch, 4, 4)
+    decision = tmp_path / "gd-result"
+    assert main(["gd-report", str(batch), "--out", str(decision)]) == 0
+    return batch, run.resolve(), decision
 
 
 @pytest.mark.ml
-def test_reference_is_c_unless_actual_gd_evidence_permits_d(
-    tmp_path: Path, runs: Evidence, monkeypatch: pytest.MonkeyPatch
+def test_reference_is_c_unless_a_replayed_actual_gd_pass_permits_d(
+    tmp_path: Path,
+    runs: Evidence,
+    registered_inputs: dict[str, Path],
+    fake_llm: FakeOpenAI,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    report = build(request(tmp_path, runs), tmp_path / "c")
+    report = build(request(tmp_path / "c", runs), tmp_path / "c/r")
     reference = report["reference"]
     assert reference["permitted"] == "C"
     assert reference["reason"].startswith("no G-D decision supplied")
@@ -736,41 +725,58 @@ def test_reference_is_c_unless_actual_gd_evidence_permits_d(
         "mean_nearest_structure_distance": reference["summary"]["mean_nearest_structure_distance"],
     }
     assert 0 < reference["summary"]["mean_nearest_structure_distance"] <= 1
-    d_run = relabelled_d(runs.stories, tmp_path / "d-run")
+
+    batch, gd_run, decision = gd_reference(tmp_path, registered_inputs, fake_llm, monkeypatch)
     both = {
-        "runs": [
-            {"run": str(runs.stories), "condition": "C"},
-            {"run": str(d_run), "condition": "D"},
-        ]
+        "runs": [{"run": str(gd_run), "condition": c} for c in ("C", "D")],
+        "gd_decision": str(decision),
+        "gd_batch": str(batch),
     }
-    # A D outcome that does not replay from its bound evidence cannot promote D.
-    unbound = gd_folder(tmp_path / "unbound", outcome="passed", test_only=False)
-    path = request(tmp_path / "u", runs, reference={**both, "gd_decision": str(unbound)})
-    reference = build(path, tmp_path / "u/r")["reference"]
-    assert reference["permitted"] == "C"
-    assert "no longer replays" in reference["reason"]
-    assert any("D outputs" in problem for problem in reference["problems"])
-
-    # Simulates a decision that replays exactly; fixtures cannot hold actual owner evidence.
-    def replay(batch: Path, _packets: list[Path]) -> dict[str, Any]:
-        return json.loads((batch.parent / "decision.json").read_text())
-
-    monkeypatch.setattr(evidence, "gd_decision", replay)
-    synthetic = gd_folder(tmp_path / "synthetic", outcome="passed", test_only=True)
-    path = request(tmp_path / "s", runs, reference={**both, "gd_decision": str(synthetic)})
+    # The real writer's synthetic decision replays, but cannot promote D.
+    path = request(tmp_path / "s", runs, reference=both)
     reference = build(path, tmp_path / "s/r")["reference"]
+    assert reference["gd_decision"]["replays"] is True
+    assert reference["gd_decision"]["outcome"] == "pending"
     assert reference["permitted"] == "C"
     assert "synthetic test-only" in reference["reason"]
-    failed = gd_folder(tmp_path / "failed", outcome="failed", test_only=False)
-    path = request(tmp_path / "f", runs, reference={**both, "gd_decision": str(failed)})
-    assert build(path, tmp_path / "f/r")["reference"]["permitted"] == "C"
-    actual = gd_folder(tmp_path / "actual", outcome="passed", test_only=False)
-    path = request(tmp_path / "a", runs, reference={**both, "gd_decision": str(actual)})
-    reference = build(path, tmp_path / "a/r")["reference"]
-    assert reference["permitted"] == "D"
-    assert [i["pipeline"] for i in reference["identities"]] == ["baseline_d"]
-    assert any("C outputs" in problem for problem in reference["problems"])
-    assert reference["summary"]["compared"] == 2
+    assert any("D outputs" in problem for problem in reference["problems"])
+    assert [i["pipeline"] for i in reference["identities"]] == ["baseline_c"]
+    # A decision cannot be checked without the batch it is replayed from.
+    unbatched = {**both, "gd_batch": None}
+    build(request(tmp_path / "u", runs, reference=unbatched), tmp_path / "u/r", expected=2)
+    # A decision edited to claim an actual pass does not replay, so D stays unpermitted.
+    forged = tmp_path / "forged"
+    shutil.copytree(decision, forged)
+    claimed = json.loads((forged / "decision.json").read_text())
+    claimed.update(outcome="passed", test_only=False, reference_baseline={"condition": "D"})
+    (forged / "decision.json").write_text(json.dumps(claimed))
+    path = request(tmp_path / "f", runs, reference={**both, "gd_decision": str(forged)})
+    reference = build(path, tmp_path / "f/r")["reference"]
+    assert reference["gd_decision"]["replays"] is False
+    assert reference["permitted"] == "C"
+    assert "no longer replays" in reference["reason"]
+
+    # Fixtures cannot hold an actual pass, so the D rule and the baseline-identity check
+    # are exercised on the real writer's decision and reference-baseline record.
+    saved = json.loads((decision / "decision.json").read_text())
+    assert evidence.gd_permission(saved)[0] == "C"
+    baseline = reference_record(read_gd_binding(batch), "D")
+    actual = saved | {"outcome": "passed", "test_only": False, "reference_baseline": baseline}
+    assert evidence.gd_permission(actual)[0] == "D"
+    failed = saved | {"outcome": "failed", "test_only": False}
+    assert evidence.gd_permission(failed | {"reference_baseline": None})[0] == "C"
+    identity_ = evidence.reference_identity(gd_run, "D")
+    assert evidence.baseline_problems(identity_, baseline, gd_run) == []
+    changed = identity_ | {"params": {**identity_["params"], "critic_iterations": 9}}
+    assert evidence.baseline_problems(changed, baseline, gd_run) == [
+        "reference run params differs from the G-D reference baseline"
+    ]
+    plan = gd_run / "stories/D/brief-01/r1/plan.json"
+    with restored(plan):
+        plan.write_text(plan.read_text().replace("Scene 0", "Scene zero"))
+        assert evidence.baseline_problems(identity_, baseline, gd_run) == [
+            "reference planning artifact changed since G-D: plan.json"
+        ]
 
 
 @pytest.mark.ml
