@@ -86,6 +86,12 @@ duplicates (identical apart from descriptive text) are reported, not counted.
 `uv run nde plan alternatives RUN_DIR` rebuilds the report from the saved
 artifacts and exits non-zero when a plan, provenance record or source changed.
 
+Current conditional checkpoints are trained with every output position masked
+(`training_condition_policy` in the checkpoint binding), so a partially observed
+layout is outside their training distribution. Inpainting such a layout is
+mechanically valid and checked like any other candidate, but the quality of the
+masked values it proposes is unvalidated.
+
 Fixture checkpoints establish software mechanics only. An accepted E revision is
 a mechanically valid generated plan; literary adherence, owner review and G-E
 remain separate. Real E experiments require genuine passed G3 evidence.
