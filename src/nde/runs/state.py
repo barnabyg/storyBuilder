@@ -6,6 +6,7 @@ from nde.llm.gateway import Completion, Gateway
 from nde.runs.records import (
     BudgetMatch,
     CallRecord,
+    LocalWorkRecord,
     OutputRecord,
     StoryRecord,
     StructuredMetrics,
@@ -18,6 +19,8 @@ class RunState:
     calls: list[CallRecord] = field(default_factory=list[CallRecord])
     stories: list[StoryRecord] = field(default_factory=list[StoryRecord])
     budget_matches: list[BudgetMatch] = field(default_factory=list[BudgetMatch])
+    # Local conditional-model work, kept apart from provider calls.
+    local_work: list[LocalWorkRecord] = field(default_factory=list[LocalWorkRecord])
     structured: dict[str, StructuredMetrics] = field(default_factory=dict[str, StructuredMetrics])
     # The call in progress, for failure records.
     current_call: str | None = None

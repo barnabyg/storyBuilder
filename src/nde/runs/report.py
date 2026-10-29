@@ -7,16 +7,19 @@ from nde.files import write_text_lf
 from nde.runs.records import (
     REPORT,
     CallRecord,
+    LocalWorkRecord,
     Manifest,
     OutputRecord,
     StoryRecord,
     read_calls,
+    read_local_work,
     read_manifest,
     read_outputs,
     read_stories,
 )
 from nde.stories.comparison import compare
 from nde.stories.comparison import lines as comparison_lines
+from nde.stories.resources import CATEGORIES, provider_categories, story_resources
 
 
 def render_report(run_dir: Path) -> str:
@@ -66,6 +69,7 @@ def render_report(run_dir: Path) -> str:
     stories = read_stories(run_dir)
     lines += _stories_section(manifest, stories, calls)
     lines += _budget_section(manifest, stories)
+    lines += _resource_section(run_dir, manifest, stories, calls)
     lines += _equal_budget_section(manifest)
     lines += comparison_lines(compare(run_dir, manifest, stories, calls))
     lines += _benchmark_section(manifest)
@@ -368,7 +372,114 @@ def _equal_budget_section(manifest: Manifest) -> list[str]:
         )
     unmatched = sum(not match.matched for match in equal.matches)
     lines += ["", f"{len(equal.matches) - unmatched} matched, {unmatched} not matched.", ""]
+    if equal.resource_policy is not None:
+        lines += [
+            f"Resource policy v{equal.resource_policy['version']}: matching uses provider "
+            "generation tokens only. Local conditional-model work is reported separately "
+            "and is not equated, so a match is not an equal total budget.",
+            "",
+            *(
+                f"- {match.brief} #{match.repetition + 1} local work: "
+                + "; ".join(
+                    f"{name} {totals.passes} passes, {totals.tokens} model tokens, "
+                    f"{totals.attention_cells} attention cells, "
+                    f"{totals.elapsed_seconds:.2f} s"
+                    for name, totals in (match.local_work or {}).items()
+                )
+                for match in equal.matches
+            ),
+            "",
+        ]
     return lines
+
+
+def _tokens(row: dict[str, int]) -> str:
+    return f"{row['calls']} / {row['input_tokens'] + row['output_tokens']}"
+
+
+def _resource_section(
+    run_dir: Path, manifest: Manifest, stories: list[StoryRecord], calls: list[CallRecord]
+) -> list[str]:
+    """Provider calls by purpose beside local model work, for runs with a local model."""
+    if manifest.stories is None or "local_work" not in manifest.files:
+        return []
+    work = read_local_work(run_dir)
+    lines = [
+        "## Resource accounting",
+        "",
+        "Provider calls are grouped by what they served (calls / tokens). Local "
+        "conditional-model work has its own units: forward passes, model tokens, attention "
+        "cells and seconds. The two are never converted or summed. Imported plans count "
+        "their original calls and local work once, without new spend.",
+        "",
+        "| Brief | Condition | Rep | Status | "
+        + " | ".join(category.capitalize() for category in CATEGORIES)
+        + " | Local passes | Model tokens | Attention cells | Local seconds |",
+        "|" + " --- |" * (len(CATEGORIES) + 8),
+    ]
+    for story in stories:
+        resources = story_resources(calls, work, story.condition, story.brief, story.repetition)
+        local = resources["local"]
+        lines.append(
+            f"| {story.brief} | {story.condition} | {story.repetition + 1} | {story.status} | "
+            + " | ".join(_tokens(resources["provider"][category]) for category in CATEGORIES)
+            + f" | {local['passes']} | {local['tokens']} | {local['attention_cells']} "
+            f"| {local['elapsed_seconds']:.2f} |"
+        )
+    lines += ["", *_local_work_lines(work), *_selection_lines(run_dir, stories)]
+    totals = provider_categories([call for call in calls if call.condition is not None])
+    lines += [
+        "Run totals by purpose: "
+        + ", ".join(f"{category} {_tokens(totals[category])}" for category in CATEGORIES),
+        "",
+    ]
+    return lines
+
+
+def _local_work_lines(work: list[LocalWorkRecord]) -> list[str]:
+    if not work:
+        return ["No local model work was recorded.", ""]
+    return [
+        "### Local model work",
+        "",
+        "| Brief | Condition | Rep | Operation | Status | Checkpoint | Test only | Guidance "
+        "| Attempts | Passes | Model tokens | Attention cells | Seconds | Imported from |",
+        "|" + " --- |" * 14,
+        *(
+            f"| {r.brief} | {r.condition} | {r.repetition + 1} | {r.operation} | {r.status} "
+            f"| `{r.checkpoint_id[:12]}` | {'yes' if r.test_only else 'no'} "
+            f"| {r.guidance_scale:g} ({r.guidance_policy}) | {len(r.attempts)} | {r.passes} "
+            f"| {r.tokens} | {r.attention_cells} | {r.elapsed_seconds:.2f} "
+            f"| {'-' if r.imported_from is None else f'`{r.imported_from[:12]}`'} |"
+            for r in work
+        ),
+        "",
+    ]
+
+
+def _selection_lines(run_dir: Path, stories: list[StoryRecord]) -> list[str]:
+    rows: list[str] = []
+    for story in stories:
+        path = run_dir / story.path / "conditional-selection.json"
+        if not path.is_file():
+            continue
+        selection = json.loads(path.read_text(encoding="utf-8"))
+        rows.append(
+            f"| {story.brief} | {story.condition} | {story.repetition + 1} "
+            f"| {selection['source']} | `{selection['proposal_id'][:12]}` "
+            f"| `{selection['completion_id'][:12]}` | `{selection['plan_sha256'][:12]}` "
+            f"| {'-' if story.sha256 is None else f'`{story.sha256[:12]}`'} |"
+        )
+    if not rows:
+        return []
+    return [
+        "### Selected conditional plans",
+        "",
+        "| Brief | Condition | Rep | Source | Proposal | Completion | Plan | Final story |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        *rows,
+        "",
+    ]
 
 
 def _quote(text: str) -> list[str]:

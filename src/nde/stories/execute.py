@@ -47,6 +47,7 @@ from nde.stories.pipeline import (
     derive_seed,
 )
 from nde.stories.registry import PIPELINES
+from nde.stories.resources import local_totals
 
 # The normalised story, which blind batches and judges see, and the model's raw text.
 RAW_FILE = "story.raw.md"
@@ -97,6 +98,9 @@ class PreparedStories:
                 conditions=self.equal_budget.conditions,
                 tolerance=self.equal_budget.tolerance,
                 max_revision_passes=self.equal_budget.max_revision_passes,
+                resource_policy=None
+                if self.equal_budget.resource_policy is None
+                else self.equal_budget.resource_policy.model_dump(mode="json"),
             ),
         )
 
@@ -144,7 +148,26 @@ def _condition(loaded: LoadedConfig, spec: ConditionSpec) -> Condition:
                 f"condition {spec.name!r} uses role {role!r}, which has no model in `roles`"
             )
     pipeline.check_roles(loaded.config.roles)
+    try:
+        pipeline.check_inputs()
+    except ConfigError as error:
+        raise ConfigError(f"condition {spec.name!r}: {error}") from error
     return Condition(spec, pipeline)
+
+
+def _check_resource_policy(conditions: list[Condition], spec: EqualBudgetConfig | None) -> None:
+    """Local model work is another unit: comparing it needs an explicit registered policy."""
+    if spec is None or spec.resource_policy is not None:
+        return
+    local = [
+        c.spec.name for c in conditions if c.spec.name in spec.conditions and c.pipeline.local_model
+    ]
+    if local:
+        raise ConfigError(
+            f"equal_budget compares {', '.join(local)}, which runs a local conditional model; "
+            "register equal_budget.resource_policy, since local model work is not provider "
+            "tokens and cannot silently count as an equal budget"
+        )
 
 
 def prepare_stories(
@@ -157,6 +180,7 @@ def prepare_stories(
         return None
     briefs = _select_briefs(stories.briefs, briefs_dir)
     conditions = [_condition(loaded, spec) for spec in stories.conditions]
+    _check_resource_policy(conditions, stories.equal_budget)
     if any(condition.spec.params.get("exemplars") for condition in conditions) and any(
         brief.split != "dev" for brief in briefs
     ):
@@ -270,6 +294,7 @@ def write_story(run: StoryRun, condition: Condition, brief: Brief, repetition: i
         condition=condition.spec.name,
         repetition=repetition,
         seed=seed,
+        directory=run.run_dir / folder,
     )
     record = StoryRecord(
         brief=brief.id,
@@ -368,6 +393,11 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
                 )
                 break
     match.after = {name: jobs[name].tokens for name in spec.conditions}
+    if spec.resource_policy is not None:
+        match.local_work = {
+            name: local_totals(run.state.local_work, name, match.brief, match.repetition)
+            for name in spec.conditions
+        }
     match.matched = not failed and within(cheaper.tokens, dearer.tokens, spec.tolerance)
     if not match.matched and match.reason is None:
         match.reason = f"not within {spec.tolerance:.0%} after {_passes(match.passes)}"

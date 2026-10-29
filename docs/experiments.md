@@ -196,6 +196,11 @@ budget** table give, per brief, each condition's budget before and after
 matching, which condition was revised, the passes added, whether it matched,
 and why not. `configs/stories-ab-equal-budget.yaml` runs A against B this way.
 
+A condition with a local conditional model (Candidate E) also does work that is
+not provider tokens. Comparing it needs `equal_budget.resource_policy`; matching
+then stays on provider tokens and local work is reported beside it, never called
+an equal total budget. See [candidate-e.md](candidate-e.md#comparisons-and-the-resource-policy).
+
 ### Pipelines
 
 | Pipeline | Condition | Steps |
@@ -203,6 +208,8 @@ and why not. `configs/stories-ab-equal-budget.yaml` runs A against B this way.
 | `baseline_a` | Baseline A | one call on `prose` with `story_a@1`: brief to complete story |
 | `baseline_b` | Baseline B | a beat outline on `planner` (`beat_outline@1`, structured, with repair), then one call per scene on `prose` through the shared prose contract |
 | `baseline_b_scrambled` | B-scrambled (gate G-instr) | B's outline (the same cached call), scenes shuffled with a seeded permutation that is never the original order, then fresh prose through the shared prose contract; see [instrument-check.md](instrument-check.md) |
+| `baseline_c`, `baseline_d` | Baseline C, Candidate D | see [baseline-c.md](baseline-c.md) and [baseline-d.md](baseline-d.md) |
+| `candidate_e` | Candidate E | a learned conditional proposal on a local checkpoint, hybrid text completion on `planner`, then C's ledger and shared prose; see [candidate-e.md](candidate-e.md) |
 
 Parameters: `baseline_a` takes `prompt` (default `{template: story_a,
 version: 1}`); `baseline_b` takes `outline_prompt` (default
@@ -259,6 +266,7 @@ passing its own scene list; the tests drive them with a hand-written one.
 | `stories.jsonl` | one line per story: brief, condition, pipeline, repetition, seed, status, word count, target, length attempts and its files |
 | `calls.jsonl` | as for every run; each line also names the `brief`, `condition`, pipeline `step` and length-control `story_attempt` it served |
 | `manifest.json` | the `stories` section: brief IDs, the checksum of each frozen split they come from, conditions, repetitions, the length settings and any stories still out of range |
+| `local-work.jsonl` | only for runs with a local-model condition: one `LocalWorkRecord` per local model operation, with its passes, model tokens, attention cells and seconds |
 
 The report's **Stories** section lists every story with its word count,
 calls, tokens and cost, and a **Per condition** table gives the totals and the
@@ -291,6 +299,13 @@ an intermediate output as a file beside the story. A pipeline's parameters are
 a Pydantic model it validates in a `from_params` class method. Register the
 class in `PIPELINES` in `src/nde/stories/__init__.py`. Baseline A
 (`src/nde/stories/baseline_a.py`) is the smallest example.
+
+A pipeline that runs a local model sets `local_model = True` and overrides
+`check_inputs()` to validate its model inputs during preparation. Calls that an
+established workflow makes on the gateway without a prompt template go through
+`ctx.attributed(step, request)`, so they are recorded like any other step, and
+`ctx.directory` is the story's folder for records that must be durable while the
+work runs. `src/nde/stories/candidate_e.py` is the example.
 
 ## Prompt templates
 

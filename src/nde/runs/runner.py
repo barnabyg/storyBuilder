@@ -35,6 +35,7 @@ from nde.runs.config import (
 from nde.runs.prompts import PromptTemplate, require_template
 from nde.runs.records import (
     CALLS,
+    LOCAL_WORK,
     OUTPUTS,
     STORIES,
     BenchmarkSummary,
@@ -160,6 +161,8 @@ def _manifest(prepared: PreparedRun, options: RunOptions, started: datetime) -> 
     )
     if prepared.stories is not None:
         manifest.files["stories"] = STORIES
+        if any(condition.pipeline.local_model for condition in prepared.stories.conditions):
+            manifest.files["local_work"] = LOCAL_WORK
     if prepared.plans is not None:
         manifest.files["plans"] = "plans.jsonl"
     if prepared.judges is not None:
@@ -323,6 +326,8 @@ def _finish(prepared: PreparedRun, options: RunOptions, end: _Finish) -> None:
     if manifest.stories is not None:
         _summarise_stories(manifest.stories, state)
         write_jsonl(run_dir / STORIES, state.stories)
+        if "local_work" in manifest.files:
+            write_jsonl(run_dir / LOCAL_WORK, state.local_work)
     if end.judge_run is not None and manifest.judges is not None:
         records = end.judge_run.records
         manifest.judges.records = len(records)
