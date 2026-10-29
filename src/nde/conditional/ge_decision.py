@@ -11,9 +11,10 @@ Synthetic (test-only) criteria results stay scientifically pending.
 The single development iteration is enforced across protocols from the
 repository's G-E history: every G-E protocol, run claim, decision claim and
 review packet in any commit of any local ref, plus the claims kept beside those
-protocols. A comparison is the reference identity and dev briefs a protocol
-freezes; it may have one run first attempt and one run development iteration,
-which is decided only against the first attempt's settled, replayable failure.
+protocols. A comparison is every protocol with the same test-only status and
+canonical reference identity, whatever its dev briefs; it may have one run first
+attempt and one run development iteration, which is decided only against the
+first attempt's settled, replayable failure.
 
 The first decision that applies the structural criterion freezes the owner
 ratings it used in a sealed review claim beside the protocol; every later
@@ -345,11 +346,26 @@ def history(protocol: Path) -> History:
     return found
 
 
-def _comparison(protocol: Record) -> tuple[bool, str, frozenset[str]]:
-    """What a protocol compares: test-only status, reference identity and dev briefs."""
-    frozen = protocol["frozen"]
-    reference = json.dumps(ge.unlocated(frozen["reference"]), sort_keys=True)
-    return bool(protocol["test_only"]), reference, frozenset(frozen["cohort"]["briefs"])
+def reference_identity(reference: Record) -> Record:
+    """A reference's canonical identity: its planner contract and the evidence naming it.
+
+    The owner's C selection ID or the G-D decision ID identifies it, never the bytes or
+    path of the file holding that record.
+    """
+    selection, decision = reference.get("c_selection"), reference.get("gd_decision")
+    return {
+        "condition": reference["condition"],
+        "pipeline": reference["pipeline"],
+        "params": reference["params"],
+        "c_selection": None if selection is None else selection["id"],
+        "gd_decision": None if decision is None else decision["id"],
+    }
+
+
+def _comparison(protocol: Record) -> tuple[bool, str]:
+    """What a protocol is compared against: its test-only status and reference identity."""
+    reference = reference_identity(protocol["frozen"]["reference"])
+    return bool(protocol["test_only"]), json.dumps(reference, sort_keys=True)
 
 
 def _attempt(protocol: Record) -> tuple[int, str | None]:
@@ -362,10 +378,11 @@ def history_problems(protocol: Record, first: str, found: History) -> list[str]:
     """Violations of the one-iteration rule in the protocol's comparison.
 
     `first` is the comparison's first attempt: the protocol itself, or the one its
-    iteration names. Protocols registering the same reference and overlapping dev
-    briefs belong to the comparison; only those that were run (claimed) count.
+    iteration names. Every protocol with the same test-only status and canonical
+    reference identity belongs to the comparison, whatever its dev briefs; only those
+    that were run (claimed) count, and a run attempt counts even if never decided.
     """
-    test_only, reference, briefs = _comparison(protocol)
+    comparison = _comparison(protocol)
     family: dict[str, Record] = {}
     for other in [protocol, *found.protocols.values()]:
         try:
@@ -373,7 +390,7 @@ def history_problems(protocol: Record, first: str, found: History) -> list[str]:
             _attempt(other)
         except (KeyError, TypeError, ValueError):
             continue
-        if key[:2] == (test_only, reference) and key[2] & briefs:
+        if key == comparison:
             family.setdefault(str(other["id"]), other)
     run = [other for name, other in sorted(family.items()) if name in found.claims]
     resets = [str(p["id"]) for p in run if _attempt(p)[0] == FIRST and p["id"] != first]
@@ -382,8 +399,8 @@ def history_problems(protocol: Record, first: str, found: History) -> list[str]:
     problems: list[str] = []
     if resets:
         problems.append(
-            "history reset: another first attempt registering the same reference and "
-            f"overlapping dev briefs was run: {', '.join(resets)}"
+            "history reset: another first attempt against the same reference was run, "
+            f"decided or not: {', '.join(resets)}"
         )
     if len(iterations) > 1:
         problems.append(
@@ -479,9 +496,9 @@ def _history_section(
         "policy": protocol["frozen"]["iteration"]["policy"],
         "change": protocol["frozen"]["iteration"]["change"],
         "first_attempt": first,
-        "rule": "One run first attempt per comparison (reference and overlapping dev "
-        "briefs) and at most one run development iteration, decided against the first "
-        "attempt's settled failure.",
+        "rule": "One run first attempt per comparison (test-only status and canonical "
+        "reference identity, whatever the dev briefs) and at most one run development "
+        "iteration, decided against the first attempt's settled failure.",
     }
     return section, problems
 

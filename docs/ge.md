@@ -362,15 +362,21 @@ The decision enforces the single development iteration across protocols. Its
 history is every G-E protocol, run claim, decision claim and review packet
 committed in the protocol's repository, in any commit of any local branch,
 deleted or superseded versions included. The claims currently kept beside those
-protocols count too. A **comparison** is the protocols with the same test-only
-status, the same reference identity and overlapping dev briefs. Only protocols
-that were run (claimed) count.
+protocols count too. A **comparison** is every protocol with the same test-only
+status and the same canonical reference identity: the reference condition, its
+planner pipeline and parameters, and the owner's C selection ID or the G-D
+decision ID. The dev briefs do not matter, and neither do the bytes or path of
+the file holding the selection or decision. Only protocols that were run
+(claimed) count, and a run attempt counts even if it is never decided or stays
+pending.
 
 - The decided protocol's run claim must be committed, so the repository records
   the run.
-- A comparison has one run first attempt. Another run attempt 1, including one
-  registered after deleting the first, is a **history reset**: every decision in
-  the comparison becomes inconsistent.
+- A comparison has one run first attempt. Another run attempt 1 against the same
+  reference, on any dev briefs and including one registered after deleting the
+  first, is a **history reset**: every decision in the comparison becomes
+  inconsistent.
+
 - It has at most one run development iteration, bound to that first attempt. A
   second one is inconsistent, as is an iteration of another first attempt.
 - An iteration is decided only against the first attempt's **settled, committed
