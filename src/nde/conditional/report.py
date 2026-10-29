@@ -71,6 +71,7 @@ from nde.runs.records import Manifest, StoryRecord, read_manifest, read_stories
 from nde.schema.brief import Brief
 from nde.stories.execute import select_briefs
 from nde.stories.normalise import word_count
+from nde.stories.registry import PIPELINES
 from nde.stories.selected import selected_text
 from nde.tiers import load_selection
 
@@ -1290,7 +1291,8 @@ def planner_contract_problems(
     """How a D planner differs from the reference baseline an actual G-D pass named.
 
     The contract is the pipeline, its parameters, the plan schema, the baseline's
-    own role bindings and the prompts both use. Dev and G-E configurations
+    own role bindings and every prompt the D planner uses (plus any other prompt
+    both record). Dev and G-E configurations
     necessarily differ from G-D's frozen test configuration (cohort, other
     conditions), so its checksum is not part of the contract.
     """
@@ -1306,8 +1308,19 @@ def planner_contract_problems(
     for role, recorded in sorted(_object(baseline.get("models")).items()):
         if models.get(role) != recorded:
             problems.append(f"D {role} model binding differs from the G-D reference baseline")
-    for label, checksum in sorted(_object(baseline.get("prompts")).items()):
-        if label in prompts and prompts[label] != checksum:
+    recorded = _object(baseline.get("prompts"))
+    try:
+        # Every prompt the D planner itself uses must be recorded by the baseline and
+        # loaded now. G-D's configuration also ran C, whose own prompts D never loads.
+        needed = {need.prompt.label for need in PIPELINES[pipeline](params).templates()}
+    except (KeyError, ValueError) as error:
+        return [*problems, f"D planner parameters are unusable: {error}"]
+    for label in sorted(needed | (recorded.keys() & prompts.keys())):
+        if label not in recorded:
+            problems.append(f"D prompt is not recorded by the G-D reference baseline: {label}")
+        elif label not in prompts:
+            problems.append(f"D prompt is not loaded by this configuration: {label}")
+        elif prompts[label] != recorded[label]:
             problems.append(f"D prompt differs from the G-D reference baseline: {label}")
     return problems
 

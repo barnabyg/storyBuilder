@@ -93,8 +93,8 @@ This example registers nothing real; supply genuine identities and limits.
   permitted only by a `gd_decision` folder that replays from its `gd_batch` (and
   `gd_realisation` packets) as an actual pass naming D, and the D condition must
   satisfy the evidence report's planner contract against that reference baseline:
-  pipeline, parameters, schema, the baseline's own role bindings and shared
-  prompts. Its configuration checksum is not compared, because dev outputs
+  pipeline, parameters, schema, the baseline's own role bindings, and every
+  prompt D uses, recorded by the baseline and loaded now with the same checksum. Its configuration checksum is not compared, because dev outputs
   necessarily come from another configuration than G-D's test run; the report
   applies the same contract, so it identifies the same D. A registered C is
   refused when a replayed G-D decision permits D.

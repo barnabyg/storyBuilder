@@ -182,8 +182,10 @@ always recorded under `reference.reason`, with the decision's identity, outcome 
 When a replayed decision names the permitted reference, each reference run must
 match the planner contract of its full recorded baseline
 (`planner_contract_problems`, shared with [G-E](ge.md)): the pipeline, its
-parameters, the plan schema, the baseline's own role bindings and the prompts
-both use. The configuration checksum is not part of the contract: dev runs, which
+parameters, the plan schema, the baseline's own role bindings, and every prompt
+the D planner uses, which the baseline must record and the run must have loaded
+with the same checksum (other prompts both record must also agree; C's own
+prompts from G-D's configuration are not required). The configuration checksum is not part of the contract: dev runs, which
 select dev briefs and may run E beside D, necessarily differ from G-D's frozen
 test configuration. Any of the decision's planning artifacts inside the run must
 also be unchanged. Each difference is listed under `reference.identity_problems`. Reference runs of

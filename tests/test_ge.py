@@ -26,6 +26,7 @@ from nde.corpus.records_io import create_record, read_sealed
 from nde.runs.config import ConditionSpec, load_config
 from nde.runs.runner import RunOptions
 from nde.stories.execute import story_conditions, story_templates
+from nde.stories.registry import PIPELINES
 from nde.tiers import load_selection
 from tests.conditional_support import trained_checkpoint
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
@@ -542,23 +543,36 @@ def test_d_reference_identity_follows_the_g_d_baseline(registered: Fixture) -> N
     """Fixtures hold no actual G-D pass; the D identity rule is exercised in memory."""
     loaded = load_config(registered.config)
     roles = {str(name): binding for name, binding in loaded.config.roles.items()}
-    spec = ConditionSpec(name="D", pipeline="baseline_d", params={"critic_iterations": 1})
+    spec = ConditionSpec(name="D", pipeline="baseline_d", params={})
+    needed = sorted(need.prompt.label for need in PIPELINES["baseline_d"]({}).templates())
+    loaded_prompts = dict.fromkeys(needed, "a" * 64)
     baseline = {
         "pipeline": "baseline_d",
-        "params": {"critic_iterations": 1},
+        "params": {},
         "schema_sha256": ge.digest(ge.schema_json()),
         "models": {name: binding.model_dump(mode="json") for name, binding in roles.items()},
-        "prompts": {"skeleton@1": "a" * 64},
+        # G-D's configuration also ran C, whose own prompts D never loads.
+        "prompts": loaded_prompts | {"c_only@1": "b" * 64},
     }
-    assert ge.d_reference_problems(spec, roles, baseline, {"other@1": "b" * 64}) == []
-    changed = spec.model_copy(update={"params": {"critic_iterations": 2}})
-    assert ge.d_reference_problems(changed, roles, baseline, {}) == [
+    assert ge.d_reference_problems(spec, roles, baseline, loaded_prompts) == []
+    changed = spec.model_copy(update={"params": {"critic_iterations": 0}})
+    assert ge.d_reference_problems(changed, roles, baseline, loaded_prompts) == [
         "D params differs from the G-D reference baseline"
     ]
-    assert ge.d_reference_problems(spec, roles, baseline, {"skeleton@1": "c" * 64}) == [
-        "D prompt differs from the G-D reference baseline: skeleton@1"
+    first = needed[0]
+    assert ge.d_reference_problems(spec, roles, baseline, loaded_prompts | {first: "c" * 64}) == [
+        f"D prompt differs from the G-D reference baseline: {first}"
     ]
-    assert ge.d_reference_problems(spec, {}, baseline, {}) == [
+    # Every prompt D itself uses must be recorded by the baseline and loaded now.
+    unloaded = {label: sha for label, sha in loaded_prompts.items() if label != first}
+    assert ge.d_reference_problems(spec, roles, baseline, unloaded) == [
+        f"D prompt is not loaded by this configuration: {first}"
+    ]
+    unrecorded = baseline | {"prompts": unloaded}
+    assert ge.d_reference_problems(spec, roles, unrecorded, loaded_prompts) == [
+        f"D prompt is not recorded by the G-D reference baseline: {first}"
+    ]
+    assert ge.d_reference_problems(spec, {}, baseline, loaded_prompts) == [
         f"D {role} model binding differs from the G-D reference baseline" for role in sorted(roles)
     ]
 
