@@ -879,3 +879,61 @@ def test_e_checkpoint_drift_during_inference_is_a_recorded_rejection(
     second = provenance(run / records[1]["path"])
     if drift == "unreadable":
         assert second["backend"]["status"] == "preflight-failed"
+
+
+@pytest.mark.ml
+def test_e_text_only_masks_run_no_learned_inference(
+    tmp_path: Path, llm: FakeOpenAI, monkeypatch: pytest.MonkeyPatch, learned: Path
+) -> None:
+    def forbidden(*_args: Any, **_options: Any) -> dict[str, Any]:
+        raise AssertionError("no structural value is editable, so the checkpoint must not run")
+
+    monkeypatch.setattr(inpainting, "sample_candidate", forbidden)
+    llm.default = lambda _body: completion(json.dumps({"fields": {DESCRIPTION: TEXT}}))
+    backend = {"kind": "e", "checkpoint": str(learned), "target_policy": POLICY}
+    value = run_config(tmp_path, llm.base_url, {"mask": {"units": [DESCRIPTION]}}, backend)
+    run = revise(tmp_path, value, 0)
+    assert run is not None
+    folder = folder_of(run)
+    record = provenance(folder)
+    assert record["status"] == "accepted"
+    assert record["changed_units"] == [DESCRIPTION]
+    metadata = record["backend"]
+    assert metadata["status"] == "text-only"
+    assert metadata["attempts"] == []
+    assert metadata["masked_tokens"] == 0
+    assert metadata["work"] == {"tokens": 0, "attention_cells": 0, "passes": 0} | {
+        "elapsed_seconds": metadata["work"]["elapsed_seconds"]
+    }
+    assert metadata["unrepresented"] == []
+    assert len(record["calls"]) == 1
+    [row] = json.loads((run / "alternatives.json").read_text())["alternatives"]
+    assert row["local_work"]["tokens"] == 0
+
+
+@pytest.mark.ml
+def test_e_reports_selected_structure_it_cannot_represent_per_unit(learned: Path) -> None:
+    checkpoint = inspect_checkpoint(learned)
+    spec = RevisionSpec.model_validate(
+        {"mask": {"units": ["states/goal/key", "states/belief/key"]}, "instruction": "x"}
+    )
+    # Declared for an unverifiable fixture only: goal is outside this policy.
+    backend = ERevisionBackend.model_validate(
+        {"kind": "e", "checkpoint": learned, "target_policy": {**POLICY, "goal": "excluded"}}
+    )
+    plan = NarrativePlan.model_validate(SOURCE)
+    observation = inpainting.observe(plan, spec, backend, checkpoint)
+    assert [observation.leaves[path].selector for path in observation.editable] == [
+        "states/belief/key"
+    ]
+    assert observation.summary()["unrepresented"] == [
+        {"unit": "states/goal/key", "values": ["states/goal/key"]}
+    ]
+    # Every structural value of a fully represented selection is editable.
+    full = RevisionSpec.model_validate(
+        {"mask": {"channels": ["causal_links", "states"]}, "instruction": "x"}
+    )
+    policy = ERevisionBackend.model_validate(
+        {"kind": "e", "checkpoint": learned, "target_policy": POLICY}
+    )
+    assert inpainting.observe(plan, full, policy, checkpoint).summary()["unrepresented"] == []

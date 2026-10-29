@@ -99,6 +99,9 @@ class Observation:
     editable: list[ViewPath]
     text_fields: list[str]
     canonical_ids: dict[str, str]
+    # Per selected unit, its unlocked structural values E cannot represent, which
+    # stay as the source has them.
+    unrepresented: list[dict[str, Any]]
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -107,6 +110,7 @@ class Observation:
             "masked_paths": [list(path) for path in self.editable],
             "masked_tokens": self.tokens.count(MASK),
             "text_fields": self.text_fields,
+            "unrepresented": self.unrepresented,
         }
 
 
@@ -211,6 +215,55 @@ def text_fields(plan: NarrativePlan, spec: RevisionSpec) -> list[str]:
     return [selector for selector in found if _authorised(_selector_of(selector), spec)]
 
 
+def _structural(plan: NarrativePlan) -> list[str]:
+    """Paths of the plan's editable non-text, non-identity values, addressed like E leaves."""
+    found: list[str] = []
+
+    def visit(value: Any, prefix: str, collection: str, key: str) -> None:
+        if isinstance(value, dict):
+            for name, child in cast(dict[str, Any], value).items():
+                if name not in {"evidence", "id"}:
+                    visit(child, f"{prefix}/{name}", collection, name)
+        elif isinstance(value, list):
+            for index, child in enumerate(cast(list[Any], value)):
+                identifier = (
+                    cast(dict[str, Any], child).get("id") if isinstance(child, dict) else None
+                )
+                step = index if identifier is None else identifier
+                visit(child, f"{prefix}/{step}", collection, key)
+        elif not (
+            isinstance(value, str)
+            and (
+                key in TEXT_FIELDS
+                or (collection in INTERPRETIVE_FIELDS and key in {"value", "alternatives"})
+            )
+        ):
+            found.append(prefix)
+
+    for root, value in plan.model_dump(mode="json").items():
+        if root not in IMMUTABLE_ROOTS | {"constraints"}:
+            visit(value, root, root, root)
+    return found
+
+
+def _unrepresented(
+    plan: NarrativePlan, spec: RevisionSpec, leaves: dict[ViewPath, Leaf]
+) -> list[dict[str, Any]]:
+    """Each selected unit's unlocked structural values that have no leaf in E's view."""
+    represented = {"/".join(map(str, leaf.address)) for leaf in leaves.values()}
+    missing = [
+        path
+        for path in _structural(plan)
+        if path not in represented and not any(within(path, lock) for lock in spec.locks)
+    ]
+    rows: list[dict[str, Any]] = []
+    for unit in selected_units(spec):
+        values = [path for path in missing if within(path, unit)]
+        if values:
+            rows.append({"unit": unit, "values": values})
+    return rows
+
+
 def _selector_of(selector: str) -> str:
     parts = selector.split("/")
     return "/".join(parts[:-1]) if parts[-1].isdigit() else selector
@@ -255,7 +308,15 @@ def observe(
         tokens[leaves[path].start : leaves[path].end] = [MASK] * (
             leaves[path].end - leaves[path].start
         )
-    return Observation(view, tokens, leaves, editable, text_fields(plan, spec), ids)
+    return Observation(
+        view,
+        tokens,
+        leaves,
+        editable,
+        text_fields(plan, spec),
+        ids,
+        _unrepresented(plan, spec, leaves),
+    )
 
 
 def _value(value: Any, path: ViewPath) -> Any:
@@ -533,7 +594,26 @@ def _masked_values(observation: Observation, generated: list[int]) -> dict[str, 
     return values
 
 
+def _text_only(run: _Run, work: _Work) -> NarrativePlan:
+    """No selected structure is editable: the source, with only the text manifest reset."""
+    work.status = "text-only"
+    content = run.record.before.model_dump(mode="json")
+    for selector in run.observation.text_fields:
+        replace_text(content, selector, PLACEHOLDER)
+    try:
+        structure = NarrativePlan.model_validate(content)
+    except ValidationError as error:
+        raise StepFailedError(f"revision-{run.record.name}", str(error)) from error
+    errors = candidate_errors(run.record.before, structure, run.record.spec)
+    if errors:
+        raise StepFailedError(f"revision-{run.record.name}", "; ".join(errors))
+    return structure
+
+
 def _structure(run: _Run, work: _Work) -> NarrativePlan:
+    if not run.observation.editable:
+        # Learned inference would only reproduce clamped tokens: spend nothing on it.
+        return _text_only(run, work)
     started = time.monotonic()
     deadline = started + run.backend.max_seconds
     try:

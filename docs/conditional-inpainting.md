@@ -53,6 +53,13 @@ leaves are masked; identities, list order and counts, locked and unselected
 content stay observed and are clamped. Masked values keep their serialized width,
 so version 1 cannot add, remove or reorder records even where a whole-channel
 mask would let D do so. Selections E cannot represent at all fail preflight.
+Selected, unlocked structural values outside the target policy or the textless
+layout stay as the source has them; provenance and `inpainting/observation.json`
+list them per selected unit under `unrepresented`. When no selected structural
+value is representable but selected text is, as for a mask of only
+`knowledge_facts/lamp-fact/description`, E runs no learned inference: the planner
+completes the text manifest under the same checks, and provenance records backend
+status `text-only` with no attempts and no local work.
 
 Preflight hashes the checkpoint file once and binds its identity. Each attempt
 uses its own derived seed and is reserved before inference, and must run on that
@@ -79,7 +86,7 @@ The run keeps D's layout: `plan.json`, cards, `revisions/revision/provenance.jso
 `boundary.json`, `change-summary.md`, `source-plan.json` and `last-accepted/`.
 Provenance adds a versioned `backend` block with the checkpoint/parameter/
 representation identities, test-only status, target policy, conditions, guidance,
-sampling temperature, target-policy check, masked leaves, text manifest, every attempt's seed, work
+sampling temperature, target-policy check, masked leaves, unrepresented values, text manifest, every attempt's seed, work
 reservation, generated masked values and diagnostics, and total local
 tokens/attention cells/passes/time. LLM completion calls, tokens and costs remain
 in `calls`. `inpainting/observation.json` and `inpainting/attempt-NNN.json` keep
