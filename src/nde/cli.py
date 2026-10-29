@@ -20,6 +20,7 @@ from nde import (
 from nde.annotations import cli as annotation_cli
 from nde.conditional import completion as conditional_complete
 from nde.conditional import data as conditional_data
+from nde.conditional import ge_cli
 from nde.conditional import generation as conditional_generate
 from nde.conditional import layout as conditional_layout
 from nde.conditional import report as conditional_report
@@ -153,6 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         ("gd-report", gd_report.configure, "report a closed registered G-D batch"),
         ("gd", gd_cli.configure, "registered D-versus-C gate workflow"),
+        ("ge", ge_cli.configure, "registered E-versus-reference dev comparison"),
         ("control-report", controllability.configure, "report plan-only structural edit evidence"),
         ("diversity-report", diversity.configure, "compare structures across seeds"),
         ("compare-cd", cd_comparison.configure, "compare selected C and D on dev"),
@@ -381,6 +383,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "corpus": corpus_cli.run,
     "gd-report": gd_report.run,
     "gd": gd_cli.run,
+    "ge": ge_cli.run,
     "control-report": controllability.run,
     "diversity-report": diversity.run,
     "compare-cd": cd_comparison.run,

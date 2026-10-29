@@ -38,7 +38,7 @@
 | P4 | Masked revision, coarse-to-fine D, bounded critic, controls/diversity, G-D | [#48–55](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP4%5D%22), closed | [Revisions](revisions.md), [D](baseline-d.md), [G-D](gd.md) |
 | P5 | Provenance, splits, segmentation/features, independent extraction, pilot/review, exports and exemplars | [#56–65](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP5%5D%22), closed | [Corpus](corpus.md), [extraction](extraction.md), [G2](corpus-g2.md) |
 | P6 | Codec/tasks, datasets, CPU ML models, paired evaluation, audits/sweeps, G3 and augmentation | [#66–75](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP6%5D%22), open; tooling present | [Training](reconstruction-training.md), [experiments](reconstruction-experiments.md), [G3](reconstruction-evaluation.md) |
-| P7 | Conditional examples, variable layouts, brief-conditioned training with guidance, bounded generation, text completion, D/E inpainting, the Candidate E run pipeline and adherence/diversity/similarity reporting; G-E comparison not started | [#76–85](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP7%5D%22): #76–80 closed; #81–83 implemented, open pending acceptance; #84–85 open (29 October 2026) | [Data](conditional-data.md), [generation](conditional-generation.md), [inpainting](conditional-inpainting.md), [E](candidate-e.md), [evidence](conditional-report.md) |
+| P7 | Conditional examples, variable layouts, brief-conditioned training with guidance, bounded generation, text completion, D/E inpainting, the Candidate E run pipeline, adherence/diversity/similarity reporting and registered G-E preparation; G-E decision not started | [#76–85](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP7%5D%22): #76–80 closed; #81–84 implemented, open pending acceptance; #85 open (29 October 2026) | [Data](conditional-data.md), [generation](conditional-generation.md), [inpainting](conditional-inpainting.md), [E](candidate-e.md), [evidence](conditional-report.md), [G-E](ge.md) |
 
 Status above was checked against `main` at `47e25b6` and GitHub Issues on
 27 October 2026. The dated G0/G-instr results below remain historical records;
@@ -616,8 +616,10 @@ scientific G3 pass or real pretrained-model result is recorded here.
 **Implementation:** P7.1–P7.4 tooling and P7.5 reporting (#76–83) are
 implemented and verified on CPU fixture checkpoints only: the Candidate E run
 pipeline, D/E inpainting and the [condition-adherence, diversity and
-training-similarity report](conditional-report.md) are available, and the G-E
-comparison (#84–85) is not.
+training-similarity report](conditional-report.md) are available. The
+[registered G-E preparation](ge.md) (#84: readiness, protocol, bound dev run and
+owner review packet) is implemented; the G-E decision report (#85) is not, and
+no G-E protocol is registered.
 Real E experiments still require a genuine G3 pass; reconstruction software or
 synthetic criteria are insufficient, and E refuses non-fixture checkpoints
 without passed G3 evidence.

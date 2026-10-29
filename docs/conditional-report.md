@@ -223,7 +223,7 @@ protocol its evidence at the paths they recorded. Where those are not available,
 
 ## Use in the G-E comparison
 
-A registered G-E comparison binds the report `id` and reads `adherence`,
+A [registered G-E comparison](ge.md) binds the report `id` and reads `adherence`,
 `diversity`, `training_similarity`, `reference`, `realisation`, `pending` and
 `test_only`. Reports from fixture checkpoints are software evidence only. The
 report records evidence; the G-E decision, owner structural review and any
