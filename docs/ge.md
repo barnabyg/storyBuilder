@@ -125,9 +125,16 @@ This example registers nothing real; supply genuine identities and limits.
 - `judges` defaults to and only accepts `diagnostic_only`: model judges are never
   validated for this task here, and their agreement cannot replace owner review.
 - `iteration`: attempt 1, or the single development iteration (attempt 2) with
-  `previous_protocol` and a `change`. The iteration must keep the first attempt's
-  cohort, reference, criteria and owner review, must change E, and cannot follow
-  another iteration. A third attempt cannot be registered.
+  `previous_protocol` and a `change`. Registration binds attempt 2 to an attempt
+  1 that was run (its run claim exists) and records that protocol's and claim's
+  IDs. The iteration must keep the first attempt's whole frozen cohort (briefs
+  and checksums, split, repeat, run seed and slots), its reference identity, its
+  validator and structural criteria and its owner review, must change E, and
+  cannot point at another iteration. Registration checks one protocol and the
+  attempt it names; it cannot see other protocols, so it does not stop a fresh
+  attempt 1 or a second attempt 2 naming the same first attempt. Enforcing the
+  history across protocols (at most one iteration per first attempt, no reset to
+  a new attempt 1) belongs to the G-E decision.
 
 `register` refuses anything readiness blocks and writes a sealed `ge-protocol`
 record (`protocol_version` 1) with its paths rebased beside the protocol. Its

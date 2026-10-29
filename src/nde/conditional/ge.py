@@ -694,6 +694,14 @@ def _located(candidate: Record) -> Record:
     return candidate | {"checkpoint": candidate["checkpoint"] | {"path": None}}
 
 
+def _unlocated(reference: Record) -> Record:
+    """The reference identity without where its evidence is found from a protocol."""
+    return reference | {
+        name: None if reference[name] is None else reference[name] | {"path": None}
+        for name in ("c_selection", "gd_decision")
+    }
+
+
 def _iteration(
     registration: GERegistration, base: Path, frozen: Record, result: Evaluation
 ) -> Record:
@@ -713,14 +721,19 @@ def _iteration(
     earlier = GERegistration.model_validate(previous["registration"])
     if earlier.iteration.attempt != 1:
         raise ValueError("the development iteration must follow the first registered attempt")
+    claim = read_claim(path)
+    if claim is None or claim["protocol_id"] != previous["id"]:
+        raise ValueError("the first attempt was never run; there is nothing to iterate on")
+    result.files.add(claim_path(path))
+    record["previous"]["claim_id"] = claim["id"]
     unchanged = (
         earlier.test_only == registration.test_only
-        and earlier.reference.condition == registration.reference.condition
         and earlier.validator_comparison == registration.validator_comparison
         and earlier.structural_criterion == registration.structural_criterion
         and earlier.owner_review == registration.owner_review
-        and previous["frozen"]["cohort"]["briefs"] == frozen["cohort"]["briefs"]
-        and previous["frozen"]["cohort"]["repeat"] == frozen["cohort"]["repeat"]
+        # The whole cohort: briefs and their checksums, split, repeat, run seed and slots.
+        and previous["frozen"]["cohort"] == frozen["cohort"]
+        and _unlocated(previous["frozen"]["reference"]) == _unlocated(frozen["reference"])
     )
     if not unchanged:
         raise ValueError(

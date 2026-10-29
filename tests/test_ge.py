@@ -846,6 +846,22 @@ def test_the_single_development_iteration_is_bound_to_the_first_attempt(
     )
     assert "keeps the first attempt's" in rejected(changed, capsys)
     loosened.unlink()
+    # Nor can the cohort's seeds: another run seed is another cohort.
+    reseeded = changed / "reseeded"
+    reseeded.mkdir()
+    (reseeded / "ge.yaml").write_text(yaml.safe_dump(config | {"seed": 8}))
+    later = iteration | {"previous_protocol": os.path.relpath(registered.protocol, reseeded)}
+    registration(reseeded, registered, config="ge.yaml", iteration=later)
+    assert "keeps the first attempt's" in rejected(reseeded, capsys)
+    # An attempt 1 that was never run cannot be iterated on.
+    unrun = tmp_path / "unrun"
+    path = registration(unrun, registered, id="synthetic-test-only-ge-unrun")
+    assert ge_command("register", path, "--out", unrun / "protocol.json") == 0
+    (unrun / "next").mkdir()
+    shutil.copy2(changed / "ge.yaml", unrun / "next/ge.yaml")
+    first = {"attempt": 2, "previous_protocol": "../protocol.json", "change": "Raise guidance."}
+    registration(unrun / "next", registered, config="ge.yaml", iteration=first)
+    assert "was never run" in rejected(unrun / "next", capsys)
     path = registration(changed, registered, config="ge.yaml", iteration=iteration)
     assert ge_command("register", path, "--out", changed / "protocol.json") == 0
     second = read_sealed(changed / "protocol.json")
