@@ -702,6 +702,42 @@ def test_changed_checkpoints_runs_and_missing_results_are_stale(
     assert ge_command("verify", protocol, run) == 0
 
 
+@pytest.mark.ml
+def test_a_resealed_protocol_must_follow_from_its_registration(registered: Fixture) -> None:
+    """A protocol re-sealed and committed with edited criteria or sample does not check."""
+    original = read_sealed(registered.protocol)
+
+    def follows(section: str) -> str:
+        return f"protocol {section} does not follow from its registration and frozen evidence"
+
+    sample = original["owner_review"]["sample"]
+    edits: list[tuple[tuple[str, ...], Any, list[str]]] = [
+        (("criteria", "structural_criterion", "minimum_share"), 0.1, [follows("criteria")]),
+        (("owner_review", "sample"), sample[:1], [follows("owner_review")]),
+        (("owner_review", "estimated_minutes"), 1, [follows("owner_review")]),
+        (("held_out",), "anything", [follows("held_out")]),
+        (
+            ("frozen", "owner_sample"),
+            ["brief-02/r2"],
+            ["registered owner_sample differs from current evidence", follows("owner_review")],
+        ),
+    ]
+    for index, (keys, replacement, expected) in enumerate(edits):
+        value = copy.deepcopy(original)
+        del value["id"], value["version"]
+        target = value
+        for key in keys[:-1]:
+            target = target[key]
+        target[keys[-1]] = replacement
+        # Beside the original, so every registered path still resolves.
+        path = registered.root / f"resealed-{index}.json"
+        create_record(path, value)
+        commit(registered.root, path.name)
+        result = ge.check(path)
+        assert result["status"] == "blocked"
+        assert sorted(result["problems"]) == sorted(expected)
+
+
 def review_file(path: Path, packet: dict[str, Any], *, rating: str = "A", **fields: Any) -> Path:
     ratings = [
         {

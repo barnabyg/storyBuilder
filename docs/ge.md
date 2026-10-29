@@ -150,7 +150,9 @@ rules. Commit the protocol before running.
 `check` replays all of this against current evidence and requires the protocol
 to be committed and unchanged. A changed checkpoint, dataset, brief, selection,
 G-D or G3 replay, configuration, resource limit or protocol blocks it, and each
-reason is listed in `ge-check.json`.
+reason is listed in `ge-check.json`. It also rebuilds every other protocol
+section (criteria, owner sample and budget, rules) from the registration and the
+frozen evidence, so a protocol re-sealed with edited sections does not check.
 
 ## Registered run
 

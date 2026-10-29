@@ -826,30 +826,32 @@ def register(path: Path, out: Path) -> Record:
     result = evaluate(registration, folder)
     if result.problems:
         raise ValueError("G-E registration blocked: " + "; ".join(result.problems))
-    sample = result.frozen["owner_sample"]
+    return create_record(out, _protocol_content(registration, result.frozen))
+
+
+def _protocol_content(registration: GERegistration, frozen: Record) -> Record:
+    """Everything a protocol records, derived from its registration and frozen evidence."""
+    sample = frozen["owner_sample"]
     owner = registration.owner_review
-    return create_record(
-        out,
-        {
-            "kind": PROTOCOL_KIND,
-            "protocol_version": PROTOCOL_VERSION,
-            "name": registration.id,
-            "test_only": registration.test_only,
-            "scope": SCOPE,
-            "registration": registration.model_dump(mode="json"),
-            "frozen": result.frozen,
-            "criteria": {
-                "validator_comparison": registration.validator_comparison.model_dump(mode="json"),
-                "structural_criterion": registration.structural_criterion.model_dump(mode="json"),
-                "judges": registration.judges,
-            },
-            "owner_review": owner.model_dump(mode="json")
-            | {"sample": sample, "estimated_minutes": len(sample) * owner.minutes_per_item},
-            "stopping_rule": "fixed_dev_cohort_no_top_up",
-            "fail_action": FAIL_ACTION,
-            "held_out": HELD_OUT,
+    return {
+        "kind": PROTOCOL_KIND,
+        "protocol_version": PROTOCOL_VERSION,
+        "name": registration.id,
+        "test_only": registration.test_only,
+        "scope": SCOPE,
+        "registration": registration.model_dump(mode="json"),
+        "frozen": frozen,
+        "criteria": {
+            "validator_comparison": registration.validator_comparison.model_dump(mode="json"),
+            "structural_criterion": registration.structural_criterion.model_dump(mode="json"),
+            "judges": registration.judges,
         },
-    )
+        "owner_review": owner.model_dump(mode="json")
+        | {"sample": sample, "estimated_minutes": len(sample) * owner.minutes_per_item},
+        "stopping_rule": "fixed_dev_cohort_no_top_up",
+        "fail_action": FAIL_ACTION,
+        "held_out": HELD_OUT,
+    }
 
 
 def read_protocol(path: Path) -> Record:
@@ -901,9 +903,16 @@ def check(path: Path) -> Record:
         result["protocol_commit"] = committed(path)
     except ValueError as error:
         problems.append(str(error))
-    current = evaluate(
-        GERegistration.model_validate(protocol["registration"]), path.parent.resolve()
-    )
+    registration = GERegistration.model_validate(protocol["registration"])
+    # A re-sealed protocol must still be exactly what its registration and frozen
+    # evidence produce: criteria, owner sample and budget cannot be edited apart.
+    expected = _protocol_content(registration, protocol["frozen"])
+    problems += [
+        f"protocol {section} does not follow from its registration and frozen evidence"
+        for section in sorted((expected.keys() | protocol.keys()) - {"id", "version"})
+        if protocol.get(section) != expected.get(section)
+    ]
+    current = evaluate(registration, path.parent.resolve())
     result["authority"] = current.frozen.get("g3")
     problems += current.problems
     saved: Record = protocol["frozen"]
