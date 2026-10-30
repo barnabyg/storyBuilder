@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from nde.cli import main
-from nde.continuity.plan import PLAIN_STYLE_RULES
+from nde.continuity.plan import PLAIN_STYLE_RULES, ContinuityPlan
 from nde.continuity.story import NumberedStory
 from nde.stories.normalise import normalise
 from tests.conftest import REPO, write_config
@@ -191,6 +191,26 @@ def test_a_citation_of_a_paragraph_that_does_not_exist_is_sent_back(
     assert "paragraph 99 does not exist" in answered[1]
     assert stories(run_dir)[0]["status"] == "ok"
     assert flags_of(folder, INTRODUCTION) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Tom Reyes", "Tom Reyes"),
+        ("Tom", "Tom Reyes"),
+        ("Mr Reyes", "Tom Reyes"),
+        ("mr. reyes", "Tom Reyes"),
+        ("Tom Smith", None),
+        ("Mr Smith", None),
+        ("Mr", None),
+    ],
+)
+def test_a_name_finds_a_sheet_only_if_all_its_words_belong_to_that_person(
+    name: str, expected: str | None
+) -> None:
+    sheet = ContinuityPlan.model_validate(plan_reply()).sheet_for(name)
+
+    assert (None if sheet is None else sheet.name) == expected
 
 
 def test_the_checker_reads_numbered_paragraphs_under_scene_headings() -> None:

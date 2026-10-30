@@ -27,6 +27,14 @@ KNOWLEDGE_RULE = (
 )
 
 
+_TITLES = frozenset({"mr", "mrs", "ms", "miss", "dr", "sir", "lady", "captain", "officer"})
+
+
+def _name_words(name: str) -> set[str]:
+    """A person's name without titles, so "Ms Raman" can match "Priya Raman"."""
+    return {word.strip(".,") for word in name.casefold().split()} - _TITLES
+
+
 class CharacterSheet(Strict):
     name: str = Field(min_length=1, description="the character's full name")
     appearance: str = Field(min_length=1, description="what a stranger would notice about them")
@@ -102,9 +110,11 @@ class ContinuityPlan(Strict):
         for sheet in self.characters:
             if name.casefold() == sheet.name.casefold():
                 return sheet
-        words = set(name.casefold().split())
+        words = _name_words(name)
+        if not words:
+            return None
         for sheet in self.characters:
-            if words & set(sheet.name.casefold().split()):
+            if words <= _name_words(sheet.name):
                 return sheet
         return None
 
