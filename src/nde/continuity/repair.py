@@ -13,8 +13,10 @@ from nde.runs.config import PromptRef
 from nde.stories.normalise import normalise
 from nde.stories.pipeline import Step, StoryContext, derive_seed
 
-REPAIR_PROMPT = PromptRef(template="continuity_repair", version=1)
-REPAIR_VARIABLES = frozenset({"plan", "story", "passage", "problems", "rules"})
+REPAIR_PROMPT = PromptRef(template="continuity_repair", version=2)
+REPAIR_VARIABLES = frozenset({"plan", "story", "passage", "before", "after", "problems", "rules"})
+START_OF_STORY = "(This is the start of the story.)"
+END_OF_STORY = "(This is the end of the story.)"
 
 
 class RepairedPassage(Strict):
@@ -79,6 +81,8 @@ def repair_passage(
             "plan": render_plan(plan),
             "story": story.render(),
             "passage": passage,
+            "before": story.paragraph(number - 1) if number > 1 else START_OF_STORY,
+            "after": story.paragraph(number + 1) if number < len(story) else END_OF_STORY,
             "problems": _render_problems(flags),
             "rules": f"{KNOWLEDGE_RULE}\n\n{PLAIN_STYLE_RULES}",
         },

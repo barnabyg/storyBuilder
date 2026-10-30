@@ -31,8 +31,10 @@ config's `budget.per_run_usd`.
    whole story and the problems, and supplies new text for that passage alone. Code
    splices it in, so every other word stays as it was. The checks then run again. This
    repeats up to `repair_tries` times (a condition parameter, 2 by default) and stops
-   early if nothing is flagged or no text changes. Every try goes through the same
-   budget. Problems still found by the last check are reported as unresolved.
+   early if nothing is flagged or no text changes. The writer may give a passage back
+   unchanged if it is fine or any fix would make the story worse. Every try goes
+   through the same budget. Problems still found by the last check are reported as
+   unresolved.
 
 Automated checks guide repair and never establish story quality. Only the owner's
 reading does that.

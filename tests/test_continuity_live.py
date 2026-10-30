@@ -117,6 +117,27 @@ def test_the_real_model_catches_the_real_power_cut(tmp_path: Path) -> None:
     assert SOUR_AFTER_FOUR_MINUTES in {flag.passage for flag in flags}
 
 
+def test_the_real_model_does_not_flag_what_people_know_about_their_own_lives(
+    tmp_path: Path,
+) -> None:
+    # Passages the first version of the check wrongly flagged on brief-01.
+    story = NumberedStory(
+        (
+            "Martin laid the transfer papers on Ada's kitchen table. Ada's husband built the boat.",
+            '"The rent\'s overdue," he said. "There\'s another notice at home. Debt letters '
+            "beside the bread bin. I leave them there so I don't open them with the children "
+            'watching."',
+            "The cabin light dimmed, then brightened. Her husband had taken the fitting apart "
+            "twice. He had left it for the next wet afternoon.",
+        ),
+        (1, 1, 1),
+    )
+
+    flags = _read(tmp_path, "knowledge", _plan("Martin Rook", []), story)
+
+    assert flags == []
+
+
 def test_the_real_model_catches_priya_doing_the_sums_too_early(tmp_path: Path) -> None:
     story = NumberedStory(
         (

@@ -137,6 +137,29 @@ def test_the_repair_step_receives_the_sheets_the_plan_and_the_problem(
     assert "character_introduction: Tom appears with no introduction" in request
     assert f"Rewrite only this passage:\n\n{scene_text(2).split(chr(10) * 2)[0]}" in request
     assert "at most one simile or metaphor" in request
+    assert f"The paragraph before it reads:\n\n{scene_text(1).split(chr(10) * 2)[1]}" in request
+    assert f"The paragraph after it reads:\n\n{scene_text(2).split(chr(10) * 2)[1]}" in request
+
+
+def test_a_passage_given_back_unchanged_stays_reported_and_ends_the_repairs(
+    continuity_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    flagged = fake_continuity(UNINTRODUCED)
+    first_paragraph_of_scene_two = scene_text(2).split("\n\n")[0]
+
+    def declines(body: Json) -> Reply:
+        if "Rewrite only this passage" in last_user_message(body):
+            reply = {"replacement": first_paragraph_of_scene_two}
+            return completion(json.dumps(reply))
+        return flagged(body)
+
+    continuity_llm.default = declines
+
+    _, folder = run_continuity(tmp_path, continuity_llm, repair_tries=3)
+
+    assert _audit_requests(continuity_llm) == 1
+    assert (folder / "story.md").read_bytes() == (folder / "story.unrepaired.md").read_bytes()
+    assert len(result(folder)["unresolved_problems"]) == 1
 
 
 def test_repair_stops_at_the_fixed_number_of_tries_and_reports_what_is_left(
