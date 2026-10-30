@@ -142,7 +142,8 @@ def test_the_real_model_accepts_a_secret_learned_on_the_page_first(tmp_path: Pat
     story = NumberedStory(
         (
             'Mrs. Alcott leaned over the counter. "I sell the pills," she told Priya. "I get a '
-            'hundred a month. It pays my aide three days a week. I stretch my insulin past its label."',
+            "hundred a month. It pays my aide three days a week. I stretch my insulin past its "
+            'label."',
             PRIYA_KNOWS_THE_LEDGER,
         ),
         (1, 1),
