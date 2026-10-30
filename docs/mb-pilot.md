@@ -38,6 +38,9 @@ stays because editing it would break the approved checksum.
   Stop at the cap. An unfinished batch stays open and sealed, and is recorded as
   incomplete.
 - Reading starts at least 48 hours after the owner's last generating-code work.
+  The owner confirmed on 30 October 2026 that they do not work on the code, so no
+  wait applies. If `eval serve` warns about recent agent commits, the report records
+  that as a caveat.
 - Conditions stay hidden until all scores are complete and the batch is closed.
 
 ## Commands
