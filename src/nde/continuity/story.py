@@ -25,14 +25,25 @@ class NumberedStory:
         """Number `story`, already normalised, using the scene texts it was joined from.
 
         Normalising the joined story can drop a paragraph the per-scene pass kept, such
-        as a title-like first line. Any such difference lands on the last scene.
+        as a title-like first line, so each paragraph is matched by its text, in order.
+        A paragraph with no match stays in the scene before it.
         """
         paragraphs = _split(story)
-        mapped = [
-            number for number, text in enumerate(scene_texts, 1) for _ in _split(normalise(text))
+        written = [
+            (paragraph, number)
+            for number, text in enumerate(scene_texts, 1)
+            for paragraph in _split(normalise(text))
         ]
-        scenes = mapped[: len(paragraphs)]
-        scenes += [len(scene_texts)] * (len(paragraphs) - len(scenes))
+        scenes: list[int] = []
+        position = 0
+        current = 1
+        for paragraph in paragraphs:
+            for index in range(position, len(written)):
+                if written[index][0] == paragraph:
+                    current = written[index][1]
+                    position = index + 1
+                    break
+            scenes.append(current)
         return cls(tuple(paragraphs), tuple(scenes))
 
     def __len__(self) -> int:

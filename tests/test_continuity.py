@@ -8,6 +8,7 @@ import yaml
 from nde.cli import main
 from nde.continuity.plan import PLAIN_STYLE_RULES
 from nde.continuity.story import NumberedStory
+from nde.stories.normalise import normalise
 from tests.conftest import REPO, write_config
 from tests.continuity_support import (
     calls,
@@ -200,6 +201,16 @@ def test_the_checker_reads_numbered_paragraphs_under_scene_headings() -> None:
         story.render() == "--- Scene 1 ---\n\n[1] One.\n\n[2] Two.\n\n--- Scene 2 ---\n\n[3] Three."
     )
     assert story.text == "One.\n\nTwo.\n\nThree.\n"
+
+
+def test_a_paragraph_dropped_from_the_joined_story_does_not_shift_later_scenes() -> None:
+    # The per-scene pass drops the title; only the joined pass then sees the preamble.
+    first_scene = "Old Lamp\n\nHere is the story:\n\nOne."
+    joined = normalise(first_scene).strip() + "\n\nTwo."
+    story = NumberedStory.from_scenes(normalise(joined), [first_scene, "Two."])
+
+    assert story.paragraphs == ("One.", "Two.")
+    assert story.scenes == (1, 2)
 
 
 def test_the_command_runs_one_dev_brief_and_reports_where_everything_is(
