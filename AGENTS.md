@@ -44,3 +44,21 @@ one-question-at-a-time approach that worked in the G-schema review:
    and agent work, and record actual intervals. Preserve the inputs, feedback,
    approved versions and required replay evidence. Finish with the result and
    any remaining owner work clearly stated.
+
+## Live API testing
+
+As of 2026-10-30, agents may run live tests and small experiments against
+`openai` provider models without asking the owner first. Set
+`budget.per_run_usd` to 3 or less on every run. If a run needs more, ask the
+owner, who may well permit it.
+
+More capable OpenAI models may be used for this testing when the task benefits.
+Check the model ID and price against OpenAI's current lists first, and put the
+price in the config's `prices` table.
+
+This does not cover:
+
+- other paid providers such as DeepSeek, which still need owner approval;
+- `budget.allow_unpriced_models: true`, because those calls can't be costed;
+- preregistered or gate runs, whose registered models, budgets, samples and
+  rules still apply.
