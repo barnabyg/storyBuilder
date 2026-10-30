@@ -83,6 +83,77 @@ def test_exact_saved_cohort_is_ready_and_has_inspectable_reports(
     assert "ready" in (tmp_path / "admission/readiness.md").read_text(encoding="utf-8")
 
 
+def batch_command(cohort_run: tuple[Path, Path, Path], tmp_path: Path, *extra: str) -> list[str]:
+    _, _, run_dir = cohort_run
+    return [
+        "eval",
+        "batch",
+        "gate",
+        "--from",
+        str(run_dir),
+        "A",
+        "--from",
+        str(run_dir),
+        "B",
+        "--batches-dir",
+        str(tmp_path / "batches"),
+        "--rubric-dir",
+        str(REPO / "benchmark/rubric"),
+        "--optional-scores",
+        *extra,
+    ]
+
+
+def test_batch_with_a_cohort_stores_readiness_only_for_an_admitted_cohort(
+    cohort_run: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    cohort, benchmark, _ = cohort_run
+    command = batch_command(
+        cohort_run, tmp_path, "--cohort", str(cohort), "--benchmark", str(benchmark)
+    )
+    assert main(command) == 0
+    assert (tmp_path / "batches/gate/sealed/readiness/readiness.json").is_file()
+
+
+def test_batch_with_a_cohort_refuses_an_unready_cohort_without_building(
+    cohort_run: tuple[Path, Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cohort, benchmark, _ = cohort_run
+    raw = json.loads(cohort.read_text(encoding="utf-8"))
+    raw["brief_checksums"]["brief-01"] = "0" * 64
+    cohort.write_text(json.dumps(raw), encoding="utf-8")
+    command = batch_command(
+        cohort_run, tmp_path, "--cohort", str(cohort), "--benchmark", str(benchmark)
+    )
+    assert main(command) == 2
+    assert "not ready" in capsys.readouterr().err
+    assert not (tmp_path / "batches/gate").exists()
+
+
+@pytest.mark.parametrize("flag", ["--cohort", "--benchmark"])
+def test_batch_needs_a_cohort_and_benchmark_together(
+    cohort_run: tuple[Path, Path, Path],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    flag: str,
+) -> None:
+    assert main(batch_command(cohort_run, tmp_path, flag, str(tmp_path))) == 2
+    assert "together" in capsys.readouterr().err
+
+
+def test_batch_reports_an_unreadable_cohort(
+    cohort_run: tuple[Path, Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _, benchmark, _ = cohort_run
+    broken = tmp_path / "broken.json"
+    broken.write_text("{", encoding="utf-8")
+    command = batch_command(
+        cohort_run, tmp_path, "--cohort", str(broken), "--benchmark", str(benchmark)
+    )
+    assert main(command) == 2
+    assert "cannot read cohort" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

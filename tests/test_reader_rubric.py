@@ -382,6 +382,68 @@ def test_the_primary_score_is_required_and_the_rest_stays_optional(
     assert client.post("/pairs/1", data=form, follow_redirects=False).status_code == 303
 
 
+def _required_batch(tmp_path: Path, runs: tuple[Path, Path]) -> Path:
+    return build_batch(
+        tmp_path,
+        runs,
+        "demo",
+        "--optional-scores",
+        "--primary-score",
+        "coherence",
+        "--require-score",
+        "coherence",
+        "--require-score",
+        "originality",
+    )
+
+
+def test_required_scores_block_a_judgement_and_the_rest_stay_optional(
+    runs: tuple[Path, Path], tmp_path: Path
+) -> None:
+    client = reader(_required_batch(tmp_path, runs))
+    page = client.get("/pairs/1").text
+    assert 'name="score-a-originality" value="1" required' in page
+    assert 'name="score-a-pacing" value="1" required' not in page
+
+    form = {"preferred": "A", "strength": "1", "score-a-coherence": "4", "score-b-coherence": "2"}
+    missing = client.post("/pairs/1", data=form)
+    assert missing.status_code == 422
+    problems = missing.text.split('<div class="problems">', 1)[1].split("</div>", 1)[0]
+    assert "score-a-originality" in problems
+    assert "score-b-originality" in problems
+
+    complete = form | {"score-a-originality": "3", "score-b-originality": "3"}
+    assert client.post("/pairs/1", data=complete, follow_redirects=False).status_code == 303
+
+
+def test_the_report_lists_required_scores_by_pair_with_the_mean_paired_difference(
+    runs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    batch = _required_batch(tmp_path, runs)
+    key = _key(batch)
+    client = reader(batch)
+    # Each intact story is scored 2 above its pair on coherence and 1 below on originality,
+    # whichever side it was shown on.
+    for number, pair in enumerate(key["pairs"], start=1):
+        form = {"preferred": "A", "strength": "1"}
+        for side in ("a", "b"):
+            intact = pair[side]["condition"] == "intact"
+            form[f"score-{side}-coherence"] = "5" if intact else "3"
+            form[f"score-{side}-originality"] = "2" if intact else "3"
+        assert client.post(f"/pairs/{number}", data=form, follow_redirects=False).status_code == 303
+    client.post("/close")
+
+    report = _report(tmp_path, capsys)
+
+    assert "preference and strength, coherence, originality required" in report
+    assert "## Paired scores: coherence" in report
+    assert "## Paired scores: originality" in report
+    assert "| intact | control | intact minus control |" in report
+    assert f"| 1 | {key['pairs'][0]['brief']} | 5 | 3 | +2 |" in report
+    assert "Mean paired difference (intact minus control): +2.00 over 4 pairs." in report
+    assert "Mean paired difference (intact minus control): -1.00 over 4 pairs." in report
+
+
 def test_an_unknown_primary_score_is_rejected(
     runs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

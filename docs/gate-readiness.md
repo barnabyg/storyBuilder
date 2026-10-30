@@ -39,9 +39,10 @@ count, including repairs, length regeneration and revisions. Cache hits keep
 experimental tokens and add zero new provider spend. Matching uses the registered
 fraction of the larger budget, inclusive at the boundary.
 
-For strict programmatic batch creation use `nde.eval.readiness.build_gate_batch`
-with `GateCohort`, benchmark path, two `Source` objects and `GateBatchSettings`.
-This rechecks admission immediately before creating the sealed batch and stores
-its readiness evidence under `sealed/readiness/`. The ordinary `nde eval batch`
-intersection behaviour is unchanged. Readiness alone does not validate a
+For strict batch creation add `--cohort cohort.json --benchmark benchmark` to
+`nde eval batch`, or call `nde.eval.readiness.build_gate_batch` with `GateCohort`,
+benchmark path, two `Source` objects and `GateBatchSettings`. Both recheck
+admission immediately before creating the sealed batch and store its readiness
+evidence under `sealed/readiness/`. Without `--cohort`, `nde eval batch` keeps its
+ordinary intersection behaviour. Readiness alone does not validate a
 scientific protocol, establish a passed prerequisite gate or certify blinding.

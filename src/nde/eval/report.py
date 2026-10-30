@@ -187,6 +187,42 @@ def _guess_section(revealed: _Revealed) -> list[str]:
     return lines
 
 
+def _required_scores_section(revealed: _Revealed) -> list[str]:
+    """Each pair's required scores, with the mean paired difference between the conditions."""
+    first, second = revealed.names
+    lines: list[str] = []
+    for dimension in revealed.view.required_score_dimensions:
+        differences: list[int] = []
+        rows: list[str] = []
+        for (number, judgement, a, _), pair in zip(
+            revealed.numbered(), revealed.key.pairs, strict=True
+        ):
+            if judgement.a is None or judgement.b is None:
+                continue
+            by_condition = {
+                a: judgement.a.scores[dimension],
+                (second if a == first else first): judgement.b.scores[dimension],
+            }
+            difference = by_condition[first] - by_condition[second]
+            differences.append(difference)
+            rows.append(
+                f"| {number} | {pair.brief} | {by_condition[first]} | {by_condition[second]} "
+                f"| {difference:+d} |"
+            )
+        lines += [
+            f"## Paired scores: {dimension}",
+            "",
+            f"| Pair | Brief | {first} | {second} | {first} minus {second} |",
+            "| --- | --- | --- | --- | --- |",
+            *rows,
+            "",
+            f"Mean paired difference ({first} minus {second}): "
+            f"{sum(differences) / len(differences):+.2f} over {len(differences)} pairs.",
+            "",
+        ]
+    return lines
+
+
 def _pairs_section(revealed: _Revealed) -> list[str]:
     lines = [
         "## Pairs (key revealed)",
@@ -211,13 +247,15 @@ def render_report(batch: Path) -> str:
     closed = read_closed(batch)
     key = revealed.key
     sources = "; ".join(f"{revealed.label(s)} from `{s.run}`" for s in key.sources)
+    required = revealed.view.required_score_dimensions
+    required_marks = ", ".join(["preference and strength", *required])
     lines = [
         f"# Blind batch report: {batch.name}",
         "",
         f"- **Pairs:** {len(key.pairs)}",
         f"- **Sources:** {sources}",
         f"- **Rubric:** {f'v{key.rubric_version}' if key.rubric_version else 'none'}",
-        "- **Marks:** preference and strength required; rubric scores, tags and the guess "
+        f"- **Marks:** {required_marks} required; other rubric scores, tags and the guess "
         "optional, so the secondary sections summarise only what was given"
         if revealed.view.optional_scores
         else "- **Marks:** all required",
@@ -228,6 +266,7 @@ def render_report(batch: Path) -> str:
     primary = revealed.view.primary_dimension
     if primary is not None:
         lines += _primary_section(revealed, primary)
+    lines += _required_scores_section(revealed)
     lines += _preferences(revealed)
     rubric = revealed.view.rubric
     if rubric is not None:

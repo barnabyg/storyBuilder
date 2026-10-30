@@ -66,6 +66,21 @@ def configure(evaluation: argparse.ArgumentParser) -> None:
         metavar="DIMENSION",
         help="a rubric dimension that is always required and leads the report, e.g. coherence",
     )
+    build.add_argument(
+        "--require-score",
+        metavar="DIMENSION",
+        action="append",
+        default=[],
+        help="a rubric dimension always required for both stories and reported pair by pair; "
+        "repeat for each",
+    )
+    build.add_argument(
+        "--cohort",
+        type=Path,
+        help="a registered cohort JSON: build only if every expected pair passes strict "
+        "readiness (needs --benchmark)",
+    )
+    build.add_argument("--benchmark", type=Path, help="the benchmark folder --cohort registers")
     _batches_dir_option(build)
 
     serve = sub.add_parser("serve", help="open the blind reader on localhost")
@@ -109,15 +124,29 @@ def _build(args: argparse.Namespace) -> int:
     if len(sources) != 2:  # noqa: PLR2004 - a batch compares exactly two sources
         print("nde eval batch: give --from exactly twice", file=sys.stderr)
         return EXIT_USAGE
+    if (args.cohort is None) != (args.benchmark is None):
+        print("nde eval batch: give --cohort and --benchmark together", file=sys.stderr)
+        return EXIT_USAGE
     first, second = (batches.Source(Path(run), condition) for run, condition in sources)
-    rubric = load_rubric(args.rubric_dir, args.rubric_version)
-    path = batches.build_batch(
-        args.batches_dir,
-        args.name,
-        (first, second),
-        scoring=batches.Scoring(rubric, optional=args.optional_scores, primary=args.primary_score),
-        seed=args.seed,
+    scoring = batches.Scoring(
+        load_rubric(args.rubric_dir, args.rubric_version),
+        optional=args.optional_scores,
+        primary=args.primary_score,
+        required_dimensions=tuple(args.require_score),
     )
+    if args.cohort is None:
+        path = batches.build_batch(
+            args.batches_dir, args.name, (first, second), scoring=scoring, seed=args.seed
+        )
+    else:
+        try:
+            cohort = readiness.GateCohort.model_validate_json(
+                args.cohort.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError) as error:
+            raise batches.BatchError(f"cannot read cohort {args.cohort}: {error}") from error
+        settings = readiness.GateBatchSettings(args.batches_dir, args.name, scoring, args.seed)
+        path = readiness.build_gate_batch(cohort, args.benchmark, (first, second), settings)
     pairs = len(batches.read_view(path).pairs)
     print(f"built batch {args.name!r}: {pairs} pairs in {path}")
     print(f"read it with: uv run nde eval serve --batch {args.name}")

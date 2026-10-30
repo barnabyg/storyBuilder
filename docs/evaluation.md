@@ -44,6 +44,13 @@ uv run nde eval batch <name> --from <run dir> <condition> --from <run dir> <cond
   count against the first condition. With a judge panel, **Judges on the
   primary measure** compares each judge's rubric-mode picks with yours.
   Structure-focused gates use `coherence` this way (plan §4).
+- `--require-score <dimension>` (repeatable) requires that dimension for both
+  stories in every pair, even with `--optional-scores`. The report lists those
+  scores pair by pair, with the mean paired difference between the conditions.
+- `--cohort <file> --benchmark <folder>` builds the batch only when every pair in
+  a registered cohort passes [strict readiness](gate-readiness.md), and stores
+  that evidence under `sealed/readiness/`. It replaces the default, which leaves
+  out failed pairs. Run a protocol-bound G1 through `nde eval g1-batch` instead.
 
 A batch lives in `batches/<name>/` (gitignored; change it with
 `--batches-dir` or `NDE_BATCHES`):
