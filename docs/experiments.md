@@ -217,6 +217,7 @@ an equal total budget. See [candidate-e.md](candidate-e.md#comparisons-and-the-r
 | `baseline_b_scrambled` | B-scrambled (gate G-instr) | B's outline (the same cached call), scenes shuffled with a seeded permutation that is never the original order, then fresh prose through the shared prose contract; see [instrument-check.md](instrument-check.md) |
 | `baseline_c`, `baseline_d` | Baseline C, Candidate D | see [baseline-c.md](baseline-c.md) and [baseline-d.md](baseline-d.md) |
 | `candidate_e` | Candidate E | a learned conditional proposal on a local checkpoint, hybrid text completion on `planner`, then C's ledger and shared prose; see [candidate-e.md](candidate-e.md) |
+| `continuity` | Continuity (dev briefs only) | character sheets and a scene clock on `planner`, shared prose under plain-style rules, then checks on `critic` and targeted repair on `prose`; see [continuity.md](continuity.md) |
 
 Parameters: `baseline_a` takes `prompt` (default `{template: story_a,
 version: 1}`); `baseline_b` takes `outline_prompt` (default
@@ -297,7 +298,9 @@ A pipeline is a subclass of `nde.stories.pipeline.Pipeline` with:
   `None` if there are none);
 - `write(ctx, plan, seed=...)`: the prose calls; returns the raw story text.
   Length control may call it several times with different seeds, so it must
-  not change the plan.
+  not change the plan;
+- `finish(ctx, plan, story, attempt=...)`, optional: work on the chosen story
+  after length control, returning its final text. Most pipelines have none.
 
 Every call goes through the `StoryContext`: `ctx.complete(step, seed=...)` and
 `ctx.structured(step, Model, seed=...)` take a `Step` (its name in

@@ -17,6 +17,8 @@ then produce a [protocol-bound G1 decision](docs/g1-decision.md) after closure.
 [G1 and its one retest did not pass](docs/g1-four-pairs.md) on 30 October 2026, so the
 diffusion track has stopped: the schema, benchmark, harness and planner are the result.
 Phase 6 and 7 tooling below remains, tested on fixtures only.
+A separate exploratory attempt to fix the defects the owner found while reading writes
+[continuity stories](docs/continuity.md) from character sheets and a scene clock.
 
 ## Setup
 

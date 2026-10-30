@@ -9,6 +9,8 @@ phases:
 - `write` makes the prose calls and returns the raw story text. Length control
   calls it again with a new seed when the story is out of range.
 
+A pipeline may also work on the chosen story afterwards, in `finish`.
+
 Every call goes through a `StoryContext`, which records the brief, condition
 and step it served, and keeps intermediate outputs beside the story.
 """
