@@ -1,7 +1,8 @@
-"""The continuity pipeline: sheets first, then prose, checks and a saved inspection record."""
+"""The continuity pipeline: sheets first, then prose, checks, repair and an inspection record."""
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any, ClassVar, Self, override
 
 from pydantic import Field, JsonValue
@@ -17,10 +18,18 @@ from nde.continuity.plan import (
     continuity_plan_model,
     scene_specs,
 )
+from nde.continuity.repair import (
+    REPAIR_PROMPT,
+    REPAIR_VARIABLES,
+    Change,
+    group_by_passage,
+    repair_passage,
+)
 from nde.continuity.story import NumberedStory
 from nde.llm.config import Strict
 from nde.prose.scenes import SCENE_VARIABLES, scene_step, write_scenes
 from nde.runs.config import PromptRef, RoleName
+from nde.runs.records import STORY_FILE
 from nde.stories.baseline_a import BRIEF_VARIABLES, brief_variables
 from nde.stories.normalise import word_count
 from nde.stories.pipeline import ATTEMPTS, Pipeline, Step, StoryContext, TemplateNeed
@@ -47,6 +56,9 @@ AUDITS: tuple[Audit[Any], ...] = (
 # The record of the whole run for a person to inspect, and its readable summary.
 RESULT_FILE = "continuity.json"
 SUMMARY_FILE = "summary.md"
+REPAIRS_FILE = "repairs.json"
+# The story as first written, before any repair.
+UNREPAIRED_FILE = "story.unrepaired.md"
 QUALITY_NOTE = (
     "Automated checks are diagnostics that guide repair. Only the owner's reading "
     "establishes story quality."
@@ -57,6 +69,8 @@ class ContinuityParams(Strict):
     plan_prompt: PromptRef = Field(
         default_factory=lambda: PromptRef(template="continuity_plan", version=1)
     )
+    # Rounds of repair after the first check; each repairs every flagged passage, then rechecks.
+    repair_tries: int = Field(default=2, ge=0)
 
 
 def _dumps(value: object) -> str:
@@ -80,26 +94,103 @@ def _cost(ctx: StoryContext) -> dict[str, float]:
     }
 
 
-def _summary(plan: ContinuityPlan, story: NumberedStory, flags: Sequence[Flag], cost: float) -> str:
-    lines = [
-        f"# {plan.title}",
-        "",
-        f"Words: {word_count(story.text)}. Cost: US${cost:.4f}.",
-        "",
-        QUALITY_NOTE,
-        "",
-        "## Characters",
-        "",
-        *(f"- {sheet.name}, enters in scene {sheet.enters_scene}" for sheet in plan.characters),
-        "",
-        "## Flagged problems",
-        "",
-    ]
+def _flag_lines(flags: list[Flag]) -> list[str]:
     if not flags:
-        lines.append("None.")
+        return ["None."]
+    lines: list[str] = []
     for flag in flags:
         lines += [f"- **{flag.problem_type}:** {flag.reason}", f"  > {flag.passage}"]
-    return "\n".join(lines) + "\n"
+    return lines
+
+
+def _change_lines(changes: list[Change]) -> list[str]:
+    if not changes:
+        return ["None."]
+    lines: list[str] = []
+    for change in changes:
+        why = "; ".join(flag.reason for flag in change.problems)
+        lines += [
+            f"- **Try {change.attempt}, paragraph {change.paragraph}:** {why}",
+            f"  - Before: {change.before}",
+            f"  - After: {change.after}",
+        ]
+    return lines
+
+
+def _dump_flags(flags: list[Flag]) -> list[dict[str, Any]]:
+    return [flag.model_dump(mode="json") for flag in flags]
+
+
+@dataclass
+class _Progress:
+    """Where the checks and repairs have got to, kept on file after every step."""
+
+    plan: ContinuityPlan
+    story: NumberedStory
+    # The flags each check round found, the first round first.
+    rounds: list[list[Flag]] = field(default_factory=list[list[Flag]])
+    changes: list[Change] = field(default_factory=list[Change])
+    finished: bool = False
+
+    def keep(self, ctx: StoryContext) -> None:
+        """Save everything, so that a budget stop part-way still shows what happened."""
+        ctx.files[STORY_FILE] = self.story.text
+        cost = _cost(ctx)
+        found = self.rounds[0] if self.rounds else []
+        unresolved = self.rounds[-1] if self.rounds else []
+        ctx.keep(REPAIRS_FILE, _dumps([change.model_dump(mode="json") for change in self.changes]))
+        ctx.keep(
+            RESULT_FILE,
+            _dumps(
+                {
+                    "brief": ctx.brief.id,
+                    "title": self.plan.title,
+                    "story": STORY_FILE,
+                    "character_sheets": "character-sheets.json",
+                    "finished": self.finished,
+                    "flagged_problems": _dump_flags(found),
+                    "flags_by_round": [_dump_flags(flags) for flags in self.rounds],
+                    "repairs": REPAIRS_FILE,
+                    "unresolved_problems": _dump_flags(unresolved),
+                    "cost": cost,
+                    "note": QUALITY_NOTE,
+                }
+            ),
+        )
+        ctx.keep(SUMMARY_FILE, self._summary(cost["usd"], found, unresolved))
+
+    def _summary(self, cost: float, found: list[Flag], unresolved: list[Flag]) -> str:
+        lines = [
+            f"# {self.plan.title}",
+            "",
+            f"Words: {word_count(self.story.text)}. Cost: US${cost:.4f}.",
+            "",
+            QUALITY_NOTE,
+            "",
+        ]
+        if not self.finished:
+            lines += ["**This run stopped before the checks and repairs finished.**", ""]
+        lines += [
+            "## Characters",
+            "",
+            *(
+                f"- {sheet.name}, enters in scene {sheet.enters_scene}"
+                for sheet in self.plan.characters
+            ),
+            "",
+            "## Flagged problems, first check",
+            "",
+            *_flag_lines(found),
+            "",
+            "## Repairs",
+            "",
+            *_change_lines(self.changes),
+            "",
+            "## Unresolved problems, last check",
+            "",
+            *_flag_lines(unresolved),
+        ]
+        return "\n".join(lines) + "\n"
 
 
 class Continuity(Pipeline[ContinuityPlan]):
@@ -119,6 +210,7 @@ class Continuity(Pipeline[ContinuityPlan]):
             TemplateNeed(self.params.plan_prompt, BRIEF_VARIABLES),
             TemplateNeed(SCENE_PROMPT, SCENE_VARIABLES),
             *(TemplateNeed(audit.prompt, AUDIT_VARIABLES) for audit in AUDITS),
+            TemplateNeed(REPAIR_PROMPT, REPAIR_VARIABLES),
         ]
 
     @override
@@ -144,26 +236,39 @@ class Continuity(Pipeline[ContinuityPlan]):
             ctx.files[f"{ATTEMPTS}/{attempt + 1}/{scene_step(index)}.md"]
             for index in range(len(plan.scenes))
         ]
-        numbered = NumberedStory.from_scenes(story, scene_texts)
-        flags = [
-            flag
-            for audit in AUDITS
-            for flag in run_audit(ctx, audit, plan, numbered, round_number=0)
-        ]
-        cost = _cost(ctx)
-        ctx.keep(
-            RESULT_FILE,
-            _dumps(
-                {
-                    "brief": ctx.brief.id,
-                    "title": plan.title,
-                    "story": "story.md",
-                    "character_sheets": "character-sheets.json",
-                    "flagged_problems": [flag.model_dump(mode="json") for flag in flags],
-                    "cost": cost,
-                    "note": QUALITY_NOTE,
-                }
-            ),
+        ctx.keep(UNREPAIRED_FILE, story)
+        progress = _Progress(plan, NumberedStory.from_scenes(story, scene_texts))
+        progress.keep(ctx)
+        self._check(ctx, progress, 0)
+        for number in range(1, self.params.repair_tries + 1):
+            if not progress.rounds[-1] or not self._repair(ctx, progress, number):
+                break
+            self._check(ctx, progress, number)
+        progress.finished = True
+        progress.keep(ctx)
+        return progress.story.text
+
+    def _check(self, ctx: StoryContext, progress: _Progress, round_number: int) -> None:
+        progress.rounds.append(
+            [
+                flag
+                for audit in AUDITS
+                for flag in run_audit(
+                    ctx, audit, progress.plan, progress.story, round_number=round_number
+                )
+            ]
         )
-        ctx.keep(SUMMARY_FILE, _summary(plan, numbered, flags, cost["usd"]))
-        return story
+        progress.keep(ctx)
+
+    def _repair(self, ctx: StoryContext, progress: _Progress, attempt: int) -> bool:
+        """One try at every flagged passage; returns whether any text changed."""
+        changed = False
+        for flags in group_by_passage(progress.rounds[-1]):
+            repaired = repair_passage(ctx, progress.plan, progress.story, flags, attempt=attempt)
+            if repaired is None:
+                continue
+            progress.story, change = repaired
+            progress.changes.append(change)
+            changed = changed or change.before != change.after
+            progress.keep(ctx)
+        return changed

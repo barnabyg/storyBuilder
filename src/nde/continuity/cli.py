@@ -27,5 +27,6 @@ def run_brief(brief: str, config: Path, options: RunOptions) -> tuple[str, str]:
     if result_path.is_file():
         result = json.loads(result_path.read_text(encoding="utf-8"))
         lines.append(f"flagged problems: {len(result['flagged_problems'])}")
+        lines.append(f"unresolved after repair: {len(result['unresolved_problems'])}")
         lines.append(f"cost: US${result['cost']['usd']:.4f}")
     return status, "\n".join(lines)

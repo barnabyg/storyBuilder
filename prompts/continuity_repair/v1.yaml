@@ -1,0 +1,30 @@
+system: >-
+  You are a careful fiction editor. You fix one passage of a finished story and
+  change nothing else. You answer with a single JSON object and no other text.
+user: |-
+  This is the plan the story was written from:
+
+  $plan
+
+  This is the whole story, with numbered paragraphs, for reference:
+
+  $story
+
+  Rewrite only this passage:
+
+  $passage
+
+  It has these problems:
+
+  $problems
+
+  Fix them with the smallest change that works, using only the character sheets,
+  the plan and what the story has already shown. The rest of the story will stay
+  exactly as it is, so the new text must still fit what comes before and after it.
+  If a character knows too much, let them find out here or take away what they know.
+  If an event is too fast or too slow, change what is shown or how much time passes.
+  If a character is not introduced, introduce them here as their sheet says.
+
+  $rules
+
+  Give the new text for the passage as one paragraph, with no line breaks.

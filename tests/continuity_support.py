@@ -8,7 +8,7 @@ from typing import Any
 from tests.fake_openai import FakeOpenAI, Json, Reply, completion
 from tests.stories import jsonl, last_user_message, run, stories, story_config
 
-CONTINUITY = {"name": "continuity", "pipeline": "continuity"}
+CONTINUITY: dict[str, Any] = {"name": "continuity", "pipeline": "continuity"}
 BRIEF = "brief-01"
 
 
@@ -90,6 +90,8 @@ def fake_continuity(audits: Audits | None = None) -> Callable[[Json], Reply]:
         if "Now write scene" in message:
             number = int(message.split("Now write scene ")[1].split(" ")[0])
             return completion(scene_text(number), completion_tokens=400)
+        if "Rewrite only this passage" in message:
+            return completion(json.dumps({"replacement": "A repaired paragraph."}))
         for phrase, answer in answers.items():
             if phrase in message:
                 return completion(json.dumps(answer))
@@ -98,17 +100,19 @@ def fake_continuity(audits: Audits | None = None) -> Callable[[Json], Reply]:
     return reply
 
 
-def continuity_config(base_url: str, **stories_section: Any) -> dict[str, Any]:
-    config = story_config(
-        base_url, [CONTINUITY], briefs={"split": "dev", "ids": [BRIEF]}, **stories_section
-    )
+def continuity_config(base_url: str, *, repair_tries: int = 0) -> dict[str, Any]:
+    condition = CONTINUITY | {"params": {"repair_tries": repair_tries}}
+    config = story_config(base_url, [condition], briefs={"split": "dev", "ids": [BRIEF]})
     config["roles"]["critic"] = {"provider": "fake", "model": "fake-model", "params": {}}
     return config
 
 
-def run_continuity(tmp_path: Path, fake: FakeOpenAI, expect: int = 0) -> tuple[Path, Path]:
+def run_continuity(
+    tmp_path: Path, fake: FakeOpenAI, *, repair_tries: int = 0, expect: int = 0
+) -> tuple[Path, Path]:
     """Run the pipeline on the fake; returns the run directory and the story's folder."""
-    run_dir = run(tmp_path, continuity_config(fake.base_url), expect=expect)
+    config = continuity_config(fake.base_url, repair_tries=repair_tries)
+    run_dir = run(tmp_path, config, expect=expect)
     [record] = stories(run_dir)
     return run_dir, run_dir / record["path"]
 

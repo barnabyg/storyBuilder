@@ -27,6 +27,12 @@ config's `budget.per_run_usd`.
 3. **Check.** A model reads the chosen story with numbered paragraphs and reports
    what it finds, citing paragraph numbers. Plain code then compares that reading
    with the plan and decides what to flag.
+4. **Repair.** For each flagged passage, the writer gets the sheets, the plan, the
+   whole story and the problems, and supplies new text for that passage alone. Code
+   splices it in, so every other word stays as it was. The checks then run again. This
+   repeats up to `repair_tries` times (a condition parameter, 2 by default) and stops
+   early if nothing is flagged or no text changes. Every try goes through the same
+   budget. Problems still found by the last check are reported as unresolved.
 
 Automated checks guide repair and never establish story quality. Only the owner's
 reading does that.
@@ -37,9 +43,11 @@ The story's folder, `stories/continuity/<brief>/r1/` in the run directory, holds
 
 | File | Contents |
 | --- | --- |
-| `story.md` | the story |
-| `summary.md` | a readable summary: length, cost, characters and problems |
-| `continuity.json` | the same record for tools, with the full flagged-problem list and cost |
+| `story.md` | the story, after any repairs |
+| `story.unrepaired.md` | the story as first written |
+| `summary.md` | a readable summary: length, cost, characters, problems and repairs |
+| `continuity.json` | the same record for tools: the first check's `flagged_problems`, `flags_by_round`, `unresolved_problems`, cost, and `finished`, which stays false if a budget stop ended the run early |
+| `repairs.json` | each change, with the problems it addressed and the paragraph before and after |
 | `character-sheets.json`, `plan.json` | the sheets and the whole plan |
 | `style-rules.md` | the plain-style rules the writer received |
 | `knowledge.json` | scene by scene, what each character acted on and how they learned it |
