@@ -42,11 +42,14 @@ generated on 30 October by run
 strict readiness. They were first registered as a
 [development pilot](../benchmark/prereg/dev-mb-pilot-20261027.txt) that could not
 pass G1. Those approved records stay unchanged as history, and the G1 protocol
-supersedes that limit. The 30 frozen test briefs stay untouched.
+supersedes that limit. The 30 frozen test briefs stay untouched. The owner read other
+stories from these four briefs during G-instr on 20 October, so the premises may feel
+familiar.
 
-G1 binds its stories through `nde eval g1-run`, which replays the same config from
-the response cache with no provider spend. The story checksums must match the
-original run.
+G1 binds its stories through `nde eval g1-run`. Run
+`20261030T153611Z-dev-M-B-pilot-20261027-v1-c27ddd` replayed the same config entirely
+from the response cache: 145 calls, no provider spend, and the same eight story
+checksums as the original run.
 
 ## Reading
 
