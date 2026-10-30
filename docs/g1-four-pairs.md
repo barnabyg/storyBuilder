@@ -25,6 +25,39 @@ to 17 whole-story revision calls per brief, while C spent its budget on planning
 had one prose pass. So this result may reflect revision rather than planning. It does
 not change the outcome.
 
+## Retest
+
+This is the one follow-up the plan allows. The owner chose it on 30 October 2026,
+after seeing the first result, with these changes: "I think a fairer retest is a good
+idea, but I would drop originality. Also, I don't mind spending a bit more to get a
+better model involved." The owner also said "coherence is critical", and that
+"comparing two terrible stories is much harder than comparing two reasonable stories."
+
+| Setting | First G1 | Retest |
+| --- | --- | --- |
+| Briefs | dev brief-03 to brief-06 | held-out test brief-11 to brief-14, the first four by number |
+| Model, both roles | `deepseek-flash` | `deepseek-v4-pro` |
+| Editing | B revised until budgets matched; C not revised | Both conditions get exactly 2 passes |
+| Budgets | Matched within 10% | Not matched: C also pays for planning, and the report shows both |
+| Decided by | Coherence and originality | Coherence only: at least 3 of 4 wins, ties count as non-wins |
+| Shown order | Random | Random, restricted so each condition is first in 2 of 4 pairs |
+
+Originality is no longer scored in new owner reviews. Preference and strength are
+still recorded, and do not decide the gate. The first result stays preserved and is
+not pooled with this one. If the retest does not pass, the diffusion track stops: no
+further follow-up is allowed.
+
+Because budgets are not matched, a pass cannot claim that planning wins at equal cost.
+It would show that, with the same editing, the richer plans give this reader more
+coherent stories at the extra cost of planning.
+
+The protocol is
+[`benchmark/prereg/g1-retest-20261030.json`](../benchmark/prereg/g1-retest-20261030.json)
+and the config is [`configs/g1-retest-20261030.yaml`](../configs/g1-retest-20261030.yaml).
+Generation needs the owner's approval of its cost cap. The estimate is about US$1.10
+at peak rates, with a US$3 cap on the run. Use these files in the commands below, with
+a new batch name.
+
 ## Why four pairs
 
 The plan first asked for 30 pairs, about ten hours of reading. The owner declined

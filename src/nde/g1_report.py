@@ -37,7 +37,11 @@ FOLLOW_UP = (
 )
 
 
-def validate_required_scores(view: View, judgements: dict[int, Judgement]) -> list[str]:
+def validate_required_scores(
+    view: View,
+    judgements: dict[int, Judgement],
+    dimensions: tuple[str, ...] = ("coherence", "originality"),
+) -> list[str]:
     problems: list[str] = []
     if set(judgements) != set(range(1, view.size + 1)):
         problems.append("required owner judgements are missing or include extra pair identities")
@@ -56,10 +60,8 @@ def validate_required_scores(view: View, judgements: dict[int, Judgement]) -> li
         except BatchError as error:
             problems.append(f"pair {number}: {error}")
         for scores in (judgement.a, judgement.b):
-            if scores is None or any(
-                name not in scores.scores for name in ("coherence", "originality")
-            ):
-                problems.append(f"pair {number}: required coherence/originality evidence missing")
+            if scores is None or any(name not in scores.scores for name in dimensions):
+                problems.append(f"pair {number}: required {'/'.join(dimensions)} evidence missing")
     return problems
 
 
@@ -180,7 +182,7 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
     view, key = read_view(batch), read_key(batch)
     judgements = read_judgements(batch)
     problems = binding_problems(batch, binding)
-    problems += validate_required_scores(view, judgements)
+    problems += validate_required_scores(view, judgements, protocol.required_dimensions)
     expected = {(brief, 0) for brief in protocol.cohort.brief_checksums}
     problems += _cohort_problems(expected, binding.readiness, view, key)
     closed = read_closed(batch)
@@ -191,7 +193,10 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
         "denominator": len(expected),
         "threshold": protocol.win_threshold,
     }
-    originality: dict[str, Any] = protocol.originality.model_dump(mode="json")
+    safeguard = protocol.originality
+    originality: dict[str, Any] = (
+        {"analysis": "not_registered"} if safeguard is None else safeguard.model_dump(mode="json")
+    )
     secondary: dict[str, Any] = {}
     tags: dict[str, dict[str, int]] = {}
     criteria = "pending"
@@ -203,9 +208,6 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
         else:
             wins = sum(c.scores["coherence"] > b.scores["coherence"] for c, b in marks)
             ties = sum(c.scores["coherence"] == b.scores["coherence"] for c, b in marks)
-            delta = sum(c.scores["originality"] - b.scores["originality"] for c, b in marks) / len(
-                expected
-            )
             coherence.update(
                 candidate_wins=wins,
                 comparator_wins=len(expected) - wins - ties,
@@ -214,14 +216,20 @@ def decision(batch: Path, packets: list[Path]) -> dict[str, Any]:
                 exact_two_sided_p=binomial_two_sided(wins, len(expected)),
                 meets_threshold=wins >= protocol.win_threshold,
             )
-            originality.update(
-                mean_candidate_minus_comparator=delta,
-                lower_bound=-protocol.originality.margin,
-                meets_safeguard=delta >= -protocol.originality.margin,
-            )
+            safeguard_met = True
+            if safeguard is not None:
+                delta = sum(
+                    c.scores["originality"] - b.scores["originality"] for c, b in marks
+                ) / len(expected)
+                safeguard_met = delta >= -safeguard.margin
+                originality.update(
+                    mean_candidate_minus_comparator=delta,
+                    lower_bound=-safeguard.margin,
+                    meets_safeguard=safeguard_met,
+                )
             criteria = (
                 "passed"
-                if wins >= protocol.win_threshold and (delta >= -protocol.originality.margin)
+                if wins >= protocol.win_threshold and safeguard_met
                 else "failed_inconclusive"
             )
             preferences = sum(
@@ -295,7 +303,9 @@ def write_decision(batch: Path, out: Path, packets: list[Path]) -> dict[str, Any
         f"Test only: {result['test_only']}",
         f"Result identity: {result['id']}",
         f"Protocol: {result['protocol_sha256']}",
-        "Coherence is primary. Originality is an independent registered safeguard. "
+        "Coherence decides this gate. Overall preference and judges are diagnostic/secondary."
+        if result["originality"]["analysis"] == "not_registered"
+        else "Coherence is primary. Originality is an independent registered safeguard. "
         "Overall preference and judges are diagnostic/secondary.",
         json.dumps(result["coherence"], indent=2),
         json.dumps(result["originality"], indent=2),

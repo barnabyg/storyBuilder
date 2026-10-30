@@ -34,8 +34,9 @@
   [G1 protocol](g1-four-pairs.md) was registered on the four generated M/B pairs.
 - **G1 did not pass on 30 October:** C won 0 coherence pairs of 4, tying 1, and fell
   short on originality. See the [frozen decision and evidence](evidence/g1-2026-10-30/README.txt).
-- **Next research work:** the owner chooses between the plan's two fail actions: one
-  follow-up, or stopping the diffusion track. Real D/corpus experiments still require G1;
+- **Next research work:** the owner chose the one permitted [follow-up](g1-four-pairs.md#retest):
+  four held-out pairs, a stronger model and equal editing, decided on coherence alone.
+  If it does not pass, the diffusion track stops. Real D/corpus experiments still require G1;
   real reconstruction requires G1 and G2. Phase 7 remains conditional on G3: its
   tooling is implemented on fixtures only, and Phase 8 is not implemented.
 
@@ -508,11 +509,12 @@ originality decision, no average loss (margin 0), is preserved.
 
 **Exit gate (Gate 1, the thesis):**
 - C scores strictly higher than B on **coherence in at least 3 of 4 pairs**;
-  ties count as non-wins. This is a judgement of consistency by the owner, not a
+  ties count as non-wins. The owner's retest decides on this alone. This is a judgement of consistency by the owner, not a
   statistical test: with no real difference and no ties, chance alone gives 3 or 4
   wins about 31% of the time. Overall preference is secondary.
-- C meets the pre-registered "not worse" safeguard on **originality**, with
-  required scores for both stories and an explicit margin and analysis.
+- For the first G1 only: C meets the pre-registered "not worse" safeguard on
+  **originality**, with required scores for both stories and an explicit margin and
+  analysis. On 30 October 2026 the owner dropped originality from later reviews.
 
 **Promising but inconclusive** (for example, 2 coherence wins of 4 with no
 losses): G1 has not passed. At most one follow-up is allowed: either a comparison
@@ -713,7 +715,7 @@ the outcome is recorded.
 | G0 (passed, 18 Oct 2026) | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
 | G-instr (closed, 20 Oct 2026) | P1 | Does the instrument detect known damage? | Historical: owner ≥9/10 coherence wins, judge ≥80% agreement | Owner 9/10; judge 70%. Closed through the fail action: owner coherence is the instrument, judges diagnostic only |
 | G-schema (passed, 27 Oct 2026) | P2 | Is the schema expressive and practical? | 44/44 categories caught; all three owner reviews under two hours; meaningful qualitative differences confirmed | Cut channels |
-| **G1** (failed/inconclusive, 30 Oct 2026; 0 of 4 coherence wins, [evidence](evidence/g1-2026-10-30/README.txt)) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in at least 3 of 4 pairs; ties are non-wins; originality safeguard met | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
+| **G1** (failed/inconclusive, 30 Oct 2026; 0 of 4 coherence wins, [evidence](evidence/g1-2026-10-30/README.txt)) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in at least 3 of 4 pairs; ties are non-wins; originality safeguard met (first G1 only) | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
 | G-D (not recorded) | P4 | Does refinement help? | D meets pre-registered coherence comparison against C, originality safeguard and controllability targets | C becomes the reference baseline |
 | **G2** (not recorded) | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
 | **G3** (not recorded) | P6 | Does denoising beat AR on long-range structure? | Pre-registered validator target and positive long-range margin over matched AR | Stop; D or C is the result |
@@ -761,8 +763,8 @@ operational work. Keep missing evidence pending rather than repeating fixture
 checks as a substitute for owner judgement.
 
 1. **Research gates:** G-schema and the sampled dev review/M selection are complete.
-   [G1 did not pass](g1-four-pairs.md), and the owner chooses its fail action next.
-   Only if a follow-up passes, follow with independently registered G-D/G2 work and
+   [G1 did not pass](g1-four-pairs.md), and its one permitted retest is registered.
+   Only if that passes, follow with independently registered G-D/G2 work and
    genuine G1/G2 prerequisites for G3. Record each actual outcome; existing gate
    commands already enforce admission.
 2. **Issue close-out:** Phase 6 and 7 implementation issues (#66–85) are closed.

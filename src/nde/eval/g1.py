@@ -64,11 +64,14 @@ class G1Protocol(Record):
     primary: Literal["coherence"] = "coherence"
     ties: Literal["non_wins"] = "non_wins"
     win_threshold: int = Field(default=3, ge=1)
-    required_dimensions: tuple[Literal["coherence"], Literal["originality"]] = (
+    required_dimensions: (
+        tuple[Literal["coherence"]] | tuple[Literal["coherence"], Literal["originality"]]
+    ) = (
         "coherence",
         "originality",
     )
-    originality: OriginalitySafeguard
+    # Omit the safeguard, and require only coherence, when the owner decides that alone.
+    originality: OriginalitySafeguard | None = None
     reading_mode: Literal["full", "required_only"]
     rubric_version: Literal[1] = 1
     config_sha256: str
@@ -78,6 +81,12 @@ class G1Protocol(Record):
     stopping_rule: Literal["fixed_sample_no_top_up"] = "fixed_sample_no_top_up"
     fail_action: Literal["stop_or_one_fresh_preregistered_followup"] = (
         "stop_or_one_fresh_preregistered_followup"
+    )
+    # Settings a registered follow-up deliberately changes from the tier selection, such
+    # as a stronger model in both conditions. Omitted while empty, so earlier records
+    # keep their exact form.
+    selection_overrides: tuple[Literal["settings_sha256", "models_sha256"], ...] = Field(
+        default=(), exclude_if=lambda value: not value
     )
 
     @model_validator(mode="after")
@@ -91,6 +100,8 @@ class G1Protocol(Record):
             )
         if self.win_threshold > sample:
             raise ValueError("win threshold exceeds the registered sample")
+        if (self.originality is None) != (self.required_dimensions == ("coherence",)):
+            raise ValueError("register originality scores and its safeguard together")
         for value in (self.config_sha256, self.selection_sha256, self.schema_evidence_sha256):
             if len(value) != SHA256_LENGTH or any(c not in "0123456789abcdef" for c in value):
                 raise ValueError("protocol identities must be lowercase SHA-256 values")
@@ -182,11 +193,19 @@ def _schema_evidence(protocol: G1Protocol, directory: Path) -> None:
             raise ValueError("test-only G-schema reviews cannot admit a real G1 run")
 
 
-def _selection(protocol: G1Protocol, inputs: G1Inputs) -> None:
+def check_selection(protocol: G1Protocol, inputs: G1Inputs) -> None:
     if file_checksum(inputs.selection) != protocol.selection_sha256:
         raise ValueError("tier selection checksum differs from registration")
     selection = load_selection(inputs.selection)
-    problems = selection_problems(selection, inputs.config)
+    changed = {
+        f"selected {name} does not match current configuration"
+        for name in protocol.selection_overrides
+    }
+    problems = [
+        problem
+        for problem in selection_problems(selection, inputs.config)
+        if problem not in changed
+    ]
     if problems:
         raise ValueError("tier selection is stale or incomplete: " + "; ".join(problems))
     if selection.tier != protocol.tier or selection.test_only != protocol.test_only:
@@ -279,7 +298,7 @@ def check_g1(inputs: G1Inputs) -> G1Check:
         loaded = load_config(inputs.config)
         _configuration(protocol, loaded)
         _schema_evidence(protocol, inputs.schema_evidence)
-        _selection(protocol, inputs)
+        check_selection(protocol, inputs)
     except (OSError, ValueError, ConfigError, briefs.BriefError) as error:
         result.problems.append(str(error))
     else:

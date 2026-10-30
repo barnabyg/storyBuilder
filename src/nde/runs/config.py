@@ -155,11 +155,19 @@ class EqualBudgetConfig(Strict):
     )
     # Omitted from the config identity while unset, so existing config hashes are unchanged.
     resource_policy: ResourcePolicy | None = Field(default=None, exclude_if=_unset)
+    # Give both conditions exactly this many revision passes, instead of revising the
+    # cheaper one until budgets match. Omitted from the config identity while unset.
+    fixed_revision_passes: int | None = Field(default=None, ge=1, exclude_if=_unset)
 
     @model_validator(mode="after")
     def _two_different_conditions(self) -> Self:
         if self.conditions[0] == self.conditions[1]:
             raise ValueError("equal_budget compares two different conditions")
+        if (
+            self.fixed_revision_passes is not None
+            and self.fixed_revision_passes > self.max_revision_passes
+        ):
+            raise ValueError("fixed_revision_passes exceeds max_revision_passes")
         return self
 
 

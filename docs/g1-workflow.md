@@ -27,7 +27,11 @@ Create a JSON `G1Protocol` (schema exported by
 - `candidate: "C"`, `comparator: "B"`, `primary: "coherence"`,
   `ties: "non_wins"`, `win_threshold: 3` (or the explicit registered threshold),
   `required_dimensions: ["coherence", "originality"]`;
-- `originality: {"analysis": "mean_paired_difference", "margin": NUMBER}`.
+- `selection_overrides` (optional): `settings_sha256` and/or `models_sha256`, for a
+  registered follow-up that deliberately changes settings from the tier selection, such
+  as a stronger model in both conditions;
+- `originality: {"analysis": "mean_paired_difference", "margin": NUMBER}`, or omit it
+  with `required_dimensions: ["coherence"]` when coherence alone decides.
   The margin must be specified before reading. This supported descriptive
   safeguard requires mean paired C-minus-B originality **at least minus the
   margin**. It makes no inferential noninferiority claim. Other analysis names

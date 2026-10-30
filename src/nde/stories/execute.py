@@ -101,6 +101,7 @@ class PreparedStories:
                 resource_policy=None
                 if self.equal_budget.resource_policy is None
                 else self.equal_budget.resource_policy.model_dump(mode="json"),
+                fixed_revision_passes=self.equal_budget.fixed_revision_passes,
             ),
         )
 
@@ -391,8 +392,30 @@ def _totals(
         }
 
 
+def _revise_both(
+    run: StoryRun,
+    jobs: dict[str, StoryJob],
+    spec: EqualBudgetConfig,
+    match: BudgetMatch,
+    passes: int,
+) -> None:
+    """Give each story the same number of revision passes, whatever they cost."""
+    match.revised = "both"
+    for name in spec.conditions:
+        for _ in range(passes):
+            try:
+                revise_story(run, jobs[name], spec.revision_prompt)
+            except (ProviderError, BudgetExceededError) as error:
+                save(run, jobs[name])
+                match.reason = f"revision interrupted: {error}"
+                _totals(run, jobs, spec, match)
+                run.state.budget_matches.append(match)
+                raise
+        match.passes = passes
+
+
 def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetConfig) -> BudgetMatch:
-    """Give the cheaper story revision passes until the two budgets are within tolerance."""
+    """Revise the cheaper story until budgets match, or both stories a fixed number of times."""
     first, second = (jobs[name] for name in spec.conditions)
     match = BudgetMatch(
         brief=first.record.brief,
@@ -405,6 +428,8 @@ def match_budgets(run: StoryRun, jobs: dict[str, StoryJob], spec: EqualBudgetCon
     cheaper, dearer = sorted((first, second), key=lambda job: job.tokens)
     if failed:
         match.reason = f"no story to match: {', '.join(failed)} failed"
+    elif spec.fixed_revision_passes is not None:
+        _revise_both(run, jobs, spec, match, spec.fixed_revision_passes)
     elif not within(cheaper.tokens, dearer.tokens, spec.tolerance):
         match.revised = cheaper.record.condition
         while match.passes < spec.max_revision_passes:

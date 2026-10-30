@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -12,6 +13,7 @@ import yaml
 
 from nde import briefs
 from nde.cli import main
+from nde.eval import g1
 from nde.eval.g1 import (
     G1Binding,
     G1Protocol,
@@ -421,6 +423,51 @@ def test_registered_synthetic_workflow_generates_then_admits_a_sealed_exact_batc
     assert main(["eval", "g1-check", *common, "--out", str(out)]) == 2
     result = json.loads((out / "g1-check.json").read_text(encoding="utf-8"))
     assert "tier selection is stale" in " ".join(result["problems"])
+
+
+def test_originality_scores_and_safeguard_are_registered_together(
+    registered_inputs: dict[str, Path],
+) -> None:
+    raw = json.loads(registered_inputs["protocol"].read_text(encoding="utf-8"))
+    both = {**raw, "required_dimensions": ["coherence"]}
+    with pytest.raises(ValueError, match="together"):
+        G1Protocol.model_validate(both)
+    neither = {**both, "originality": None}
+    assert G1Protocol.model_validate(neither).originality is None
+    assert "selection_overrides" not in G1Protocol.model_validate(raw).model_dump(mode="json")
+
+
+def test_selection_overrides_excuse_only_the_declared_setting(
+    registered_inputs: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = json.loads(registered_inputs["protocol"].read_text(encoding="utf-8"))
+    registered_inputs["selection"].write_text("synthetic selection", encoding="utf-8")
+    selection = SimpleNamespace(tier=raw["tier"], test_only=raw["test_only"])
+
+    def load(_path: Path) -> SimpleNamespace:
+        return selection
+
+    def problems(_selection: object, _config: Path) -> list[str]:
+        return [models, settings]
+
+    monkeypatch.setattr(g1, "load_selection", load)
+    models = "selected models_sha256 does not match current configuration"
+    settings = "selected settings_sha256 does not match current configuration"
+    monkeypatch.setattr(g1, "selection_problems", problems)
+    inputs = g1.G1Inputs(
+        registered_inputs["protocol"],
+        registered_inputs["config"],
+        registered_inputs["selection"],
+        registered_inputs["schema"],
+    )
+    raw["selection_sha256"] = checksum_lf(registered_inputs["selection"].read_bytes())
+    protocol = G1Protocol.model_validate({**raw, "selection_overrides": ["models_sha256"]})
+    with pytest.raises(ValueError, match="settings_sha256"):
+        g1.check_selection(protocol, inputs)
+    protocol = G1Protocol.model_validate(
+        {**raw, "selection_overrides": ["models_sha256", "settings_sha256"]}
+    )
+    g1.check_selection(protocol, inputs)
 
 
 def test_real_g1_needs_at_least_four_briefs(registered_inputs: dict[str, Path]) -> None:

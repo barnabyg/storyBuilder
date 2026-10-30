@@ -186,6 +186,11 @@ The revised story replaces the story. The original is kept as
 `story.original.md`, and each pass's files are under `revisions/<n>/`. The
 story's record counts its `revision_passes`.
 
+`fixed_revision_passes: N` (at most `max_revision_passes`) replaces this with equal
+editing: each story gets exactly N passes, whatever they cost, and the two budgets are
+then only compared with `tolerance`. Use it when both conditions should be edited the
+same, and do not describe the result as an equal-budget comparison.
+
 Matching fails, and is reported for that brief rather than accepted, when:
 
 - the budgets are still apart after `max_revision_passes` passes;
