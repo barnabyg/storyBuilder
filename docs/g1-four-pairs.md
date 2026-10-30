@@ -61,6 +61,11 @@ the answers. The owner keeps no notes. For each pair, the owner gives:
 3. which story they preferred overall;
 4. how strongly, from 1 to 3.
 
+The owner confirmed the 3-of-4 rule before reading ("Yes, 3 of 4"). The reading batch
+is `g1-20261030-b`. An earlier unread batch, `g1-20261030`, was replaced before reading
+because the agent saw that its shown order put the same condition first in every
+pair. The replacement's order was not inspected.
+
 Reading takes about 80 minutes, with breaks whenever the owner likes. The owner
 does not work on the code, so no 48-hour wait applies. The report may still show its
 standard timing caveats. Conditions stay hidden until all four pairs are scored and
@@ -73,9 +78,9 @@ Run each command on one line. The agent runs these for the owner:
 ```powershell
 uv run nde eval g1-check benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --out runs/g1-check
 uv run nde eval g1-run benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --runs-dir runs
-uv run nde eval g1-batch benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --name g1-20261030 --from RUN C --from RUN B
-uv run nde eval serve --batch g1-20261030
-uv run nde g1-report batches/g1-20261030 --out runs/g1-decision
+uv run nde eval g1-batch benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --name g1-20261030-b --from RUN C --from RUN B
+uv run nde eval serve --batch g1-20261030-b
+uv run nde g1-report batches/g1-20261030-b --out runs/g1-decision
 ```
 
 Extract `.nde/g-schema-packet/` from
