@@ -12,7 +12,13 @@ import yaml
 
 from nde import briefs
 from nde.cli import main
-from nde.eval.g1 import G1Binding, G1Protocol, OriginalitySafeguard, binding_problems
+from nde.eval.g1 import (
+    G1Binding,
+    G1Protocol,
+    OriginalitySafeguard,
+    binding_problems,
+    frozen_configuration,
+)
 from nde.eval.readiness import PairReadiness, ReadinessReport, cohort_checksum, write_readiness
 from nde.files import checksum_lf
 from nde.runs.config import load_config
@@ -415,6 +421,43 @@ def test_registered_synthetic_workflow_generates_then_admits_a_sealed_exact_batc
     assert main(["eval", "g1-check", *common, "--out", str(out)]) == 2
     result = json.loads((out / "g1-check.json").read_text(encoding="utf-8"))
     assert "tier selection is stale" in " ".join(result["problems"])
+
+
+def test_real_g1_needs_at_least_four_briefs(registered_inputs: dict[str, Path]) -> None:
+    raw = json.loads(registered_inputs["protocol"].read_text(encoding="utf-8"))
+    raw["test_only"] = False
+    raw["win_threshold"] = 1
+    raw["cohort"]["brief_checksums"] = {f"brief-0{i}": "a" * 64 for i in range(3)}
+    with pytest.raises(ValueError, match="at least 4 distinct frozen briefs"):
+        G1Protocol.model_validate(raw)
+    raw["cohort"]["brief_checksums"]["brief-03"] = "a" * 64
+    assert G1Protocol.model_validate(raw).win_threshold == 1
+
+
+def test_real_g1_accepts_a_frozen_dev_cohort_and_rejects_an_unfrozen_brief(
+    registered_inputs: dict[str, Path], tmp_path: Path
+) -> None:
+    benchmark = tmp_path / "four"
+    (benchmark / "dev").mkdir(parents=True)
+    ids = [f"brief-0{i}" for i in range(1, 5)]
+    for brief_id in ids:
+        shutil.copy(REPO / f"benchmark/dev/{brief_id}.yaml", benchmark / "dev")
+    briefs.freeze(benchmark, "dev")
+    config = yaml.safe_load(registered_inputs["config"].read_text(encoding="utf-8"))
+    config["stories"]["briefs_dir"] = str(benchmark)
+    config["stories"]["briefs"] = {"ids": ids}
+    registered_inputs["config"].write_text(yaml.safe_dump(config), encoding="utf-8")
+    raw = json.loads(registered_inputs["protocol"].read_text(encoding="utf-8"))
+    raw["test_only"] = False
+    raw["cohort"]["brief_checksums"] = briefs.read_frozen(benchmark)["dev"]
+    raw["cohort"]["split_checksums"] = {"dev": briefs.split_checksum(benchmark, "dev")}
+    loaded = load_config(registered_inputs["config"])
+
+    frozen_configuration(G1Protocol.model_validate(raw), loaded)
+
+    (benchmark / "frozen.json").unlink()
+    with pytest.raises(ValueError, match="frozen"):
+        frozen_configuration(G1Protocol.model_validate(raw), loaded)
 
 
 @pytest.fixture

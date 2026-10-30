@@ -14,8 +14,7 @@ the [shared prose pipeline](docs/baseline-c.md). Inspect
 [final-prose realisation evidence](docs/realisation.md).
 Require [strict gate readiness](docs/gate-readiness.md) before blind admission,
 then produce a [protocol-bound G1 decision](docs/g1-decision.md) after closure.
-G1 has no result yet; see the [M/B development pilot](docs/mb-pilot.md) for where it
-stands and the decision it still needs.
+G1 is [registered on four pairs](docs/g1-four-pairs.md) and has no result yet.
 
 ## Setup
 

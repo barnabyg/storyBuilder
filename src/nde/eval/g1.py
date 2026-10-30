@@ -32,7 +32,7 @@ from nde.tiers import load_selection, selection_problems
 
 G1_BINDING = "g1.json"
 GENERATION_BINDING = "g1-generation.json"
-G1_SAMPLE_SIZE = 30
+G1_MIN_SAMPLE_SIZE = 4
 SHA256_LENGTH = 64
 
 
@@ -63,7 +63,7 @@ class G1Protocol(Record):
     tier: Literal["S", "M", "L"]
     primary: Literal["coherence"] = "coherence"
     ties: Literal["non_wins"] = "non_wins"
-    win_threshold: int = Field(default=21, ge=1)
+    win_threshold: int = Field(default=3, ge=1)
     required_dimensions: tuple[Literal["coherence"], Literal["originality"]] = (
         "coherence",
         "originality",
@@ -85,8 +85,10 @@ class G1Protocol(Record):
         if self.cohort.conditions != ("C", "B") or self.cohort.repeat != 1:
             raise ValueError("G1 requires C first, B second, once per distinct brief")
         sample = len(self.cohort.brief_checksums)
-        if not self.test_only and sample != G1_SAMPLE_SIZE:
-            raise ValueError("real G1 requires exactly 30 distinct frozen test briefs")
+        if not self.test_only and sample < G1_MIN_SAMPLE_SIZE:
+            raise ValueError(
+                f"real G1 requires at least {G1_MIN_SAMPLE_SIZE} distinct frozen briefs"
+            )
         if self.win_threshold > sample:
             raise ValueError("win threshold exceeds the registered sample")
         for value in (self.config_sha256, self.selection_sha256, self.schema_evidence_sha256):
@@ -226,10 +228,10 @@ def _configuration(protocol: G1Protocol, loaded: LoadedConfig) -> None:
         raise ValueError("equal-budget settings differ from registration")
     if config.budget.allow_unpriced_models:
         raise ValueError("registered G1 cannot bypass hard caps with unpriced models")
-    _frozen_configuration(protocol, loaded)
+    frozen_configuration(protocol, loaded)
 
 
-def _frozen_configuration(protocol: G1Protocol, loaded: LoadedConfig) -> None:
+def frozen_configuration(protocol: G1Protocol, loaded: LoadedConfig) -> None:
     stories, root = loaded.config.stories, loaded.briefs_dir
     if stories is None or root is None:
         raise ValueError("registered story benchmark is missing")
@@ -246,16 +248,19 @@ def _frozen_configuration(protocol: G1Protocol, loaded: LoadedConfig) -> None:
     for brief_id, checksum in protocol.cohort.brief_checksums.items():
         if brief_id not in found or found[brief_id].sha256 != checksum:
             raise ValueError(f"{brief_id}: frozen input differs from registration")
-    split = "test" if not protocol.test_only else next(iter(protocol.cohort.split_checksums))
+    if len(protocol.cohort.split_checksums) != 1:
+        raise ValueError("G1 registers exactly one frozen split")
+    split = next(iter(protocol.cohort.split_checksums))
     if protocol.cohort.split_checksums != {
         split: briefs.split_checksum(root, "test" if split == "test" else "dev")
     }:
         raise ValueError("frozen benchmark identity differs from registration")
-    if (
-        not protocol.test_only
-        and briefs.read_frozen(root).get("test") != protocol.cohort.brief_checksums
+    frozen = briefs.read_frozen(root).get(split, {})
+    if not protocol.test_only and any(
+        frozen.get(brief_id) != checksum
+        for brief_id, checksum in protocol.cohort.brief_checksums.items()
     ):
-        raise ValueError("real G1 must use the complete frozen test cohort")
+        raise ValueError("real G1 must use briefs frozen in the registered split")
     if protocol.test_only and any(
         urlparse(provider.base_url).hostname not in {"127.0.0.1", "localhost", "::1"}
         for provider in loaded.config.providers.values()

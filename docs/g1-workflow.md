@@ -1,9 +1,7 @@
 # Registered G1 workflow
 
-**Status: no G1 protocol is registered and G1 has no result.** The owner declined
-the 30-pair read on 27 October 2026. The approved four-pair
-[M/B development pilot](mb-pilot.md) cannot pass this gate. Its runbook also sets
-out the decision that G1 still needs.
+**Status: registered on four pairs, with no result yet.** See the
+[G1 protocol and runbook](g1-four-pairs.md).
 
 G1 generation and reading are separate from software acceptance. Actual G1 needs
 a passed **owner** G-schema packet, an actual owner-selected tier backed by dev
@@ -24,10 +22,10 @@ Create a JSON `G1Protocol` (schema exported by
 
 - `id`, `schema_version: "1"`, `test_only: false`, `tier`;
 - `cohort`: the [strict readiness registration](gate-readiness.md), with C first,
-  B second, exactly 30 distinct frozen **test** brief IDs/checksums, one repetition,
+  B second, at least 4 distinct frozen brief IDs/checksums from one split, one repetition,
   registered length and generation-token budget tolerances;
 - `candidate: "C"`, `comparator: "B"`, `primary: "coherence"`,
-  `ties: "non_wins"`, `win_threshold: 21` (or the explicit registered threshold),
+  `ties: "non_wins"`, `win_threshold: 3` (or the explicit registered threshold),
   `required_dimensions: ["coherence", "originality"]`;
 - `originality: {"analysis": "mean_paired_difference", "margin": NUMBER}`.
   The margin must be specified before reading. This supported descriptive

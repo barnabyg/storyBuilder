@@ -21,7 +21,7 @@ comparison is **descriptive**: mean paired D-minus-C ordinal score must be at
 least minus the registered margin. Ties contribute zero and remain in the
 denominator. It provides no confidence interval or inferential noninferiority
 claim. A nonsignificant difference is never treated as equality. Unsupported
-analyses and omitted margins are rejected; G1's 21/30 rule is not reused.
+analyses and omitted margins are rejected; G1's win-count rule is not reused.
 
 After the check passes, use `nde gd run` with the same inputs and optional
 `--runs-dir`, `--cache`, and `--ledger` paths. This uses the shared experiment,

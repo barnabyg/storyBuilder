@@ -49,6 +49,7 @@ _SECRET_SCAN_EXCLUDES: dict[str, str] = {
     "benchmark/pilots/mb-20261027/frozen.json": "pilot brief checksums",
     "benchmark/prereg/dev-mb-pilot-20261027-cohort.json": "pilot cohort checksums",
     "benchmark/prereg/dev-mb-pilot-20261027.json": "pilot registration content identities",
+    "benchmark/prereg/g1-20261030.json": "G1 registration content identities",
 }
 
 
