@@ -1,7 +1,9 @@
 # G1 on four pairs
 
-**Status (30 October 2026):** read and closed. **G1 did not pass.** See the
-[frozen evidence](evidence/g1-2026-10-30/README.txt).
+**Status (30 October 2026):** read and closed. **G1 and its one permitted retest did
+not pass, so the diffusion track stops.** See the
+[first evidence](evidence/g1-2026-10-30/README.txt) and
+[retest evidence](evidence/g1-retest-2026-10-30/README.txt).
 
 G1 asks whether multi-channel plans produce stories the owner finds better than
 beat-only plans at equal budget. It compares the selected M tier (C) with
@@ -26,6 +28,19 @@ had one prose pass. So this result may reflect revision rather than planning. It
 not change the outcome.
 
 ## Retest
+
+**Result: did not pass.** C won 2 of 4 on coherence and needed 3.
+
+| Brief | C coherence | B coherence | Preferred |
+| --- | --- | --- | --- |
+| brief-11 | 1 | 3 | B, strength 2 |
+| brief-12 | 4 | 3 | C, strength 3 |
+| brief-13 | 3 | 2 | C, strength 1 |
+| brief-14 | 1 | 3 | B, strength 2 |
+
+The story read second won in all four pairs, and each method was second in exactly
+two. So this result cannot separate method from reading order. It shows no consistent
+advantage for the richer plans, and C used about four times B's tokens.
 
 This is the one follow-up the plan allows. The owner chose it on 30 October 2026,
 after seeing the first result, with these changes: "I think a fairer retest is a good
@@ -62,9 +77,10 @@ coherent stories at the extra cost of planning.
 The protocol is
 [`benchmark/prereg/g1-retest-20261030.json`](../benchmark/prereg/g1-retest-20261030.json)
 and the config is [`configs/g1-retest-20261030.yaml`](../configs/g1-retest-20261030.yaml).
-A rehearsal of one pair on dev brief-01 cost US$0.41, so about US$1.65 is expected,
-with a US$3 cap on the run. Use these files in the commands below, with
-a new batch name.
+A rehearsal of one pair on dev brief-01 cost US$0.41, and the run cost US$1.76 against
+a US$3 cap. The reading batch was `g1-retest-20261030`, built with these files through
+the commands below. Its shuffle seed was chosen automatically so that each method came
+first twice, and the agent did not see the order until the batch closed.
 
 ## Why four pairs
 

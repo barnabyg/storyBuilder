@@ -1,8 +1,8 @@
 # Narrative Diffusion Engine — Implementation Plan
 
-**Status:** Working plan v3; tooling through Phase 7 on `main`; G-schema passed; G1 did not pass
+**Status:** Working plan v3; tooling through Phase 7 implemented; G-schema passed; G1 and its retest did not pass; diffusion track stopped
 **Created:** 18 October 2026
-**Updated:** 30 October 2026, changing G1 to four pairs at the owner's decision and recording its result
+**Updated:** 30 October 2026, changing G1 to four pairs at the owner's decision and recording both results
 **Source:** [Narrative_Diffusion_Writing_Engine_Proposal.md](../Narrative_Diffusion_Writing_Engine_Proposal.md)
 
 ## Current position
@@ -34,11 +34,14 @@
   [G1 protocol](g1-four-pairs.md) was registered on the four generated M/B pairs.
 - **G1 did not pass on 30 October:** C won 0 coherence pairs of 4, tying 1, and fell
   short on originality. See the [frozen decision and evidence](evidence/g1-2026-10-30/README.txt).
-- **Next research work:** the owner chose the one permitted [follow-up](g1-four-pairs.md#retest):
-  four held-out pairs, `gpt-6.1-sol` and equal editing, decided on coherence alone.
-  If it does not pass, the diffusion track stops. Real D/corpus experiments still require G1;
-  real reconstruction requires G1 and G2. Phase 7 remains conditional on G3: its
-  tooling is implemented on fixtures only, and Phase 8 is not implemented.
+- **The retest did not pass on 30 October:** on four held-out pairs with `gpt-6.1-sol`
+  and equal editing, decided on coherence alone, C won 2 of 4 against the 3 required.
+  See the [retest result](g1-four-pairs.md#retest) and
+  [evidence](evidence/g1-retest-2026-10-30/README.txt).
+- **The diffusion track has stopped under the registered fail action.** The schema,
+  benchmark, harness and planner are the result (proposal §14). Real D/corpus,
+  reconstruction and E experiments are not authorised: they still require a passed G1.
+  Phase 6–7 tooling remains, tested on fixtures only, and Phase 8 is not implemented.
 
 | Phase | Implementation status on `main` | Implementation issues | Operating guide |
 | --- | --- | --- | --- |
@@ -715,7 +718,7 @@ the outcome is recorded.
 | G0 (passed, 18 Oct 2026) | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
 | G-instr (closed, 20 Oct 2026) | P1 | Does the instrument detect known damage? | Historical: owner ≥9/10 coherence wins, judge ≥80% agreement | Owner 9/10; judge 70%. Closed through the fail action: owner coherence is the instrument, judges diagnostic only |
 | G-schema (passed, 27 Oct 2026) | P2 | Is the schema expressive and practical? | 44/44 categories caught; all three owner reviews under two hours; meaningful qualitative differences confirmed | Cut channels |
-| **G1** (failed/inconclusive, 30 Oct 2026; 0 of 4 coherence wins, [evidence](evidence/g1-2026-10-30/README.txt)) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in at least 3 of 4 pairs; ties are non-wins; originality safeguard met (first G1 only) | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
+| **G1** (failed/inconclusive, 30 Oct 2026; 0 of 4 coherence wins, [evidence](evidence/g1-2026-10-30/README.txt); retest 2 of 4, [evidence](evidence/g1-retest-2026-10-30/README.txt)) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in at least 3 of 4 pairs; ties are non-wins; originality safeguard met (first G1 only) | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
 | G-D (not recorded) | P4 | Does refinement help? | D meets pre-registered coherence comparison against C, originality safeguard and controllability targets | C becomes the reference baseline |
 | **G2** (not recorded) | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
 | **G3** (not recorded) | P6 | Does denoising beat AR on long-range structure? | Pre-registered validator target and positive long-range margin over matched AR | Stop; D or C is the result |
@@ -763,8 +766,8 @@ operational work. Keep missing evidence pending rather than repeating fixture
 checks as a substitute for owner judgement.
 
 1. **Research gates:** G-schema and the sampled dev review/M selection are complete.
-   [G1 did not pass](g1-four-pairs.md), and its one permitted retest is registered.
-   Only if that passes, follow with independently registered G-D/G2 work and
+   [G1 and its one permitted retest did not pass](g1-four-pairs.md), so the diffusion
+   track stops. Any return to it needs a new owner decision, and would then follow with independently registered G-D/G2 work and
    genuine G1/G2 prerequisites for G3. Record each actual outcome; existing gate
    commands already enforce admission.
 2. **Issue close-out:** Phase 6 and 7 implementation issues (#66–85) are closed.
