@@ -1,11 +1,29 @@
 # G1 on four pairs
 
-**Status (30 October 2026):** registered, with stories generated and no reading yet.
-G1 has no result.
+**Status (30 October 2026):** read and closed. **G1 did not pass.** See the
+[frozen evidence](evidence/g1-2026-10-30/README.txt).
 
 G1 asks whether multi-channel plans produce stories the owner finds better than
 beat-only plans at equal budget. It compares the selected M tier (C) with
 Baseline B.
+
+## Result
+
+| Brief | C coherence | B coherence | C originality | B originality | Preferred |
+| --- | --- | --- | --- | --- | --- |
+| brief-03 | 1 | 1 | 2 | 1 | C, strength 3 |
+| brief-04 | 1 | 4 | 2 | 4 | B, strength 3 |
+| brief-05 | 1 | 2 | 2 | 3 | B, strength 2 |
+| brief-06 | 1 | 3 | 2 | 3 | B, strength 2 |
+
+C won 0 pairs on coherence, tied 1 and lost 3, against the 3 wins required. Mean
+originality, C minus B, was -0.75, against a minimum of 0.
+
+Two caveats affect how far this reaches. The owner preferred the story shown first in
+every pair, and C was first only for brief-03. To match budgets, B also received 13
+to 17 whole-story revision calls per brief, while C spent its budget on planning and
+had one prose pass. So this result may reflect revision rather than planning. It does
+not change the outcome.
 
 ## Why four pairs
 

@@ -50,6 +50,7 @@ _SECRET_SCAN_EXCLUDES: dict[str, str] = {
     "benchmark/prereg/dev-mb-pilot-20261027-cohort.json": "pilot cohort checksums",
     "benchmark/prereg/dev-mb-pilot-20261027.json": "pilot registration content identities",
     "benchmark/prereg/g1-20261030.json": "G1 registration content identities",
+    "docs/evidence/g1-2026-10-30/decision.json": "exact public G1 evidence hashes",
 }
 
 

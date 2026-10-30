@@ -1,7 +1,7 @@
 # Registered G1 workflow
 
-**Status: registered on four pairs, with no result yet.** See the
-[G1 protocol and runbook](g1-four-pairs.md).
+**Status: read on four pairs on 30 October 2026, and G1 did not pass.** See the
+[G1 protocol, result and runbook](g1-four-pairs.md).
 
 G1 generation and reading are separate from software acceptance. Actual G1 needs
 a passed **owner** G-schema packet, an actual owner-selected tier backed by dev
