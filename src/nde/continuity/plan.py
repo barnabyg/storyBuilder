@@ -34,10 +34,31 @@ class CharacterSheet(Strict):
     )
 
 
+class KeyEvent(Strict):
+    event: str = Field(min_length=1, description="an event in the scene that takes real time")
+    expected_min_minutes: float = Field(ge=0, description="the least time it could really take")
+    expected_max_minutes: float = Field(ge=0, description="the most time it could really take")
+
+    @model_validator(mode="after")
+    def _range_is_ordered(self) -> Self:
+        if self.expected_min_minutes > self.expected_max_minutes:
+            raise ValueError(f"{self.event}: the least time is more than the most time")
+        return self
+
+
 class PlannedScene(Strict):
     summary: str = Field(min_length=1, description="what happens in the scene, in one sentence")
     beats: list[str] = Field(
         min_length=1, max_length=6, description="the scene's concrete events, in order"
+    )
+    elapsed_minutes: float = Field(
+        ge=0,
+        description="the story time, in minutes, from the end of the previous scene to the "
+        "end of this one",
+    )
+    key_events: list[KeyEvent] = Field(
+        description="the events whose realistic duration matters: spoiling, healing, travel, "
+        "weather, work. Empty if none."
     )
 
 
@@ -61,6 +82,11 @@ class ContinuityPlan(Strict):
                 )
         return self
 
+    def key_events(self) -> dict[str, KeyEvent]:
+        """Every key event by its label, K1 onwards, in story order."""
+        events = [event for scene in self.scenes for event in scene.key_events]
+        return {f"K{number}": event for number, event in enumerate(events, 1)}
+
     def sheet_for(self, name: str) -> CharacterSheet | None:
         """The sheet a name in the prose refers to, such as "Priya" or "Ms Raman"."""
         for sheet in self.characters:
@@ -83,6 +109,25 @@ def continuity_plan_model(min_scenes: int, max_scenes: int) -> type[ContinuityPl
     )
 
 
+def format_minutes(minutes: float) -> str:
+    """A duration a person can read: "4 minutes", "3 hours", "2 days"."""
+    for size, unit in ((1440, "day"), (60, "hour")):
+        if minutes >= size:
+            amount = minutes / size
+            shown = f"{amount:.1f}".removesuffix(".0")
+            return f"{shown} {unit}{'' if shown == '1' else 's'}"
+    shown = f"{minutes:.1f}".removesuffix(".0")
+    return f"{shown} minute{'' if shown == '1' else 's'}"
+
+
+def _render_key_event(label: str, event: KeyEvent) -> str:
+    low, high = (
+        format_minutes(event.expected_min_minutes),
+        format_minutes(event.expected_max_minutes),
+    )
+    return f"{label}: {event.event} ({low} to {high})"
+
+
 def render_sheets(plan: ContinuityPlan) -> str:
     return "\n\n".join(
         f"{sheet.name}\n"
@@ -95,15 +140,32 @@ def render_sheets(plan: ContinuityPlan) -> str:
 
 def render_plan(plan: ContinuityPlan) -> str:
     """The sheets and scenes, for the steps that work on a finished story."""
-    scenes = "\n".join(
-        f"Scene {number}: {scene.summary}" for number, scene in enumerate(plan.scenes, 1)
-    )
+    labels = iter(plan.key_events().items())
+    lines: list[str] = []
+    for number, scene in enumerate(plan.scenes, 1):
+        elapsed = format_minutes(scene.elapsed_minutes)
+        lines.append(f"Scene {number} ({elapsed} since the scene before): {scene.summary}")
+        lines += [_render_key_event(*next(labels)) for _ in scene.key_events]
+    scenes = "\n".join(lines)
     return f"Character sheets:\n\n{render_sheets(plan)}\n\nScenes:\n{scenes}"
+
+
+def _clock_note(scene: PlannedScene) -> str:
+    lines = [f"Scene clock: {format_minutes(scene.elapsed_minutes)} pass since the scene before."]
+    lines += [
+        f"{event.event} takes {format_minutes(event.expected_min_minutes)} to "
+        f"{format_minutes(event.expected_max_minutes)}. Do not show it faster or slower."
+        for event in scene.key_events
+    ]
+    return "\n".join(lines)
 
 
 def scene_specs(plan: ContinuityPlan) -> list[SceneSpec]:
     """The planned scenes for the shared prose steps, with the sheets and rules as notes."""
     notes = f"Character sheets:\n\n{render_sheets(plan)}\n\n{PLAIN_STYLE_RULES}"
     return [
-        SceneSpec(summary=scene.summary, beats=scene.beats, notes=notes) for scene in plan.scenes
+        SceneSpec(
+            summary=scene.summary, beats=scene.beats, notes=f"{_clock_note(scene)}\n\n{notes}"
+        )
+        for scene in plan.scenes
     ]

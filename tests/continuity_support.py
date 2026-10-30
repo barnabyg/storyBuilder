@@ -27,7 +27,20 @@ def plan_reply(scenes: int = 5) -> dict[str, Any]:
         "title": "The Last Lamp",
         "characters": [sheet("Elsie Marr", 1), sheet("Tom Reyes", 2)],
         "scenes": [
-            {"summary": f"Summary {i}.", "beats": [f"beat {i}a", f"beat {i}b"]}
+            {
+                "summary": f"Summary {i}.",
+                "beats": [f"beat {i}a", f"beat {i}b"],
+                "elapsed_minutes": 60,
+                "key_events": [
+                    {
+                        "event": "Food in the fridge smells sour",
+                        "expected_min_minutes": 720,
+                        "expected_max_minutes": 4320,
+                    }
+                ]
+                if i == 3
+                else [],
+            }
             for i in range(1, scenes + 1)
         ],
     }
@@ -58,7 +71,10 @@ type Audits = dict[str, Any]
 
 def clean_audits() -> Audits:
     """What each audit answers for a story with nothing wrong, by the phrase in its prompt."""
-    return {"List every named person": {"people": CLEAN_PEOPLE}}
+    return {
+        "List every named person": {"people": CLEAN_PEOPLE},
+        "List every event whose time": {"events": [], "scenes": []},
+    }
 
 
 def fake_continuity(audits: Audits | None = None) -> Callable[[Json], Reply]:

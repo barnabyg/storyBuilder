@@ -7,6 +7,7 @@ from typing import Any, ClassVar, Self, override
 from pydantic import Field, JsonValue
 
 from nde.continuity.audit import AUDIT_VARIABLES, Audit, run_audit
+from nde.continuity.clock import ClockAudit, check_clock
 from nde.continuity.flags import Flag
 from nde.continuity.introductions import IntroductionAudit, check_introductions
 from nde.continuity.plan import (
@@ -32,6 +33,7 @@ AUDITS: tuple[Audit[Any], ...] = (
         IntroductionAudit,
         check_introductions,
     ),
+    Audit("clock", PromptRef(template="continuity_clock", version=1), ClockAudit, check_clock),
 )
 # The record of the whole run for a person to inspect, and its readable summary.
 RESULT_FILE = "continuity.json"

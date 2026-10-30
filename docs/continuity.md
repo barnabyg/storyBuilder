@@ -20,7 +20,8 @@ config's `budget.per_run_usd`.
 
 1. **Plan.** Before any prose, the planner makes a sheet for each character:
    name, appearance, back-story, and when and how they enter. It then plans the
-   scenes.
+   scenes, recording for each how much story time passes and how long its key events
+   should realistically take.
 2. **Write.** Each scene is written from the sheets and short, concrete plain-style
    rules. Length control works as it does for every other story.
 3. **Check.** A model reads the chosen story with numbered paragraphs and reports
@@ -51,3 +52,8 @@ story's exact words) and `reason`.
 | Problem type | What it flags |
 | --- | --- |
 | `character_introduction` | a named person with no sheet, no introduction, a different entry scene from the plan, or a planned person who never appears |
+| `impossible_timing` | an event the prose makes too quick or too slow, or a scene whose stated time strays from the plan's clock |
+
+The clock check uses the plan's range for a planned key event, and the checker's own
+realistic range for any other event. A scene's stated time may differ from the plan
+by a factor of two either way, plus five minutes.
