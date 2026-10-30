@@ -1,7 +1,10 @@
 # M/B development pilot and the G1 decision
 
-**Status (30 October 2026):** approved and committed; generation and reading have
-not been recorded as complete. Formal G1 has no protocol and no result.
+**Status (30 October 2026):** generated once and admitted. Run
+`20261030T150215Z-dev-M-B-pilot-20261027-v1-78ddef` cost US$0.48 at commit
+`f578753`, and all four pairs passed strict readiness. The blind batch
+`dev-mb-pilot-20261027` is built and sealed, and reading has not started. Formal
+G1 has no protocol and no result.
 
 The owner declined the 30-pair G1 read on 27 October 2026 ("No, that's not going
 to happen. I can spare a few hours at most."). The registered replacement compares
