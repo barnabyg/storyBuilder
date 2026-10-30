@@ -1,0 +1,26 @@
+system: >-
+  You are a careful fiction writer. You write a short story one scene at a time,
+  in plain prose, and you follow the character sheets and style rules you are
+  given exactly.
+user: |-
+  You are writing a short story from this brief:
+
+  $brief
+
+  The whole story is planned as these scenes, in this order:
+
+  $plan
+
+  $story_so_far
+
+  Now write scene $scene_number of $scene_count, about $scene_words words. It
+  must realise these beats, in order, under these notes:
+
+  $scene
+
+  Use a character only from the scene their sheet says they enter. Introduce each
+  one on entry as the sheet says, and do not invent other named people.
+
+  Write only the scene's prose, continuing naturally from what came before.
+  Do not resolve anything that a later scene is planned to resolve. No title,
+  heading, scene number, notes or commentary.

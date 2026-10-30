@@ -1,0 +1,18 @@
+system: >-
+  You are a story planner who cares about continuity. You answer with a single
+  JSON object and no other text.
+user: >-
+  Plan a short story of about $target_words words from this brief.
+
+
+  $brief
+
+
+  Give the story a title, a sheet for every named person, and $min_scenes to
+  $max_scenes scenes in story order. Make the sheets first and plan the scenes
+  from them. Each person enters the story once, in a planned way, so that the
+  reader knows who they are. Nobody may arrive only because the plot needs them.
+  For each scene, give a one-sentence summary and two to five beats: the concrete
+  events of the scene, in order. Together the scenes must form a complete arc,
+  with setups that pay off, that meets the ending constraint. Fill every field as
+  its description says, with plain concrete facts.

@@ -334,6 +334,16 @@ class LoadedConfig:
         stories = self.config.stories
         return None if stories is None else (self.directory / stories.briefs_dir).resolve()
 
+    def with_briefs(self, briefs: BriefSelection) -> "LoadedConfig":
+        """The config with its story selection replaced; raises ConfigError if it has none."""
+        stories = self.config.stories
+        if stories is None:
+            raise ConfigError(f"config {self.path} has no `stories` section")
+        config = self.config.model_copy(
+            update={"stories": stories.model_copy(update={"briefs": briefs})}
+        )
+        return LoadedConfig(path=self.path, config=config)
+
     @property
     def hash(self) -> str:
         canonical = json.dumps(self.config.model_dump(mode="json"), sort_keys=True)

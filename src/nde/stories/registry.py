@@ -21,11 +21,19 @@ def _candidate_e(raw: Mapping[str, JsonValue]) -> Pipeline[Any]:
     return CandidateE.from_params(raw)
 
 
+def _continuity(raw: Mapping[str, JsonValue]) -> Pipeline[Any]:
+    # Imported on use, like Candidate E: its modules import the story pipeline base.
+    from nde.continuity.pipeline import Continuity  # noqa: PLC0415
+
+    return Continuity.from_params(raw)
+
+
 PIPELINES: dict[str, PipelineFactory] = {
     "baseline_a": BaselineA.from_params,
     "baseline_b": BaselineB.from_params,
     "baseline_c": BaselineC.from_params,
     "baseline_d": BaselineD.from_params,
     "candidate_e": _candidate_e,
+    "continuity": _continuity,
     "baseline_b_scrambled": BaselineBScrambled.from_params,
 }
