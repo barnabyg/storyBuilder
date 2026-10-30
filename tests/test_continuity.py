@@ -251,6 +251,23 @@ def test_the_command_runs_one_dev_brief_and_reports_where_everything_is(
     assert [r["brief"] for r in stories(run_dir)] == ["brief-02"]
 
 
+def test_the_command_finds_the_story_under_any_condition_name(
+    continuity_llm: FakeOpenAI,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    raw = continuity_config(continuity_llm.base_url)
+    raw["stories"]["conditions"][0]["name"] = "renamed"
+    config = write_config(tmp_path, raw)
+
+    code = main(["continuity", "brief-02", "--config", str(config), "--runs-dir", "runs"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "renamed" in out
+    assert "flagged problems: 0" in out
+
+
 def test_the_command_refuses_a_held_out_brief_before_any_call(
     continuity_llm: FakeOpenAI,
     tmp_path: Path,
