@@ -55,6 +55,9 @@ class Audit[R: AuditRecord]:
     prompt: PromptRef
     model: type[R]
     check: Callable[[ContinuityPlan, NumberedStory, R], list[Flag]]
+    # A file to keep beside the story, holding the latest reading in a form for people.
+    record_file: str | None = None
+    record: Callable[[NumberedStory, R], object] | None = None
 
 
 def run_audit(
@@ -78,4 +81,6 @@ def run_audit(
         f"audits/round-{round_number}/{audit.name}.json",
         json.dumps(record.model_dump(mode="json"), indent=2) + "\n",
     )
+    if audit.record_file is not None and audit.record is not None:
+        ctx.keep(audit.record_file, json.dumps(audit.record(story, record), indent=2) + "\n")
     return audit.check(plan, story, record)

@@ -19,6 +19,7 @@ def sheet(name: str, enters: int, how: str = "Walks in and says who they are.") 
         "back_story": f"{name} has lived on the island all their life.",
         "enters_scene": enters,
         "introduction": how,
+        "knows_at_start": [f"{name} knows the tide tables."],
     }
 
 
@@ -74,6 +75,7 @@ def clean_audits() -> Audits:
     return {
         "List every named person": {"people": CLEAN_PEOPLE},
         "List every event whose time": {"events": [], "scenes": []},
+        "list each specific fact": {"entries": []},
     }
 
 

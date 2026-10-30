@@ -42,6 +42,7 @@ The story's folder, `stories/continuity/<brief>/r1/` in the run directory, holds
 | `continuity.json` | the same record for tools, with the full flagged-problem list and cost |
 | `character-sheets.json`, `plan.json` | the sheets and the whole plan |
 | `style-rules.md` | the plain-style rules the writer received |
+| `knowledge.json` | scene by scene, what each character acted on and how they learned it |
 | `audits/round-<n>/<check>.json` | each check's reading of the story |
 
 Every flagged problem has the same three fields: `problem_type`, `passage` (the
@@ -53,7 +54,12 @@ story's exact words) and `reason`.
 | --- | --- |
 | `character_introduction` | a named person with no sheet, no introduction, a different entry scene from the plan, or a planned person who never appears |
 | `impossible_timing` | an event the prose makes too quick or too slow, or a scene whose stated time strays from the plan's clock |
+| `unexplained_knowledge` | a character acting on a fact the story gives them no way to know, or learns only later |
 
 The clock check uses the plan's range for a planned key event, and the checker's own
 realistic range for any other event. A scene's stated time may differ from the plan
 by a factor of two either way, plus five minutes.
+
+The knowledge check accepts a fact only if the reading cites where it came from: a
+paragraph no later than the one where the character acts on it, or a numbered item
+on their sheet's list of what they know at the start.

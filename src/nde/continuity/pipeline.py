@@ -10,6 +10,7 @@ from nde.continuity.audit import AUDIT_VARIABLES, Audit, run_audit
 from nde.continuity.clock import ClockAudit, check_clock
 from nde.continuity.flags import Flag
 from nde.continuity.introductions import IntroductionAudit, check_introductions
+from nde.continuity.knowledge import KnowledgeAudit, check_knowledge, knowledge_by_scene
 from nde.continuity.plan import (
     PLAIN_STYLE_RULES,
     ContinuityPlan,
@@ -34,6 +35,14 @@ AUDITS: tuple[Audit[Any], ...] = (
         check_introductions,
     ),
     Audit("clock", PromptRef(template="continuity_clock", version=1), ClockAudit, check_clock),
+    Audit(
+        "knowledge",
+        PromptRef(template="continuity_knowledge", version=1),
+        KnowledgeAudit,
+        check_knowledge,
+        record_file="knowledge.json",
+        record=knowledge_by_scene,
+    ),
 )
 # The record of the whole run for a person to inspect, and its readable summary.
 RESULT_FILE = "continuity.json"

@@ -21,6 +21,12 @@ Plain-style rules:
 """
 
 
+KNOWLEDGE_RULE = (
+    "A character may act only on what their sheet says they know at the start, or on "
+    "what they have seen, heard or worked out earlier on the page."
+)
+
+
 class CharacterSheet(Strict):
     name: str = Field(min_length=1, description="the character's full name")
     appearance: str = Field(min_length=1, description="what a stranger would notice about them")
@@ -31,6 +37,10 @@ class CharacterSheet(Strict):
     introduction: str = Field(
         min_length=1,
         description="how they enter, and what the reader is told about them when they do",
+    )
+    knows_at_start: list[str] = Field(
+        description="the facts that matter to the plot which they already know when the "
+        "story starts, one sentence each. Leave out anything they learn during the story."
     )
 
 
@@ -129,12 +139,20 @@ def _render_key_event(label: str, event: KeyEvent) -> str:
 
 
 def render_sheets(plan: ContinuityPlan) -> str:
-    return "\n\n".join(
-        f"{sheet.name}\n"
-        f"Appearance: {sheet.appearance}\n"
-        f"Back-story: {sheet.back_story}\n"
-        f"Enters in scene {sheet.enters_scene}: {sheet.introduction}"
-        for sheet in plan.characters
+    return "\n\n".join(_render_sheet(sheet) for sheet in plan.characters)
+
+
+def _render_sheet(sheet: CharacterSheet) -> str:
+    known = [f"{number}. {fact}" for number, fact in enumerate(sheet.knows_at_start, 1)]
+    return "\n".join(
+        [
+            sheet.name,
+            f"Appearance: {sheet.appearance}",
+            f"Back-story: {sheet.back_story}",
+            f"Enters in scene {sheet.enters_scene}: {sheet.introduction}",
+            "Knows at the start:",
+            *(known or ["Nothing that matters to the plot."]),
+        ]
     )
 
 
@@ -162,7 +180,7 @@ def _clock_note(scene: PlannedScene) -> str:
 
 def scene_specs(plan: ContinuityPlan) -> list[SceneSpec]:
     """The planned scenes for the shared prose steps, with the sheets and rules as notes."""
-    notes = f"Character sheets:\n\n{render_sheets(plan)}\n\n{PLAIN_STYLE_RULES}"
+    notes = f"Character sheets:\n\n{render_sheets(plan)}\n\n{KNOWLEDGE_RULE}\n\n{PLAIN_STYLE_RULES}"
     return [
         SceneSpec(
             summary=scene.summary, beats=scene.beats, notes=f"{_clock_note(scene)}\n\n{notes}"
