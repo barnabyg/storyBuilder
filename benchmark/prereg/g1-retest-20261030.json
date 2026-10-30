@@ -34,7 +34,7 @@
   ],
   "reading_mode": "required_only",
   "rubric_version": 1,
-  "config_sha256": "654237fda38ad70c48439d596314f4f3ac06012cf6423c4ceea037d69c0f0608",
+  "config_sha256": "b95b83fe6ece27e89485128b69cc77cbd320bc746d2ae046a769b6a635b5fd9c",
   "selection_sha256": "34a3722dd30ea7d89e6a450c7865393c5782cca38f33342e43fc95604c5bce03",
   "schema_evidence_sha256": "97c6ee4b30b3d19c8302bb57813f666d06c268ea1fa12061c10c7a7c7143e94a",
   "generation_limits": {

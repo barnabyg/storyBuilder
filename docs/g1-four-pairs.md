@@ -36,11 +36,19 @@ better model involved." The owner also said "coherence is critical", and that
 | Setting | First G1 | Retest |
 | --- | --- | --- |
 | Briefs | dev brief-03 to brief-06 | held-out test brief-11 to brief-14, the first four by number |
-| Model, both roles | `deepseek-flash` | `deepseek-v4-pro` |
+| Model, both roles | `deepseek-flash` | `gpt-6.1-sol` at medium reasoning effort |
 | Editing | B revised until budgets matched; C not revised | Both conditions get exactly 2 passes |
 | Budgets | Matched within 10% | Not matched: C also pays for planning, and the report shows both |
 | Decided by | Coherence and originality | Coherence only: at least 3 of 4 wins, ties count as non-wins |
 | Shown order | Random | Random, restricted so each condition is first in 2 of 4 pairs |
+
+The owner chose the model: "I've got a ton of credit on the OpenAI API, can we use
+their models please. Maybe gpt-6.1-sol set to medium thinking." Sampling temperature is
+not set, because this reasoning model does not take it.
+
+The owner also explained the first result's one preference for C: both pharmacist
+stories scored very low, and "comparing two terrible stories is much harder than
+comparing two reasonable stories." That preference carries little weight.
 
 Originality is no longer scored in new owner reviews. Preference and strength are
 still recorded, and do not decide the gate. The first result stays preserved and is
@@ -54,8 +62,8 @@ coherent stories at the extra cost of planning.
 The protocol is
 [`benchmark/prereg/g1-retest-20261030.json`](../benchmark/prereg/g1-retest-20261030.json)
 and the config is [`configs/g1-retest-20261030.yaml`](../configs/g1-retest-20261030.yaml).
-Generation needs the owner's approval of its cost cap. The estimate is about US$1.10
-at peak rates, with a US$3 cap on the run. Use these files in the commands below, with
+A rehearsal of one pair on dev brief-01 cost US$0.41, so about US$1.65 is expected,
+with a US$3 cap on the run. Use these files in the commands below, with
 a new batch name.
 
 ## Why four pairs

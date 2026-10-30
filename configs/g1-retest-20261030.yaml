@@ -1,13 +1,14 @@
 # The one permitted G1 follow-up: see docs/g1-four-pairs.md. Fresh briefs, a stronger
-# model in both conditions and the same editing passes for both. Prices are the peak
-# rates on https://api-docs.deepseek.com/quick_start/pricing, checked 30 October 2026.
+# model in both conditions and the same editing passes for both. Prices are the standard
+# rates on https://developers.openai.com/api/docs/pricing, checked 30 October 2026.
+# A reasoning model: max_completion_tokens also bounds the reasoning tokens.
 name: g1-retest-20261030-v1
 seed: 1800
 prompts_dir: ../prompts
 providers:
-  deepseek:
-    base_url: https://api.deepseek.com/v1
-    api_key_env: DEEPSEEK_API_KEY # pragma: allowlist secret - environment-variable name, no key value
+  openai:
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY # pragma: allowlist secret - environment-variable name, no key value
     json_schema: false
     timeout_s: 300
     retry:
@@ -16,23 +17,19 @@ providers:
       max_delay_s: 10
 roles:
   planner:
-    provider: deepseek
-    model: deepseek-v4-pro
-    family: deepseek
+    provider: openai
+    model: gpt-6.1-sol
+    family: openai
     params:
-      thinking:
-        type: disabled
-      temperature: 0.7
-      max_tokens: 16000
+      reasoning_effort: medium
+      max_completion_tokens: 32000
   prose:
-    provider: deepseek
-    model: deepseek-v4-pro
-    family: deepseek
+    provider: openai
+    model: gpt-6.1-sol
+    family: openai
     params:
-      thinking:
-        type: disabled
-      temperature: 0.8
-      max_tokens: 5000
+      reasoning_effort: medium
+      max_completion_tokens: 12000
 stories:
   briefs_dir: ../benchmark
   briefs:
@@ -68,9 +65,9 @@ stories:
 structured:
   max_repairs: 3
 prices:
-  deepseek/deepseek-v4-pro:
-    input_per_mtok: 1.32
-    output_per_mtok: 3.96
+  openai/gpt-6.1-sol:
+    input_per_mtok: 2.0
+    output_per_mtok: 10.0
 budget:
   per_run_usd: 3.0
   per_day_usd: 4.0

@@ -35,7 +35,7 @@
 - **G1 did not pass on 30 October:** C won 0 coherence pairs of 4, tying 1, and fell
   short on originality. See the [frozen decision and evidence](evidence/g1-2026-10-30/README.txt).
 - **Next research work:** the owner chose the one permitted [follow-up](g1-four-pairs.md#retest):
-  four held-out pairs, a stronger model and equal editing, decided on coherence alone.
+  four held-out pairs, `gpt-6.1-sol` and equal editing, decided on coherence alone.
   If it does not pass, the diffusion track stops. Real D/corpus experiments still require G1;
   real reconstruction requires G1 and G2. Phase 7 remains conditional on G3: its
   tooling is implemented on fixtures only, and Phase 8 is not implemented.
