@@ -25,10 +25,30 @@ _SECRET_SCAN_EXCLUDES: dict[str, str] = {
     # SHA-256 checksums recorded for each calibration source; YAML written by
     # `nde calibration fetch`, which cannot place inline pragmas.
     "data/manifest.calibration.yaml": "calibration source checksums",
+    # Hex High Entropy String: three public source checksums, already bound
+    # into the owner's G-schema packet. Preserve those exact manifest bytes;
+    # review this exception if the manifest is regenerated or its fields change.
+    "data/manifest.gschema-20261027.yaml": "immutable gold source checksums",
     # HexHighEntropyString: exact SHA-256 of the synthetic embedded source and
     # evidence spans. JSON cannot carry an inline pragma. Revisit if this fixture
     # gains non-checksum high-entropy fields; source identity is verified in tests.
     "src/nde/evidence/controls/evidence.json": "synthetic source/span checksum fixture",
+    # Hex High Entropy String: generated, public SHA-256 identities in these
+    # exact evidence documents. JSON cannot carry inline pragmas, and changing
+    # immutable evidence would invalidate its recorded identities. Review these
+    # exceptions whenever the documents are regenerated or gain new field kinds.
+    "docs/evidence/g-schema-2026-10-27/decision.json": "owner G-schema evidence identities",
+    "docs/evidence/dev-tier-selection-2026-10-27/decision.json": "owner dev decision identities",
+    # Also Secret Keyword: api_key_env names DEEPSEEK_API_KEY; it is an
+    # environment-variable reference, not a credential. Revisit if binding
+    # formats change; credential values must never be stored in this document.
+    "docs/evidence/dev-tier-selection-2026-10-27/selection.json": "immutable selection/env name",
+    # Hex High Entropy String: this one frozen dev cohort and its matching
+    # preregistration contain only public content/config/selection hashes.
+    # Review on regeneration or schema changes; do not generalise to a folder.
+    "benchmark/pilots/mb-20261027/frozen.json": "pilot brief checksums",
+    "benchmark/prereg/dev-mb-pilot-20261027-cohort.json": "pilot cohort checksums",
+    "benchmark/prereg/dev-mb-pilot-20261027.json": "pilot registration content identities",
 }
 
 

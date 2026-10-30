@@ -1,0 +1,21 @@
+{
+  "schema_version": "1",
+  "id": "dev-M-B-pilot-20261027-v1",
+  "brief_checksums": {
+    "brief-03": "dc7ac56016e8106577633effa6bc4d5e4ac43095d5176885703de9f5066269ed",
+    "brief-04": "80bc830bc6358e0ee44e071528284ec4428e398e3fa04551e1985b489c94f686",
+    "brief-05": "7976ddc08baf7fc8437dfa5f16fb1d678a3ce869d43f86169a1bad4810db56fb",
+    "brief-06": "d0fa18fad6deb66f86eb1243e176deb851c7e9f8db4e4b509d294478990cb15b"
+  },
+  "split_checksums": {
+    "dev": "0db83f09f9ebe8d7a4f4ca508ae9cb9dec9c40678f1e6ea75d9b42ce5f787c87"
+  },
+  "conditions": [
+    "C",
+    "B"
+  ],
+  "repeat": 1,
+  "length_tolerance": 0.1,
+  "budget_measure": "generation_tokens",
+  "budget_tolerance": 0.1
+}

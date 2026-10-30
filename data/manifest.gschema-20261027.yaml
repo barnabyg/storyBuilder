@@ -1,0 +1,33 @@
+# Owner-approved G-schema gold sources, 27 October 2026.
+# Protect these works and their authors from project training/tuning cohorts.
+# Full texts and owner-reviewed evidence are frozen in
+# docs/evidence/g-schema-2026-10-27/evidence.zip.
+
+stories:
+- id: owl-creek-bridge
+  title: An Occurrence at Owl Creek Bridge
+  author: Ambrose Bierce
+  source: https://www.gutenberg.org/cache/epub/375/pg375.txt
+  edition: Project Gutenberg eBook 375; complete standalone story
+  licence_basis: Project Gutenberg records public domain in the USA; published 1890
+  sha256: a64e03d1b1c8e5c24dc8a835083ab660b0690244487ec5c6f4a7884d47f882b4
+  start: '*** START OF'
+  end: '*** END OF'
+- id: gift-of-the-magi
+  title: The Gift of the Magi
+  author: O. Henry
+  source: https://www.gutenberg.org/cache/epub/7256/pg7256.txt
+  edition: Project Gutenberg eBook 7256; complete standalone story
+  licence_basis: Project Gutenberg records public domain in the USA; published 1905
+  sha256: cdf8ad2aad68e48c58d6745a8a1ec418871176a6521fb458a8abc88f9a0649a3
+  start: '*** START OF'
+  end: '*** END OF'
+- id: lady-or-tiger
+  title: The Lady, or the Tiger?
+  author: Frank R. Stockton
+  source: https://www.gutenberg.org/cache/epub/396/pg396.txt
+  edition: Project Gutenberg eBook 396; complete standalone story
+  licence_basis: Project Gutenberg records public domain in the USA; published 1882
+  sha256: 1a84538761d909b5d996a3e65fc94936fcaae0c4ece17c7ac2942e8e0c8bc570
+  start: '*** START OF'
+  end: End of Project Gutenberg's The Lady, or the Tiger?

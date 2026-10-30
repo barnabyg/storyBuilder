@@ -1,0 +1,16 @@
+id: brief-06
+split: dev
+genre: romance
+premise: >-
+  Two rival food-truck owners are forced to share a single parking permit for
+  a summer festival after a clerical error.
+protagonist:
+  name: Lucía Ferrer
+  description: a proud former restaurant chef who lost her restaurant in a bad lease
+central_conflict: >-
+  Lucía needs the festival to win a lease on a new restaurant, and the only
+  rival who stands in her way is the one person who makes her cooking better.
+themes: [pride, collaboration, second chances]
+ending_constraint:
+  kind: happy
+  detail: They end together and in business together, but only after Lucía gives up the lease she fought for.

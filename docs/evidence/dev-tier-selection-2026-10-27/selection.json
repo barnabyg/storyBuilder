@@ -1,0 +1,140 @@
+{
+  "version": "1",
+  "id": "d2c5a65088e23c2bde350db85d910a6943fb35d0dad2a14fae8cc4feef1b5203",
+  "tier": "M",
+  "test_only": false,
+  "owner": "Project owner (guided review in this chat)",
+  "rationale": "The owner found Story 1 meaningfully better, more coherent and less contrived than the other two. With tier identities concealed, Story 1 (M) received coherence 4/5 and originality 5/5; Story 2 (L) and Story 3 (S) each received 3/5 and 4/5. The two fixed sampled M intentions were realised according to the owner; two other M intentions remain unreviewed. This is a one-development-brief screen, not a held-out quality result or evidence of cheaper planning.",
+  "comparison": "C:\\docs\\git\\storyBuilder\\.nde\\dev-tier-selection-20261027\\comparison-03",
+  "comparison_sha256": "01ab1954a964a53185764d1db2963e03077ad990ab5a566074c09c7a84f59557",
+  "briefs": {
+    "brief-01": "322ce3fc4a54268cdea61ba3dc6484b4221a2d6c5112b14f689df3302726d915",
+    "brief-02": "dfac4e659b046dc1ce3e2c49664b9145699cddca59a5e64822c6fc3f0dd75e5e"
+  },
+  "owner_sample": [
+    "brief-01"
+  ],
+  "settings_sha256": "111b11fe2d4bb5ea0f798b35d9df318f11df80a3abebd22b0ddd91fb0d4b543f",
+  "schema_sha256": "890577b4d8f9b6eb75c18df5500f3f702af917b02fcc1626b9be715a45e8f147",
+  "prompt_sha256": {
+    "beat_outline@1": "a73e82a57365ea365368e3645c77cd39d3f294c41e51642cf22012d59c16ef13",
+    "plan_channels@2": "01ada4fa319c564a28d0635e43cd2053c56f1153abf5f39f5b8571e6531a3a05",
+    "plan_skeleton@2": "0da31dbfa52de49ef8ec5e8163cbbdf392527ec545e828a72c6e2bf28e544982",
+    "scene_prose@1": "85c4412933793b898ee85e324ec79ba20a2ae247a805a21de23575723f1e1170",
+    "story_revision@1": "778ffb95c765b54770d6e12a077d1c5447892f3be5abbc8cebcc9c5c0e7c9a4b"
+  },
+  "models_sha256": "a503d1770d593be0b1d13edc62658766d65d333ed6610c4822c3baa99ee42fa4",
+  "config": {
+    "name": "development-tier-selection-20261027-compact-attempt03",
+    "seed": 1700,
+    "prompts_dir": "C:\\docs\\git\\storyBuilder\\.nde\\dev-tier-selection-20261027\\compact-prompts",
+    "providers": {
+      "deepseek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "timeout_s": 300.0,
+        "json_schema": false,
+        "retry": {
+          "max_retries": 1,
+          "base_delay_s": 1.0,
+          "max_delay_s": 10.0
+        }
+      }
+    },
+    "roles": {
+      "planner": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "params": {
+          "thinking": {
+            "type": "disabled"
+          },
+          "temperature": 0.7,
+          "max_tokens": 16000
+        },
+        "family": "deepseek"
+      },
+      "prose": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "params": {
+          "thinking": {
+            "type": "disabled"
+          },
+          "temperature": 0.8,
+          "max_tokens": 5000
+        },
+        "family": "deepseek"
+      }
+    },
+    "calls": [],
+    "prices": {
+      "deepseek/deepseek-flash": {
+        "input_per_mtok": 0.3,
+        "output_per_mtok": 1.2
+      }
+    },
+    "budget": {
+      "per_run_usd": 1.5,
+      "per_day_usd": 3.0,
+      "allow_unpriced_models": false,
+      "assumed_output_tokens": 1024
+    },
+    "structured": {
+      "max_repairs": 3
+    },
+    "stories": {
+      "briefs_dir": "C:\\docs\\git\\storyBuilder\\benchmark",
+      "briefs": {
+        "ids": [
+          "brief-01",
+          "brief-02"
+        ]
+      },
+      "conditions": [
+        {
+          "name": "C",
+          "pipeline": "baseline_c",
+          "params": {
+            "tier": "L",
+            "skeleton_prompt": {
+              "template": "plan_skeleton",
+              "version": 2
+            },
+            "channels_prompt": {
+              "template": "plan_channels",
+              "version": 2
+            }
+          }
+        },
+        {
+          "name": "B",
+          "pipeline": "baseline_b",
+          "params": {}
+        }
+      ],
+      "repeat": 1,
+      "length": {
+        "tolerance": 0.1,
+        "max_attempts": 8
+      },
+      "equal_budget": {
+        "conditions": [
+          "C",
+          "B"
+        ],
+        "tolerance": 0.1,
+        "max_revision_passes": 48,
+        "revision_prompt": {
+          "template": "story_revision",
+          "version": 1
+        }
+      }
+    }
+  },
+  "review_sha256": {
+    "C:\\docs\\git\\storyBuilder\\.nde\\dev-tier-selection-20261027\\comparison-03\\reviews\\000001-ef6b121f61c18c05a82ee69a12eb5f083944b9ca96ef02650b8fd0bcf55855a4.json": "dad67f9c2963b6b8b6ad092fc8a45ae1b6aa2d7d4de3eff7abb86d0a2c0ae3a7",
+    "C:\\docs\\git\\storyBuilder\\.nde\\dev-tier-selection-20261027\\comparison-03\\reviews\\000002-762eeedcbc5c59f0f53114cf48ce0bf6ffcd8933d0bdf3c81e8d8eb3e44ce360.json": "dcc3eec3e543e16098548dfb269f6b3311c3766a5c1c74a41561e0dea753ffab",
+    "C:\\docs\\git\\storyBuilder\\.nde\\dev-tier-selection-20261027\\comparison-03\\reviews\\000003-5c11509441cbbaa7f7d3b1736e08a7e8291f2c724b63cae93242a06e6e843ea0.json": "a31bb8ed1b359de9cf8b5136a18fc85f85a5ce57374f2cab1f72dd3fbacb4ab2"
+  }
+}

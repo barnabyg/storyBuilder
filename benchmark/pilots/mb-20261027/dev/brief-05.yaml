@@ -1,0 +1,17 @@
+id: brief-05
+split: dev
+genre: horror
+premise: >-
+  A family moves into a farmhouse whose previous owners left every clock in the
+  house stopped at the same minute, and the clocks start again on their first
+  night.
+protagonist:
+  name: Martin Leigh
+  description: a recovering alcoholic father who is desperate for the move to be a fresh start
+central_conflict: >-
+  Martin is the only one who notices the clocks counting down, and his family
+  assumes he has started drinking again.
+themes: [credibility, addiction, family]
+ending_constraint:
+  kind: tragic
+  detail: Martin is right, he is not believed in time, and the cost falls on the person he most wanted to protect.

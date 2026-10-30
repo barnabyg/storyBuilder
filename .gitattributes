@@ -17,3 +17,9 @@
 *.db binary
 *.whl binary
 *.gz binary
+
+# These two immutable pilot documents were owner-approved with CRLF bytes.
+# Preserve their exact SHA-256 approval seals; review if either is superseded.
+# Recognise CRLF while retaining the normal trailing-space checks.
+benchmark/prereg/dev-mb-pilot-20261027.json -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmark/pilots/mb-20261027/frozen.json -text whitespace=trailing-space,space-before-tab,cr-at-eol

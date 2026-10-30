@@ -1,0 +1,81 @@
+{
+  "gate": "G-schema",
+  "decision": "passed",
+  "decision_date": "2026-10-27",
+  "report_id": "77de4d1b2df3f2936ce0c4ed0970733962a61d3ef58b67a5af4d2b9ca8641483",
+  "code_revision": "3f29d9cd83e11b038a6dd963b6f7f168c93ed48e",
+  "schema_sha256": "890577b4d8f9b6eb75c18df5500f3f702af917b02fcc1626b9be715a45e8f147",
+  "mechanical_status": "passed",
+  "mutation_categories_caught": 44,
+  "mutation_categories_total": 44,
+  "stories": [
+    {
+      "id": "owl-creek-bridge",
+      "title": "An Occurrence at Owl Creek Bridge",
+      "word_count": 3728,
+      "revision": 8,
+      "revision_sha256": "63d166ebb9c6a8e558e07a0e4828ebe3cd9148fab6ffc6da4986db2b8ebda48b",
+      "owner_review": "accepted",
+      "active_review_seconds": 3125.9146163463593,
+      "meaningful_trajectory_differences_confirmed": true
+    },
+    {
+      "id": "gift-of-the-magi",
+      "title": "The Gift of the Magi",
+      "word_count": 2057,
+      "revision": 9,
+      "revision_sha256": "4c0bdccadfb1a657f34cf4938d42b3ea2fc5e935553a8ba9f8dbfea855095380",
+      "owner_review": "accepted",
+      "active_review_seconds": 2925.8613200187683,
+      "meaningful_trajectory_differences_confirmed": true
+    },
+    {
+      "id": "lady-or-tiger",
+      "title": "The Lady, or the Tiger?",
+      "word_count": 2708,
+      "revision": 9,
+      "revision_sha256": "ce856b0cbb05563f81b5940e2aaa5c0886a38d912f43c42e201df83c3c73c299",
+      "owner_review": "accepted",
+      "active_review_seconds": 2655.213320493698,
+      "meaningful_trajectory_differences_confirmed": true
+    }
+  ],
+  "shared_comparison_seconds": 152.89435958862305,
+  "total_generation_cost_usd_including_superseded_drafts": 0.29159039999999997,
+  "replay_byte_identical": true,
+  "public_cli_replay_exit_code": 0,
+  "owner_workflow": "Guided, one-question-at-a-time correction and final exact-version approval. Agent work paused; source reading and owner dialogue were timed. Shared comparison time is separate.",
+  "limits": [
+    "Three stories and one owner; this is not an external-reader validation.",
+    "Qualitative patterns were reviewed. Unprovided numeric confidence/intensity values and whole-story agency curves remain unrecorded.",
+    "Private character knowledge, reader disclosures and imagined events were reconciled separately.",
+    "The exact timing of Jim's off-page sale, and the unshown sabotage/capture sequence and scout intent in Owl Creek, remain unspecified.",
+    "Owl Creek retains an intentional unpaid-setup advisory for the unshown driftwood/sabotage payoff.",
+    "This pass establishes the G-schema representation/usability gate only. It does not establish G1, G-D, G2, G3, or story-quality gains."
+  ],
+  "next_research_step": "Development-tier comparison and owner tier selection, then a committed G1 protocol before generation and blind reading.",
+  "evidence_archive": "evidence.zip",
+  "evidence_archive_sha256": "42a476caa7349207358359a9b773ee40c4673fc740a169a256479e2bd871ac83",
+  "bundle_member_count": 248,
+  "protected_gold_manifest": "data/manifest.gschema-20261027.yaml",
+  "protected_gold_authors": [
+    {
+      "author": "Ambrose Bierce",
+      "story_id": "owl-creek-bridge",
+      "source_sha256": "a64e03d1b1c8e5c24dc8a835083ab660b0690244487ec5c6f4a7884d47f882b4"
+    },
+    {
+      "author": "O. Henry",
+      "story_id": "gift-of-the-magi",
+      "source_sha256": "cdf8ad2aad68e48c58d6745a8a1ec418871176a6521fb458a8abc88f9a0649a3"
+    },
+    {
+      "author": "Frank R. Stockton",
+      "story_id": "lady-or-tiger",
+      "source_sha256": "1a84538761d909b5d996a3e65fc94936fcaae0c4ece17c7ac2942e8e0c8bc570"
+    }
+  ],
+  "protection_scope": "Exclude these gold works and their authors from this project’s training and tuning cohorts; no claim about external models’ pretraining data.",
+  "portable_archive_replay_byte_identical": true,
+  "protected_gold_manifest_sha256": "c75e2f9cf500ebcb9ed71f1ac6a3f33a4cec8a678507fccc8c2c1890acc966a4"
+}

@@ -1,0 +1,18 @@
+Four-pair M/B development pilot — final review version, 27 October 2026
+
+Owner-approved time ceiling: two hours total for reading and answers.
+Owner’s words: "Yes, two hours total is the right cap for my part."
+
+The original 30-pair G1 proposal is deferred because its reading workload was declined. It remains preserved under the local draft-history folder. This replacement is a development pilot, and formal G1 remains unresolved.
+
+Read four anonymous pairs, eight full stories, one story and one question at a time. Use development brief-03 through brief-06, frozen before generation in benchmark/pilots/mb-20261027. The original held-out test set remains untouched. M uses the exact selected model, prompts, parameters and limits; the comparator uses the shared prose writer with a beat outline.
+
+Give actual coherence and originality scores for both stories, then A/B overall preference and strength. Keep unknown values missing; never invent a score or preference. No extra realisation questionnaire. Plan about 80 minutes for the four pairs, with a 40-minute buffer. Pause for breaks and agent work. Stop at the two-hour cap even if review is unfinished, and retain the full fixed denominator. Do not begin another pair without sufficient remaining time.
+
+Report individual paired scores and descriptive coherence wins/ties/losses and average originality differences. Retain the owner’s no-average-originality-loss preference. This sample supports preliminary development evidence only. It cannot pass formal G1 or replace its required scientific evidence.
+
+Owner-approved generation budget: US$1.50 total, one invocation, preserving the existing $1.50/run and $3/day selected caps. Estimated generation at configured prices is around $0.46, with uncertainty. Budget approval is recorded; generation has not started. Execution follows only after the exact protocol has been approved and committed. All final story lengths, plans and counted B/C token budgets must pass technical admission across all four pairs before reading. Retain failed attempts; stop as incomplete if fixed limits are exhausted. No pair dropping, new seeds, quality-based retries or automatic budget increase.
+
+Keep condition identities hidden until all scores are complete and the batch is closed. No model rationalisations of story defects or intermediate condition results. Maintain the planned 48-hour gap from the owner’s latest generating-code work; obtain actual timing before reading and preserve unknowns.
+
+Still needed: approval of this exact final pilot protocol before commitment or execution. The approval receipt will bind the exact file checksums; this review file alone is not execution authorisation. The original G1 no-average-loss decision and M selection are preserved; the smaller pilot has not been silently promoted to a full gate.
