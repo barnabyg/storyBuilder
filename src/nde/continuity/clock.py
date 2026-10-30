@@ -81,6 +81,7 @@ def check_clock(plan: ContinuityPlan, story: NumberedStory, audit: ClockAudit) -
                     problem_type=PROBLEM_TYPE,
                     passage=story.paragraph(event.paragraph),
                     reason=reason,
+                    paragraph=event.paragraph,
                 )
             )
     for reading in audit.scenes:
@@ -94,6 +95,7 @@ def check_clock(plan: ContinuityPlan, story: NumberedStory, audit: ClockAudit) -
                 Flag(
                     problem_type=PROBLEM_TYPE,
                     passage=story.paragraph(reading.paragraph),
+                    paragraph=reading.paragraph,
                     reason=(
                         f"Scene {reading.scene} says {format_minutes(reading.prose_minutes)} "
                         f"have passed, but the plan's clock gives "

@@ -43,10 +43,22 @@ class Change(Strict):
 
 def group_by_passage(flags: Sequence[Flag]) -> list[list[Flag]]:
     """The flags to repair together: one group per distinct passage, in first-seen order."""
-    groups: dict[str, list[Flag]] = {}
+    groups: dict[tuple[int | None, str], list[Flag]] = {}
     for flag in flags:
-        groups.setdefault(flag.passage, []).append(flag)
+        groups.setdefault((flag.paragraph, flag.passage), []).append(flag)
     return list(groups.values())
+
+
+def locate(story: NumberedStory, flag: Flag) -> int | None:
+    """The paragraph holding a flag's passage: the one it names, else an exact, else any match."""
+    numbers = range(1, len(story) + 1)
+    named = flag.paragraph
+    if named is not None and named in numbers and flag.passage in story.paragraph(named):
+        return named
+    for number in numbers:
+        if flag.passage == story.paragraph(number):
+            return number
+    return next((number for number in numbers if flag.passage in story.paragraph(number)), None)
 
 
 def _render_problems(flags: Sequence[Flag]) -> str:
@@ -67,10 +79,7 @@ def repair_passage(
     and code splices it into the one paragraph that holds the passage.
     """
     passage = flags[0].passage
-    number = next(
-        (n for n in range(1, len(story) + 1) if passage in story.paragraph(n)),
-        None,
-    )
+    number = locate(story, flags[0])
     if number is None:
         return None
     step = Step(

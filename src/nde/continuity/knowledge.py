@@ -84,6 +84,7 @@ def check_knowledge(
                 Flag(
                     problem_type=PROBLEM_TYPE,
                     passage=story.paragraph(entry.acted_paragraph),
+                    paragraph=entry.acted_paragraph,
                     reason=f"{entry.character} knows something unexplained: {entry.fact} {problem}",
                 )
             )

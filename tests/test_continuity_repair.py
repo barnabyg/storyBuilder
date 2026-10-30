@@ -8,7 +8,13 @@ import yaml
 from nde.cli import main
 from nde.continuity.flags import Flag
 from nde.continuity.plan import ContinuityPlan
-from nde.continuity.repair import REPAIR_PROMPT, RepairedPassage, group_by_passage, repair_passage
+from nde.continuity.repair import (
+    REPAIR_PROMPT,
+    RepairedPassage,
+    group_by_passage,
+    locate,
+    repair_passage,
+)
 from nde.continuity.story import NumberedStory
 from nde.llm.config import ModelBinding, ProviderConfig
 from nde.llm.gateway import Gateway
@@ -263,6 +269,28 @@ def test_every_problem_type_is_repaired_the_same_way_and_shared_passages_go_toge
     third = Flag(problem_type="future_type", passage="Different.", reason="Three.")
 
     assert group_by_passage([first, third, second]) == [[first, second], [third]]
+
+
+def test_a_short_flagged_line_is_found_in_its_own_paragraph_not_an_earlier_one() -> None:
+    story = NumberedStory(('"No." He left.', "Other.", '"No."', "Later.", '"No."'), (1, 1, 1, 1, 1))
+    passage = '"No."'
+
+    named = Flag(problem_type="any", passage=passage, reason="r", paragraph=5)
+    unnamed = Flag(problem_type="any", passage=passage, reason="r")
+    fragment = Flag(problem_type="any", passage="He left.", reason="r")
+    missing = Flag(problem_type="any", passage="Not in the story.", reason="r")
+
+    assert locate(story, named) == 5
+    assert locate(story, unnamed) == 3
+    assert locate(story, fragment) == 1
+    assert locate(story, missing) is None
+
+
+def test_the_same_words_in_two_paragraphs_are_repaired_separately() -> None:
+    first = Flag(problem_type="any", passage="No.", reason="One.", paragraph=1)
+    second = Flag(problem_type="any", passage="No.", reason="Two.", paragraph=2)
+
+    assert group_by_passage([first, second]) == [[first], [second]]
 
 
 def test_a_replacement_with_line_breaks_is_rejected() -> None:

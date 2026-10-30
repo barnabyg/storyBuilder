@@ -111,7 +111,8 @@ def test_a_named_character_with_no_sheet_is_flagged_with_the_passage(
     [flag] = flags_of(folder, INTRODUCTION)
     assert "Viktor Hale" in flag["reason"]
     assert flag["passage"].startswith("Scene3 second")
-    assert set(flag) == {"problem_type", "passage", "reason"}
+    assert set(flag) == {"problem_type", "passage", "reason", "paragraph"}
+    assert flag["paragraph"] == 6
 
 
 def test_a_sheeted_character_with_no_introduction_is_flagged(

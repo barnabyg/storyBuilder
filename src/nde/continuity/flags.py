@@ -12,3 +12,5 @@ class Flag(Strict):
     # Verbatim text from the story; repair finds the problem by it.
     passage: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    # The paragraph holding the passage, when the check knows it, since short lines repeat.
+    paragraph: int | None = None

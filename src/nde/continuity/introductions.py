@@ -40,7 +40,12 @@ def check_introductions(
 
     def flag(paragraph: int, reason: str) -> None:
         flags.append(
-            Flag(problem_type=PROBLEM_TYPE, passage=story.paragraph(paragraph), reason=reason)
+            Flag(
+                problem_type=PROBLEM_TYPE,
+                passage=story.paragraph(paragraph),
+                reason=reason,
+                paragraph=paragraph,
+            )
         )
 
     for person in audit.people:
