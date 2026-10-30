@@ -138,6 +138,55 @@ def test_the_real_model_does_not_flag_what_people_know_about_their_own_lives(
     assert flags == []
 
 
+def test_the_real_model_accepts_a_secret_learned_on_the_page_first(tmp_path: Path) -> None:
+    story = NumberedStory(
+        (
+            'Mrs. Alcott leaned over the counter. "I sell the pills," she told Priya. "I get a '
+            'hundred a month. It pays my aide three days a week. I stretch my insulin past its label."',
+            PRIYA_KNOWS_THE_LEDGER,
+        ),
+        (1, 1),
+    )
+
+    flags = _read(tmp_path, "knowledge", _plan("Priya Raman", []), story)
+
+    assert [flag.reason for flag in flags if flag.passage == PRIYA_KNOWS_THE_LEDGER] == []
+
+
+def test_the_real_model_accepts_plausible_timing(tmp_path: Path) -> None:
+    later = "Two days later the food in her refrigerators had begun to smell sour."
+    story = NumberedStory((POWER_CUT, later), (1, 1))
+
+    flags = _read(tmp_path, "clock", _plan("Lucía", []), story)
+
+    assert later not in {flag.passage for flag in flags}
+
+
+def test_the_real_model_reports_a_stranger_with_no_sheet_or_introduction(tmp_path: Path) -> None:
+    story = NumberedStory(
+        (
+            "Priya Raman, a tired pharmacist in a white coat, counted pills behind the counter.",
+            'Viktor Hale took the bag from her hand. "Not tonight," he said.',
+        ),
+        (1, 1),
+    )
+
+    flags = _read(tmp_path, "introductions", _plan("Priya Raman", []), story)
+
+    assert any("Viktor Hale" in flag.reason for flag in flags)
+
+
+def test_the_real_model_accepts_a_character_introduced_as_planned(tmp_path: Path) -> None:
+    story = NumberedStory(
+        ("Priya Raman, a tired night-shift pharmacist, stood at work behind the counter.",),
+        (1,),
+    )
+
+    flags = _read(tmp_path, "introductions", _plan("Priya Raman", []), story)
+
+    assert flags == []
+
+
 def test_the_real_model_catches_priya_doing_the_sums_too_early(tmp_path: Path) -> None:
     story = NumberedStory(
         (

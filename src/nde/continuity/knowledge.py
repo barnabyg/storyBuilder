@@ -21,9 +21,10 @@ class KnowledgeEntry(Strict):
     how_learned: str = Field(
         min_length=1, description="how they learned it, or that the story never says"
     )
-    source: Literal["on_page", "sheet", "none"] = Field(
-        description="on_page if they see, hear or work it out in the story; sheet if their "
-        "character sheet lists it; none if the story gives no way to know it"
+    source: Literal["ordinary", "on_page", "sheet", "none"] = Field(
+        description="ordinary if a person in their place would simply know it; on_page if they "
+        "see, hear or work it out in the story; sheet if their character sheet lists it; none "
+        "if the story gives no way to know it"
     )
     learned_paragraph: int | None = Field(
         default=None, description="for on_page: the paragraph where they learn it"
@@ -56,6 +57,8 @@ class KnowledgeAudit(AuditRecord):
 
 def _problem(plan: ContinuityPlan, entry: KnowledgeEntry) -> str | None:
     """What is wrong with the entry's explanation, or None if it holds up."""
+    if entry.source == "ordinary":
+        return None
     if entry.source == "none":
         return f"The story gives no way to know it: {entry.how_learned}"
     if entry.source == "on_page":

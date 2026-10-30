@@ -70,6 +70,12 @@ The clock check uses the plan's range for a planned key event, and the checker's
 realistic range for any other event. A scene's stated time may differ from the plan
 by a factor of two either way, plus five minutes.
 
-The knowledge check accepts a fact only if the reading cites where it came from: a
-paragraph no later than the one where the character acts on it, or a numbered item
-on their sheet's list of what they know at the start.
+The knowledge check records each fact that matters to what happens, and how the
+character learned it. Anything a person in their place would simply know is recorded
+without a flag. Any other fact must cite where it came from: a paragraph no later than
+the one where the character acts on it, or a numbered item on their sheet's list of
+what they know at the start.
+
+The default tests use fixed readings, so they prove what the code does with a reading.
+`uv run pytest tests/test_continuity_live.py -m live` shows that the real model finds
+real G1 defects and leaves clean passages alone, for a few cents.

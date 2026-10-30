@@ -44,7 +44,7 @@ def _entry(acted: int, source: str, **fields: Any) -> dict[str, Any]:
 
 
 def _with_entries(*entries: dict[str, Any]) -> dict[str, Any]:
-    return clean_audits() | {"list each specific fact": {"entries": list(entries)}}
+    return clean_audits() | {"record each specific fact": {"entries": list(entries)}}
 
 
 def _plan() -> ContinuityPlan:
@@ -76,6 +76,10 @@ def test_acting_on_a_secret_never_told_is_flagged_with_character_fact_and_passag
 def test_learning_the_fact_on_the_page_first_has_no_flag() -> None:
     assert _check(_entry(3, "on_page", learned_paragraph=1)) == []
     assert _check(_entry(2, "on_page", learned_paragraph=2)) == []
+
+
+def test_what_a_person_in_their_place_would_simply_know_is_recorded_without_a_flag() -> None:
+    assert _check(_entry(1, "ordinary", how_learned="It is their own boat.")) == []
 
 
 def test_learning_the_fact_only_after_acting_on_it_is_flagged() -> None:
@@ -161,7 +165,7 @@ def test_the_sheets_and_writer_carry_what_each_character_knows_at_the_start(
     [scene] = [p for p in prompts if "Now write scene 1 of" in p]
     assert "Knows at the start:\n1. Tom Reyes knows the tide tables." in scene
     assert "A character may act only on what" in scene
-    [audit] = [p for p in prompts if "list each specific fact" in p]
+    [audit] = [p for p in prompts if "record each specific fact" in p]
     assert "1. Tom Reyes knows the tide tables." in audit
 
 

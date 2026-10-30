@@ -46,7 +46,7 @@ AUDITS: tuple[Audit[Any], ...] = (
     Audit("clock", PromptRef(template="continuity_clock", version=1), ClockAudit, check_clock),
     Audit(
         "knowledge",
-        PromptRef(template="continuity_knowledge", version=2),
+        PromptRef(template="continuity_knowledge", version=3),
         KnowledgeAudit,
         check_knowledge,
         record_file="knowledge.json",

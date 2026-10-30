@@ -75,7 +75,7 @@ def clean_audits() -> Audits:
     return {
         "List every named person": {"people": CLEAN_PEOPLE},
         "List every event whose time": {"events": [], "scenes": []},
-        "list each specific fact": {"entries": []},
+        "record each specific fact": {"entries": []},
     }
 
 
