@@ -36,8 +36,9 @@ Brief IDs are unique across both splits.
 
 ## Splits
 
-- **dev** (`benchmark/dev/`): ten briefs, used freely during development.
-  Dev briefs may be edited at any time; the dev split is not frozen.
+- **dev** (`benchmark/dev/`): ten development briefs. The split has no record
+  in `benchmark/frozen.json`, but the owner's tier selection binds their exact
+  checksums, so editing one invalidates that selection and needs a new one.
 - **test** (`benchmark/test/`): thirty held-out briefs. Outputs for test briefs
   are generated only for gate runs and read only blind. The test split is
   frozen.
@@ -76,7 +77,7 @@ manifest, so a gate result names exactly the briefs it used.
 
 ## Drafting and curating briefs
 
-Briefs are drafted by an LLM and curated by the owner (plan §9, open item 3).
+Briefs are drafted by an LLM and curated by the owner (plan §9, Resolved).
 Drafting is an ordinary run, so it is cached, costed and capped:
 
 ```powershell
@@ -111,5 +112,5 @@ split was frozen on 20 October 2026. The plan's §4 lists which drafts were
 kept.
 
 The ten committed dev briefs were drafted by an LLM (Claude, while
-implementing this ticket) rather than through the drafting config, and are
-committed for the owner to review.
+implementing this ticket) rather than through the drafting config. They have
+been used unchanged since 19 October; no separate owner sign-off is recorded.

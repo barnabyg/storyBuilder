@@ -484,12 +484,13 @@ check them against the provider's price list.
   outputs cost to produce.
 - Before each provider call, the gateway reserves a conservative estimate of
   its cost: input tokens are estimated at 3 characters per token plus 8 per
-  message, and output tokens at the call's `max_tokens` (or
-  `assumed_output_tokens` when it sets none). If the reservation would take the
+  message, and output tokens at the call's `max_tokens` or
+  `max_completion_tokens` (`assumed_output_tokens` when it sets neither). If the reservation would take the
   run or the day over its cap, the call is not made. The run stops with
   `status: aborted`, `abort_reason: budget`, and still writes its manifest,
-  outputs so far and report. `nde run` then exits 1. Set `max_tokens` on every
-  role: providers stop there, so it bounds the output cost. The input
+  outputs so far and report. `nde run` then exits 1. Set one of them on every
+  role, using `max_completion_tokens` for OpenAI reasoning models: providers stop
+  there, so it bounds the output cost. The input
   estimate is generous for English but is not a hard bound, so a request can
   cost slightly more than its reservation, and the cap can be overshot by that
   difference on the last request. Leave some headroom under a hard limit.
@@ -513,13 +514,13 @@ Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
 | `calls.jsonl` | one line per provider call (including repair attempts): the reported model ID, template, tokens, cost, latency, retries and whether it was a cache hit |
 | `stories.jsonl`, `stories/` | story runs only; see [Story-generation runs](#story-generation-runs) |
 | `judgements.jsonl` | judge-panel runs only: every judge verdict, by pair and shown position; see [evaluation.md](evaluation.md#llm-judge-panel) |
+| `report.md` | generated from the files above |
 
 The manifest records each model's role, provider, model and `family`. Story
 runs add a `stories` section (brief IDs, frozen-split checksums, conditions,
 length settings, out-of-range stories and any equal-budget matches) and
 judge-panel runs a `judges` section (the batch, modes, panel, rubric version
 and verdict counts).
-| `report.md` | generated from the files above |
 
 Regenerate a report with `uv run nde report <run dir>`.
 

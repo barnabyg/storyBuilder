@@ -1,11 +1,12 @@
 # Reproducible G-schema evidence
 
-This closes the reporting implementation, not the owner's G-schema review.
+This documents the reporting implementation. The owner's G-schema review passed
+on 27 October 2026; the record is in `docs/evidence/g-schema-2026-10-27/`.
 The bundled validator controls are synthetic. They provide mechanical evidence;
 they never establish literary accuracy or owner approval.
 
 ```powershell
-uv run nde schema-evidence --manifest data/manifest.calibration.yaml --annotations .nde/annotations --out .nde/g-schema
+uv run nde schema-evidence --manifest data/manifest.gschema-20261027.yaml --annotations .nde/annotations --out .nde/g-schema
 uv run nde schema-evidence --replay .nde/g-schema/inputs.json --out .nde/g-schema-replay
 ```
 
@@ -13,12 +14,11 @@ The first command reads local saved inputs only. It never downloads a source,
 calls a provider, starts a timer or creates an owner review. Annotation sessions
 are read from `<annotations>/<story-id>/session.json` using the story IDs in the
 provenance manifest. Use `nde annotate draft --out .nde/annotations/<story-id>`
-when preparing each story. The existing manifest inventories three actual
-public-domain works: *An Occurrence at Owl Creek Bridge*, *The Gift of the Magi*
-and *The Yellow Wallpaper*. The report measures their extracted word counts
-when local sources exist; it does not claim all three satisfy the roughly
-2,000–5,000-word selection target. Missing sources and out-of-range lengths are
-shown as pending, so replace unsuitable selections before the owner gate.
+when preparing each story. `data/manifest.gschema-20261027.yaml` records the
+three works in the passed review: *An Occurrence at Owl Creek Bridge*, *The Gift
+of the Magi* and *The Lady, or the Tiger?*. The report measures extracted word
+counts when local sources exist. Missing sources and lengths outside roughly
+2,000–5,000 words show as pending.
 The source licence basis is recorded provenance, not a new legal determination.
 
 Outputs are `evidence.md`, `evidence.html`, machine-readable `evidence.json`,
@@ -73,7 +73,7 @@ unknown. At least one pair must differ mechanically; the owner must separately
 confirm whether the differences are meaningful. Automatic difference is not
 literary confirmation.
 
-## Small remaining owner procedure
+## Owner procedure for a repeat review
 
 1. Select three to five provenance-checked stories in range, draft tier L and
    inspect the existing scene cards. Preserve the original draft.

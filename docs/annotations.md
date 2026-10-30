@@ -3,7 +3,8 @@
 This is a small Phase 2 workflow for three to five stories, using the existing
 gateway, cache, ledger, versioned prompts and call provenance. It does not run
 the later bulk extraction pipeline. Tooling acceptance is automated; the
-owner's literary evidence remains a separate, pending G-schema requirement.
+owner's literary evidence is separate. G-schema passed on 27 October 2026
+(`docs/evidence/g-schema-2026-10-27/`).
 
 Import a local public-domain source through the provenance workflow first.
 The manifest must record its checksum, edition and licence basis. Drafting
@@ -75,7 +76,7 @@ curves cannot establish this. Reviews are append-only records; a later revision
 requires its own review. Test-only review actions exercise storage in isolated
 temporary sessions and supply no evidence about real stories.
 
-No routine manual regression testing is needed. The remaining owner work is to
-correct and review the selected real stories, record active effort, and judge
-whether retained channels distinguish them. If correction is slow or channels
+No routine manual regression testing is needed. For any later annotation round,
+the owner corrects and reviews the selected stories, records active effort, and
+judges whether retained channels distinguish them. If correction is slow or channels
 do not discriminate, cut or merge those channels and repeat on another story.

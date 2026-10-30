@@ -73,8 +73,7 @@ through the public CLI, saved diagnostics and both card formats.
 | Absent relationship participant | `relationship_presence` |
 | Unscoped non-canon constraint | `constraint_character_required` |
 
-Additional named integration cases cover `state_presence`,
-`relationship_presence`, uncertainty bounds and valid controls. No API keys,
+Additional named integration cases cover uncertainty bounds and valid controls. No API keys,
 provider calls, downloads or owner availability are needed for implementation
 acceptance. A manual inspection of the command above should show the final
 goal “guide the boat home,” relationships changing from “suspicious” to “allies,”

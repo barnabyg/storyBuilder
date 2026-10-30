@@ -14,6 +14,8 @@ the [shared prose pipeline](docs/baseline-c.md). Inspect
 [final-prose realisation evidence](docs/realisation.md).
 Require [strict gate readiness](docs/gate-readiness.md) before blind admission,
 then produce a [protocol-bound G1 decision](docs/g1-decision.md) after closure.
+G1 has no result yet; see the [M/B development pilot](docs/mb-pilot.md) for where it
+stands and the decision it still needs.
 
 ## Setup
 
@@ -132,11 +134,8 @@ names what it suppresses (`# noqa: <rule>`, or `# pragma: allowlist secret` for
 a secret-scan false positive) and has its justification beside it.
 The only broader exceptions are the per-file ignores for `tests/**` in
 `pyproject.toml` (assert statements and literal expected values), justified
-there, and the secret-scan exclusions for checksum files (`prompts/checksums.json`,
-`benchmark/frozen.json`, `tests/fixtures/frozen-split/frozen.json`,
-`benchmark/rubric/checksums.json`,
-`data/manifest.calibration.yaml`, and the synthetic source/span checksum fixture
-`src/nde/evidence/controls/evidence.json`), justified in `src/nde/verify/steps.py`.
+there, and the secret-scan exclusions for exact checksum and identity files, each
+listed with its justification in `_SECRET_SCAN_EXCLUDES` in `src/nde/verify/steps.py`.
 The code has no type-checker suppressions.
 
 CI (`.github/workflows/verify.yml`) runs the same command headless on every

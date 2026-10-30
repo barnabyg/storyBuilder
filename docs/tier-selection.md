@@ -66,8 +66,9 @@ prompt text and model/generation/repair/budget settings. The name, brief selecto
 and directory may change from dev to test; condition ordering is canonicalised
 and the chosen tier is checked separately. Other relevant settings must match.
 Model IDs alone do not establish model-parameter compatibility. `tiers check`
-returns 0 for matching current evidence/settings, 1 for stale or mismatched
-evidence/settings, and 2 for an unreadable or malformed selection/config. Set
+returns 0 for matching current evidence/settings, 1 for stale, mismatched or
+unavailable evidence/settings (including an unreadable or invalid config), and 2
+for an unreadable or malformed selection. Set
 the config's C `params.tier` to the selected tier before checking it.
 
 Manual test with configured credentials: generate a small dev comparison,

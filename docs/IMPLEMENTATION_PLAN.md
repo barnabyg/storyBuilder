@@ -2,7 +2,7 @@
 
 **Status:** Working plan v3; tooling through Phase 7 on `main`; G-schema passed
 **Created:** 18 October 2026
-**Updated:** 29 October 2026, recording the G-schema result, the dev M tier selection and Phase 6–7 issue closure
+**Updated:** 30 October 2026, recording the declined 30-pair G1 read and the registered M/B development pilot
 **Source:** [Narrative_Diffusion_Writing_Engine_Proposal.md](../Narrative_Diffusion_Writing_Engine_Proposal.md)
 
 ## Current position
@@ -29,10 +29,14 @@
   no genuine G1, G-D, G2 or G3 outcome is recorded in this plan. Synthetic fixture criteria can
   pass while the scientific outcome remains pending. Closed implementation
   tickets and green verification do not authorise later research phases.
-- **Next research work:** with the dev M tier selected, commit a G1 protocol before generation and
-  blind reading. Real D/corpus experiments require G1; real reconstruction
-  requires G1 and G2. Phase 7 remains conditional on G3: its tooling is
-  implemented on fixtures only, and Phase 8 is not implemented.
+- **G1 cannot complete as written:** on 27 October the owner declined the 30-pair
+  read ("I can spare a few hours at most"), so no G1 protocol is registered. A
+  [four-pair M/B development pilot](mb-pilot.md) is approved and committed. It is
+  preliminary evidence and cannot pass G1.
+- **Next research work:** the owner chooses what replaces the 30-pair G1, then
+  generates and blind-reads the pilot. Real D/corpus experiments still require G1;
+  real reconstruction requires G1 and G2. Phase 7 remains conditional on G3: its
+  tooling is implemented on fixtures only, and Phase 8 is not implemented.
 
 | Phase | Implementation status on `main` | Implementation issues | Operating guide |
 | --- | --- | --- | --- |
@@ -43,8 +47,8 @@
 | P6 | Codec/tasks, datasets, CPU ML models, paired evaluation, audits/sweeps, G3 and augmentation | [#66–75](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP6%5D%22), closed | [Training](reconstruction-training.md), [experiments](reconstruction-experiments.md), [G3](reconstruction-evaluation.md) |
 | P7 | Conditional examples, variable layouts, brief-conditioned training with guidance, bounded generation, text completion, D/E inpainting, the Candidate E run pipeline, adherence/diversity/similarity reporting, registered G-E preparation and the G-E decision report; no G-E result | [#76–85](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP7%5D%22): closed | [Data](conditional-data.md), [generation](conditional-generation.md), [inpainting](conditional-inpainting.md), [E](candidate-e.md), [evidence](conditional-report.md), [G-E](ge.md) |
 
-Status above was checked against `main` at `39692ae` and GitHub Issues on
-29 October 2026. The dated G0/G-instr results below remain historical records;
+Status above was checked against `main` at `de0beaf` and GitHub Issues on
+30 October 2026. The dated G0/G-instr results below remain historical records;
 the task tables retain their original plan IDs, which differ from GitHub issue
 numbers. Operating guides describe the implemented interfaces. Future changes
 to scientific criteria require a new committed protocol, not reinterpretation
@@ -62,7 +66,7 @@ of a completed result.
 ### Working assumptions (change any of these if they are wrong)
 
 - One developer, part-time. Effort is given in relative sizes, not dates.
-- Gate evaluations use stories of about **2,000 words with 5–8 scenes**. That is long enough for setup/payoff and arc shape to matter, and short enough to read about 30 pairs in roughly 10 hours.
+- Gate evaluations use stories of about **2,000 words with 5–8 scenes**. That is long enough for setup/payoff and arc shape to matter, and short enough to read about 30 pairs in roughly 10 hours. The owner declined that workload for G1 on 27 October 2026; see [the M/B pilot](mb-pilot.md).
 - Implementation verification uses tiny local CPU models and needs no GPU or model downloads. Before real Phase 6 training, select compatible local pretrained weights and measure resource requirements; neither the current tests nor a nominal GPU memory size establishes feasibility. Other model architectures need an explicit adapter.
 - The corpus is public-domain only at first (Standard Ebooks, Project Gutenberg). Licensed modern fiction is out of scope until Phase 6 shows that data volume is the bottleneck.
 
@@ -96,7 +100,7 @@ P0 Foundations ─► P1 Benchmark + instrument check ─► P2 Schema v0 ─►
 Phases 4 and 5 are independent and can run in parallel, for example on separate branches or worktrees.
 
 This diagram describes scientific prerequisites. Fixture-based software has
-been implemented through Phase 6 ahead of those decisions; real workflows
+been implemented through Phase 7 ahead of those decisions; real workflows
 retain evidence checks and do not infer permission from code availability.
 
 ## 3. Cross-cutting foundations
@@ -481,6 +485,11 @@ The [immutable selection](evidence/dev-tier-selection-2026-10-27/selection.json)
 binds the actual reviews and generation settings. All tiers incurred full-L
 planning before projection. G1 registration and held-out evaluation remain open.
 
+**Reading decision (27 October 2026):** the owner declined the 30-pair read below.
+The M/B [development pilot](mb-pilot.md) replaces it for now on four dev briefs and
+cannot pass G1. The original originality decision, no average loss (margin 0), is
+preserved. P3.6 and Gate 1 stay as written until the owner chooses a replacement.
+
 **Goal:** answer the first real question. **Do multi-channel plans produce better stories than beat-only plans at equal budget?**
 
 | Ticket | Work |
@@ -700,7 +709,7 @@ the outcome is recorded.
 | G0 (passed, 18 Oct 2026) | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
 | G-instr (closed, 20 Oct 2026) | P1 | Does the instrument detect known damage? | Historical: owner ≥9/10 coherence wins, judge ≥80% agreement | Owner 9/10; judge 70%. Closed through the fail action: owner coherence is the instrument, judges diagnostic only |
 | G-schema (passed, 27 Oct 2026) | P2 | Is the schema expressive and practical? | 44/44 categories caught; all three owner reviews under two hours; meaningful qualitative differences confirmed | Cut channels |
-| **G1** (not recorded) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in ≥21/30 pairs; ties are non-wins; originality safeguard met | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
+| **G1** (not recorded; 30-pair read declined, see [M/B pilot](mb-pilot.md)) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in ≥21/30 pairs; ties are non-wins; originality safeguard met | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
 | G-D (not recorded) | P4 | Does refinement help? | D meets pre-registered coherence comparison against C, originality safeguard and controllability targets | C becomes the reference baseline |
 | **G2** (not recorded) | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
 | **G3** (not recorded) | P6 | Does denoising beat AR on long-range structure? | Pre-registered validator target and positive long-range margin over matched AR | Stop; D or C is the result |
@@ -748,9 +757,10 @@ operational work. Keep missing evidence pending rather than repeating fixture
 checks as a substitute for owner judgement.
 
 1. **Research gates:** G-schema and the sampled dev review/M selection are complete.
-   Next are committed G1 registration and blind reading. Follow with independently registered
-   G-D/G2 work and genuine G1/G2 prerequisites for G3. Record each actual
-   outcome; existing gate commands already enforce admission.
+   Next are the owner's choice of what replaces the declined 30-pair G1 and the
+   [M/B pilot](mb-pilot.md). Follow with independently registered G-D/G2 work and
+   genuine G1/G2 prerequisites for G3. Record each actual outcome; existing gate
+   commands already enforce admission.
 2. **Issue close-out:** Phase 6 and 7 implementation issues (#66–85) are closed.
    Tooling on `main` is not a reason to manufacture a scientific result.
 3. **Fresh held-out briefs, before a G1 follow-up or Phase 8:** plan authorship,
