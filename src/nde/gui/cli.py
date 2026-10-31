@@ -82,8 +82,8 @@ def run(args: argparse.Namespace) -> int:
         threading.Timer(_BROWSER_DELAY_S, webbrowser.open, [url]).start()
     server = uvicorn.Server(uvicorn.Config(create_app(studio), log_level="warning"))
     if sys.platform == "win32":
-        # run.bat starts this with `start /b`, which leaves Ctrl+C switched off until
-        # the program switches it back on.
+        # A program can inherit Ctrl+C switched off from whatever started it, and then
+        # only the program can switch it back on.
         ctypes.windll.kernel32.SetConsoleCtrlHandler(None, False)
     # After shutting down, uvicorn raises the interrupt again for its caller to handle.
     with contextlib.suppress(KeyboardInterrupt):

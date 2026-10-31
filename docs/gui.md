@@ -4,14 +4,14 @@ A local web page for writing and reading [continuity stories](continuity.md), wi
 command line needed. To start it, double-click `run.bat` in the repository folder, or
 type `.\run` in PowerShell in that folder.
 
-The page opens in your browser. Keep the window that opens with it, and press Ctrl+C there
-to stop. If a story is being written, stopping loses it, and the window says so. It needs
+The page opens in your browser. Story Builder runs in its own window: keep that window
+open, and press Ctrl+C there or close it to stop. If a story is being written, stopping loses it, and the window says so. It needs
 `OPENAI_API_KEY` in the environment or in `.env`, and says so on the page if the key is
 missing.
 
 `run.bat` needs the `.venv` folder that `uv sync` creates. It is the same as
 `uv run nde gui`, without needing the pinned version of `uv`. Started from PowerShell, it
-gives the prompt back straight away while Story Builder keeps running in that window.
+gives the prompt back straight away, and that terminal plays no further part.
 
 ## What it does
 
@@ -81,4 +81,11 @@ asked:
 
 ```powershell
 $env:NDE_BROWSER = "1"; uv run pytest tests/test_gui_browser.py
+```
+
+`tests/test_run_bat.py` starts Story Builder through `run.bat` and stops it with Ctrl+C. It
+opens a real window, so it also only runs when asked, and only on Windows:
+
+```powershell
+$env:NDE_CONSOLE = "1"; uv run pytest tests/test_run_bat.py
 ```
