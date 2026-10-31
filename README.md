@@ -127,7 +127,7 @@ uv run nde-verify
 | 3 | Type checking | `pyright` in strict mode, warnings as errors |
 | 4 | Static bug analysis | `ruff check --select B,S` (flake8-bugbear and bandit rules) |
 | 5 | Automated tests | `pytest`, with warnings as errors; `live` tests excluded |
-| 6 | Dependencies and secrets | `uv lock --check`, `pip-audit` over every locked group, `detect-secrets` |
+| 6 | Dependencies and secrets | `detect-secrets`, `uv lock --check`, `pip-audit` over every locked group |
 | 7 | Build | `uv build` into a temporary directory |
 
 A gate fails on a non-zero exit **or** on any warning in its output. Later
@@ -145,7 +145,8 @@ listed with its justification in `_SECRET_SCAN_EXCLUDES` in `src/nde/verify/step
 The code has no type-checker suppressions.
 
 CI (`.github/workflows/verify.yml`) runs the same command headless on every
-push and pull request.
+push and pull request. Before pushing, `uv run nde-verify --quick` runs every gate
+except the tests in under a minute; see [docs/verification.md](docs/verification.md).
 
 A separate CPU ML job installs the pinned optional group and sets
 `NDE_REQUIRE_ML=1`, making missing ML support a failure. Run its checks locally:

@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from typing import TextIO
 
 from nde.verify.dashboard import DEFAULT_PORT, Dashboard, DashboardState
-from nde.verify.gates import canonical_profile
+from nde.verify.gates import canonical_profile, quick_profile
 from nde.verify.pytest_reporter import EVENTS_URL_ENV
 from nde.verify.runner import Gate, run_gates
 
@@ -20,13 +20,22 @@ from nde.verify.runner import Gate, run_gates
 DEFAULT_LINGER_S = 3.0
 
 
-def dashboard_port(argv: Sequence[str], environ: Mapping[str, str]) -> int | None:
-    """The port to try for the dashboard, or None when it is switched off."""
+def _parse(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="nde-verify", description=__doc__)
     parser.add_argument(
         "--no-dashboard", action="store_true", help="do not start the live dashboard"
     )
-    args = parser.parse_args(argv)
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="run every gate except the tests, before pushing; this is not full verification",
+    )
+    return parser.parse_args(argv)
+
+
+def dashboard_port(argv: Sequence[str], environ: Mapping[str, str]) -> int | None:
+    """The port to try for the dashboard, or None when it is switched off."""
+    args = _parse(argv)
     if args.no_dashboard or environ.get("NDE_DASHBOARD") == "0" or environ.get("CI"):
         return None
     return int(environ.get("NDE_DASHBOARD_PORT", DEFAULT_PORT))
@@ -71,5 +80,11 @@ def verify(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    port = dashboard_port(sys.argv[1:] if argv is None else argv, os.environ)
-    return verify(canonical_profile(), out=sys.stdout, err=sys.stderr, dashboard_port=port)
+    arguments = sys.argv[1:] if argv is None else argv
+    port = dashboard_port(arguments, os.environ)
+    quick = _parse(arguments).quick
+    gates = quick_profile() if quick else canonical_profile()
+    status = verify(gates, out=sys.stdout, err=sys.stderr, dashboard_port=port)
+    if quick:
+        print("Quick check only: the tests did not run, so this is not full verification.")
+    return status

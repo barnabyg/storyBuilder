@@ -5,12 +5,13 @@ import sys
 
 from nde.verify.runner import Command, Gate
 
+TESTS_GATE = "tests"
 GATE_ORDER = (
     "format",
     "lint",
     "types",
     "static-analysis",
-    "tests",
+    TESTS_GATE,
     "dependencies-and-secrets",
     "build",
 )
@@ -45,7 +46,7 @@ def canonical_profile() -> list[Gate]:
             ),
         ),
         Gate(
-            "tests",
+            TESTS_GATE,
             (
                 _python_module(
                     "pytest", "-p", "no:cacheprovider", "-p", "nde.verify.pytest_reporter"
@@ -55,9 +56,10 @@ def canonical_profile() -> list[Gate]:
         Gate(
             "dependencies-and-secrets",
             (
+                # First because it needs no uv: a wrong uv version must not hide a leaked secret.
+                _python_module("nde.verify.steps", "secrets"),
                 _uv("lock", "--check"),
                 _python_module("nde.verify.steps", "audit"),
-                _python_module("nde.verify.steps", "secrets"),
             ),
         ),
         Gate("build", (_python_module("nde.verify.steps", "build"),)),
@@ -65,3 +67,8 @@ def canonical_profile() -> list[Gate]:
     if tuple(gate.name for gate in gates) != GATE_ORDER:  # pragma: no cover - guards edits
         raise RuntimeError("canonical profile is out of the standard gate order")
     return gates
+
+
+def quick_profile() -> list[Gate]:
+    """Every gate except the slow tests, for a check before pushing. Not full verification."""
+    return [gate for gate in canonical_profile() if gate.name != TESTS_GATE]
