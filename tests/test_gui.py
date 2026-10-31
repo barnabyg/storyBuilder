@@ -136,6 +136,7 @@ def test_an_example_fills_in_the_form_and_a_held_out_brief_is_never_offered(
 
     filled = client.get("/", params={"idea": "brief-09"})
     assert 'value="Kari Lund"' in filled.text
+    assert '<option value="brief-09" selected>' in filled.text
     held_out = client.get("/", params={"idea": "brief-11"})
     assert 'name="genre" value=""' in held_out.text
 

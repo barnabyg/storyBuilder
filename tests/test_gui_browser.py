@@ -65,6 +65,7 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
             page.get_by_label("Example idea").select_option("brief-09")
             page.get_by_role("button", name="Fill in").click()
             expect(page.get_by_label("Main character's name")).to_have_value("Kari Lund")
+            expect(page.get_by_label("Example idea")).to_have_value("brief-09")
 
             # The browser itself stops an unanswered question, before the server sees it.
             genre = page.locator('input[name="genre"]').input_value()
