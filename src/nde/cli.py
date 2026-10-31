@@ -36,6 +36,7 @@ from nde.env import load_dotenv
 from nde.eval import cli as eval_cli
 from nde.eval import gd_cli, rubric
 from nde.evidence import cli as evidence_cli
+from nde.gui import cli as gui_cli
 from nde.llm.cache import DEFAULT_CACHE_PATH
 from nde.llm.ledger import DEFAULT_LEDGER_PATH
 from nde.narrative import cli as narrative_cli
@@ -216,6 +217,8 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"the models and budget ({continuity_cli.DEFAULT_CONFIG.as_posix()})",
     )
     _run_options(continuity)
+
+    gui_cli.configure(commands.add_parser("gui", help="open the story builder in a web page"))
 
     report = commands.add_parser("report", help="regenerate a run directory's report")
     report.add_argument("run_dir", type=Path)
@@ -425,6 +428,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "plan": narrative_cli.run,
     "run": _run,
     "continuity": _continuity,
+    "gui": gui_cli.run,
     "report": _report,
     "eval": eval_cli.run,
     "rubric": _rubric_lock,
