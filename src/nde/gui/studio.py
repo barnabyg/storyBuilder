@@ -2,7 +2,8 @@
 
 An idea typed into the GUI is saved as a brief in its own folder, never in the benchmark,
 so the development and held-out splits stay as they are. The benchmark's dev briefs are
-offered as examples; held-out briefs are never opened.
+offered as examples; held-out briefs are never opened. Changing or removing an example
+is recorded beside the typed ideas, and never touches the benchmark's files.
 """
 
 import json
@@ -32,6 +33,8 @@ DEFAULT_OWN_BRIEFS = Path(".nde/gui-briefs")
 # Above every benchmark brief, so a story's brief ID names one idea wherever it is kept.
 FIRST_OWN_BRIEF = 1001
 SPLIT = "dev"
+EXAMPLES_FOLDER = "examples"
+REMOVED_EXAMPLES = "removed-benchmark-examples.yaml"
 
 
 class StudioBusyError(Exception):
@@ -153,6 +156,22 @@ def _failure(run_dir: Path) -> str | None:
     return next((story.error for story in read_stories(run_dir) if story.error), None)
 
 
+def _brief_number(brief: Brief) -> int:
+    return int(brief.id.removeprefix("brief-"))
+
+
+def _brief_yaml(brief: Brief) -> str:
+    return yaml.safe_dump(brief.model_dump(mode="json"), sort_keys=False, allow_unicode=True)
+
+
+def _replace_text(path: Path, text: str) -> None:
+    """Write a file in one step, so a failure part way cannot leave a broken example."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_suffix(".partial")
+    write_text_lf(partial, text)
+    partial.replace(path)
+
+
 class Studio:
     """Writes one story at a time and finds the ones already written."""
 
@@ -170,6 +189,7 @@ class Studio:
             clock=options.clock,
         )
         self.own_briefs = own_briefs
+        self._examples_root = own_briefs / EXAMPLES_FOLDER
         self._lock = threading.Lock()
         self._jobs: dict[str, Job] = {}
         self._current: Job | None = None
@@ -178,15 +198,88 @@ class Studio:
     def cap_usd(self) -> float | None:
         return load_config(self.config).config.budget.per_run_usd
 
-    def examples(self) -> list[Brief]:
-        """The benchmark's development briefs, offered as starting points."""
+    def _benchmark_examples(self) -> dict[str, Brief]:
         folder = load_config(self.config).briefs_dir
         if folder is None:
             raise ConfigError(f"config {self.config} has no `stories` section")
         try:
-            return sorted(load_briefs(folder, (SPLIT,)).values(), key=lambda brief: brief.id)
+            return load_briefs(folder, (SPLIT,))
         except BriefError as error:
             raise ConfigError(str(error)) from error
+
+    def _own_examples(self) -> dict[str, Brief]:
+        if not (self._examples_root / SPLIT).is_dir():
+            return {}
+        try:
+            return load_briefs(self._examples_root, (SPLIT,))
+        except BriefError as error:
+            raise ConfigError(str(error)) from error
+
+    def _removed_examples(self) -> set[str]:
+        """The benchmark examples taken off the list; their files are never touched."""
+        path = self._examples_root / REMOVED_EXAMPLES
+        if not path.is_file():
+            return set()
+        return set(yaml.safe_load(path.read_text(encoding="utf-8")) or [])
+
+    def _set_removed_examples(self, removed: set[str]) -> None:
+        self._examples_root.mkdir(parents=True, exist_ok=True)
+        _replace_text(
+            self._examples_root / REMOVED_EXAMPLES,
+            yaml.safe_dump(sorted(removed)) if removed else "",
+        )
+
+    def examples(self) -> list[Brief]:
+        """The ideas offered as starting points: the benchmark's dev briefs, then the owner's."""
+        removed = self._removed_examples()
+        kept = [b for b in self._benchmark_examples().values() if b.id not in removed]
+        return [
+            *sorted(kept, key=lambda brief: brief.id),
+            *sorted(self._own_examples().values(), key=_brief_number),
+        ]
+
+    def example(self, brief_id: str) -> Brief | None:
+        """An example still on the list, by ID."""
+        return next((brief for brief in self.examples() if brief.id == brief_id), None)
+
+    def is_benchmark_example(self, brief_id: str) -> bool:
+        return brief_id in self._benchmark_examples()
+
+    def removed_example_count(self) -> int:
+        return len(self._removed_examples() & self._benchmark_examples().keys())
+
+    def add_example(self, content: BriefContent) -> Brief:
+        with self._lock:
+            return self._add_example(content)
+
+    def _add_example(self, content: BriefContent) -> Brief:
+        brief = Brief(**content.model_dump(), id=self._next_own_id(), split=SPLIT)
+        _replace_text(self._own_example_path(brief.id), _brief_yaml(brief))
+        return brief
+
+    def update_example(self, brief_id: str, content: BriefContent) -> Brief:
+        """Change an example; a benchmark example is replaced by the owner's changed copy."""
+        with self._lock:
+            if brief_id in self._own_examples():
+                brief = Brief(**content.model_dump(), id=brief_id, split=SPLIT)
+                _replace_text(self._own_example_path(brief_id), _brief_yaml(brief))
+                return brief
+            # Copied before the original goes, so a failure cannot lose the example.
+            brief = self._add_example(content)
+            self._set_removed_examples(self._removed_examples() | {brief_id})
+            return brief
+
+    def delete_example(self, brief_id: str) -> None:
+        with self._lock:
+            if brief_id in self._own_examples():
+                self._own_example_path(brief_id).unlink()
+            else:
+                self._set_removed_examples(self._removed_examples() | {brief_id})
+
+    def restore_examples(self) -> None:
+        """Put back every benchmark example taken off the list; the owner's stay as they are."""
+        with self._lock:
+            self._set_removed_examples(set())
 
     def _own_ideas(self) -> dict[str, Brief]:
         if not (self.own_briefs / SPLIT).is_dir():
@@ -194,18 +287,31 @@ class Studio:
         return load_briefs(self.own_briefs, (SPLIT,))
 
     def find_idea(self, brief_id: str) -> Brief | None:
-        """An idea by ID, whether typed into the GUI or one of the examples."""
-        ideas = self._own_ideas() | {brief.id: brief for brief in self.examples()}
+        """An idea by ID: typed into the GUI, an example, or a benchmark brief taken off the list.
+
+        A story's page needs its idea even after that example has left the list.
+        """
+        ideas = self._own_ideas() | self._benchmark_examples() | self._own_examples()
         return ideas.get(brief_id)
+
+    def _next_own_id(self) -> str:
+        """The next free ID, counted across typed ideas and examples so each names one idea."""
+        found = [
+            *(self.own_briefs / SPLIT).glob("brief-*.yaml"),
+            *(self._examples_root / SPLIT).glob("brief-*.yaml"),
+        ]
+        numbers = [int(path.stem.removeprefix("brief-")) for path in found]
+        return f"brief-{max(numbers, default=FIRST_OWN_BRIEF - 1) + 1}"
+
+    def _own_example_path(self, brief_id: str) -> Path:
+        return self._examples_root / SPLIT / f"{brief_id}.yaml"
 
     def _save_idea(self, content: BriefContent) -> str:
         folder = self.own_briefs / SPLIT
         folder.mkdir(parents=True, exist_ok=True)
-        numbers = [int(path.stem.removeprefix("brief-")) for path in folder.glob("brief-*.yaml")]
-        brief_id = f"brief-{max(numbers, default=FIRST_OWN_BRIEF - 1) + 1}"
+        brief_id = self._next_own_id()
         brief = Brief(**content.model_dump(), id=brief_id, split=SPLIT)
-        body = yaml.safe_dump(brief.model_dump(mode="json"), sort_keys=False, allow_unicode=True)
-        write_text_lf(folder / f"{brief_id}.yaml", body)
+        write_text_lf(folder / f"{brief_id}.yaml", _brief_yaml(brief))
         return brief_id
 
     @property
