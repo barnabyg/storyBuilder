@@ -53,7 +53,7 @@ button.danger, .button.danger { background: #8b2e2e; color: #fff; }
 .examples li { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .example-idea { flex: 1 1 16rem; }
 .examples .actions { margin: 0; }
-.examples a { font-family: inherit; font-size: inherit; }
+.library.examples a { font-family: inherit; font-size: inherit; }
 .notice { background: #f6e7c8; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
 .problems { background: #f8d7d3; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
 .problems ul { margin: 0.25rem 0 0; padding-left: 1.25rem; }
