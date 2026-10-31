@@ -12,6 +12,7 @@ from nde.continuity.story import NumberedStory
 from nde.llm.config import Strict
 
 PROBLEM_TYPE = "character_introduction"
+DESCRIPTION_PROBLEM_TYPE = "missing_description"
 
 
 class Appearance(Strict):
@@ -20,6 +21,10 @@ class Appearance(Strict):
     introduced: bool = Field(
         description="whether the reader is told who they are, and something of their appearance "
         "or history, where they first appear"
+    )
+    described: bool = Field(
+        description="whether the scene they first appear in gives a detail of their body: age, "
+        "height, build, hair or face. Clothes and belongings do not count."
     )
     why: str = Field(min_length=1, description="one sentence on what the reader is told")
 
@@ -38,10 +43,10 @@ def check_introductions(
     flags: list[Flag] = []
     seen: set[str] = set()
 
-    def flag(paragraph: int, reason: str) -> None:
+    def flag(paragraph: int, reason: str, problem_type: str = PROBLEM_TYPE) -> None:
         flags.append(
             Flag(
-                problem_type=PROBLEM_TYPE,
+                problem_type=problem_type,
                 passage=story.paragraph(paragraph),
                 reason=reason,
                 paragraph=paragraph,
@@ -67,6 +72,13 @@ def check_introductions(
                 paragraph,
                 f"{person.name} appears with no introduction. {person.why} "
                 f"Planned introduction: {sheet.introduction}",
+            )
+        if not person.described:
+            flag(
+                paragraph,
+                f"The reader is never told what {person.name} looks like. Add a detail of "
+                f"their body from their sheet here: {sheet.appearance}",
+                DESCRIPTION_PROBLEM_TYPE,
             )
     for sheet in plan.characters:
         if sheet.name not in seen:

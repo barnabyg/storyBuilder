@@ -17,6 +17,10 @@ comparison or further proof runs are needed: "it clearly works right now".
 This is the owner's judgement from one story, read knowing how it was made. It is not
 a blind result or a gate. See the [evidence](evidence/continuity-2026-10-31/README.txt).
 
+The writer and checks then changed to address the criticism. Asked whether the characters
+in a new story on the same brief now felt physically described, the owner answered
+"Yes, that's better". That answer covers physical description only, not the whole story.
+
 ## Running it
 
 ```powershell
@@ -36,7 +40,8 @@ config's `budget.per_run_usd`.
    scenes, recording for each how much story time passes and how long its key events
    should realistically take.
 2. **Write.** Each scene is written from the sheets and short, concrete plain-style
-   rules. Length control works as it does for every other story.
+   rules, and must give at least two details of a character's body when they enter.
+   Length control works as it does for every other story.
 3. **Check.** A model reads the chosen story with numbered paragraphs and reports
    what it finds, citing paragraph numbers. Plain code then compares that reading
    with the plan and decides what to flag.
@@ -76,6 +81,7 @@ story's exact words) and `reason`.
 | Problem type | What it flags |
 | --- | --- |
 | `character_introduction` | a named person with no sheet, no introduction, a different entry scene from the plan, or a planned person who never appears |
+| `missing_description` | a character on a sheet whose entry scene gives no detail of their body: age, height, build, hair or face. Clothes and belongings do not count |
 | `impossible_timing` | an event the prose makes too quick or too slow, or a scene whose stated time strays from the plan's clock |
 | `unexplained_knowledge` | a character acting on a fact the story gives them no way to know, or learns only later |
 

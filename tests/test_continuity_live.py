@@ -179,13 +179,33 @@ def test_the_real_model_reports_a_stranger_with_no_sheet_or_introduction(tmp_pat
 
 def test_the_real_model_accepts_a_character_introduced_as_planned(tmp_path: Path) -> None:
     story = NumberedStory(
-        ("Priya Raman, a tired night-shift pharmacist, stood at work behind the counter.",),
+        (
+            "Priya Raman, a night-shift pharmacist of forty with cropped grey hair and a thin "
+            "face, stood at work behind the counter.",
+        ),
         (1,),
     )
 
     flags = _read(tmp_path, "introductions", _plan("Priya Raman", []), story)
 
     assert flags == []
+
+
+def test_the_real_model_does_not_count_clothes_and_belongings_as_a_description(
+    tmp_path: Path,
+) -> None:
+    # The owner read this opening and found no physical description of the sisters.
+    story = NumberedStory(
+        (
+            "Priya Raman, a night-shift pharmacist, stood at work behind the counter in a "
+            "patched orange jacket, a brass compass hanging from her neck.",
+        ),
+        (1,),
+    )
+
+    flags = _read(tmp_path, "introductions", _plan("Priya Raman", []), story)
+
+    assert [flag.problem_type for flag in flags] == ["missing_description"]
 
 
 def test_the_real_model_catches_priya_doing_the_sums_too_early(tmp_path: Path) -> None:
