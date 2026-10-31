@@ -17,6 +17,10 @@ comparison or further proof runs are needed: "it clearly works right now".
 This is the owner's judgement from one story, read knowing how it was made. It is not
 a blind result or a gate. See the [evidence](evidence/continuity-2026-10-31/README.txt).
 
+The writer and checks then changed to address the criticism. Asked whether the characters
+in a new story on the same brief now felt physically described, the owner answered
+"Yes, that's better". That answer covers physical description only, not the whole story.
+
 ## Running it
 
 ```powershell
