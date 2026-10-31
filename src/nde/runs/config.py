@@ -334,14 +334,18 @@ class LoadedConfig:
         stories = self.config.stories
         return None if stories is None else (self.directory / stories.briefs_dir).resolve()
 
-    def with_briefs(self, briefs: BriefSelection) -> "LoadedConfig":
-        """The config with its story selection replaced; raises ConfigError if it has none."""
+    def with_briefs(self, briefs: BriefSelection, briefs_dir: Path | None = None) -> "LoadedConfig":
+        """The config with its story selection replaced; raises ConfigError if it has none.
+
+        `briefs_dir` also replaces the folder the briefs are read from.
+        """
         stories = self.config.stories
         if stories is None:
             raise ConfigError(f"config {self.path} has no `stories` section")
-        config = self.config.model_copy(
-            update={"stories": stories.model_copy(update={"briefs": briefs})}
-        )
+        update: dict[str, object] = {"briefs": briefs}
+        if briefs_dir is not None:
+            update["briefs_dir"] = str(briefs_dir.resolve())
+        config = self.config.model_copy(update={"stories": stories.model_copy(update=update)})
         return LoadedConfig(path=self.path, config=config)
 
     @property

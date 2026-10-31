@@ -88,15 +88,20 @@ class PreparedRun:
 
 
 def prepare(
-    config_path: Path, environ: Mapping[str, str], *, briefs: BriefSelection | None = None
+    config_path: Path,
+    environ: Mapping[str, str],
+    *,
+    briefs: BriefSelection | None = None,
+    briefs_dir: Path | None = None,
 ) -> PreparedRun:
     """Load and fully validate a config; raises ConfigError before any network call.
 
-    `briefs` replaces the config's story selection, for commands that name a brief.
+    `briefs` replaces the config's story selection, for commands that name a brief,
+    and `briefs_dir` the folder it reads them from.
     """
     loaded = load_config(config_path)
     if briefs is not None:
-        loaded = loaded.with_briefs(briefs)
+        loaded = loaded.with_briefs(briefs, briefs_dir)
     config = loaded.config
     templates: dict[str, PromptTemplate] = {}
     for call in config.calls:
@@ -345,8 +350,11 @@ def _finish(prepared: PreparedRun, options: RunOptions, end: _Finish) -> None:
     write_report(run_dir)
 
 
-def execute(prepared: PreparedRun, options: RunOptions) -> Path:
-    """Run a prepared config. The run directory is always left with a manifest and report."""
+def execute(prepared: PreparedRun, options: RunOptions, state: RunState | None = None) -> Path:
+    """Run a prepared config. The run directory is always left with a manifest and report.
+
+    A caller may pass `state` to watch the run's calls and spend from another thread.
+    """
     config = prepared.loaded.config
     started = options.clock()
     run_dir = _new_run_dir(options.runs_dir, config.name, started)
@@ -354,7 +362,7 @@ def execute(prepared: PreparedRun, options: RunOptions) -> Path:
     manifest.files["configuration"] = "config.json"
     write_text_lf(run_dir / "config.json", config.model_dump_json(indent=2) + "\n")
     write_manifest(run_dir, manifest)
-    state = RunState()
+    state = RunState() if state is None else state
     gateway = _gateway(config, options)
     judge_run = _judge_run(prepared, gateway, state)
     try:
