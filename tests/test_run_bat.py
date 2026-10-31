@@ -24,6 +24,8 @@ ignoring = console.SetConsoleCtrlHandler(None, True)
 sys.exit(0 if attached and ignoring and console.GenerateConsoleCtrlEvent(0, 0) else 1)
 """
 _LIMIT_S = 30
+# subprocess names this only on Windows, and the type check also runs on Linux.
+_CREATE_NO_WINDOW = 0x08000000
 
 
 def _free_port() -> int:
@@ -109,7 +111,7 @@ def test_ctrl_c_stops_story_builder_started_by_run_bat(
             [sys.executable, "-c", _PRESS_CTRL_C, str(listener)],
             check=True,
             timeout=_LIMIT_S,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=_CREATE_NO_WINDOW,
         )
         deadline = time.monotonic() + _LIMIT_S
         while time.monotonic() < deadline and not _is_free(port):
