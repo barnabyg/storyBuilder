@@ -198,9 +198,10 @@ def _example_label(brief: Brief) -> str:
     return f"{brief.genre}: {premise}"
 
 
-def _examples(examples: list[Brief]) -> str:
+def _examples(examples: list[Brief], chosen: str | None) -> str:
     options = "".join(
-        f'<option value="{escape(brief.id)}">{escape(_example_label(brief))}</option>'
+        f'<option value="{escape(brief.id)}"{" selected" if brief.id == chosen else ""}>'
+        f"{escape(_example_label(brief))}</option>"
         for brief in examples
     )
     return (
@@ -219,7 +220,7 @@ def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str
     limit = "" if cap is None else f" It stops at {_usd(cap)} at the very most."
     return f"""
     <h2>Write a new story</h2>
-    {_examples(studio.examples())}
+    {_examples(studio.examples(), values.get("idea"))}
     {alert}
     <form method="post" action="/stories">
       {_field("genre", "Genre", "What kind of story is it?", values)}
@@ -454,7 +455,8 @@ def create_app(studio: Studio) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def home(idea: str | None = None, deleted: str | None = None) -> HTMLResponse:
         chosen = None if idea is None else studio.find_idea(idea)
-        return _home(studio, None if chosen is None else _values_of(chosen), deleted=deleted)
+        values = None if chosen is None else {**_values_of(chosen), "idea": chosen.id}
+        return _home(studio, values, deleted=deleted)
 
     @app.post("/stories")
     async def write(request: Request) -> Response:
