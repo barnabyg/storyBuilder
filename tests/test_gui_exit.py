@@ -67,6 +67,7 @@ class _Gui:
             stderr=subprocess.PIPE,
             text=True,
             cwd=tmp_path,
+            # pragma: allowlist nextline secret - a fake key for the fake server
             env=os.environ | {"FAKE_API_KEY": "test-key"},
         )
 

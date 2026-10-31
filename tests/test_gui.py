@@ -38,6 +38,7 @@ def studio(fake_llm: FakeOpenAI, tmp_path: Path) -> Studio:
         write_config(tmp_path, config),
         RunOptions(
             runs_dir=tmp_path / "runs",
+            # pragma: allowlist nextline secret - a fake key for the fake server
             environ={"FAKE_API_KEY": "test-key"},
             ledger_path=tmp_path / "ledger.sqlite",
         ),

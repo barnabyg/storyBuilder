@@ -30,6 +30,7 @@ def test_an_example_idea_becomes_a_story_read_saved_and_deleted_in_the_browser(
         write_config(tmp_path, continuity_config(fake_llm.base_url)),
         RunOptions(
             runs_dir=tmp_path / "runs",
+            # pragma: allowlist nextline secret - a fake key for the fake server
             environ={"FAKE_API_KEY": "test-key"},
             ledger_path=tmp_path / "ledger.sqlite",
         ),
