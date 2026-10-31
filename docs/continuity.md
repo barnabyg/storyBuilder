@@ -33,6 +33,8 @@ another). It refuses a held-out brief before any call, and so does any config th
 names one for this pipeline. Run it with `OPENAI_API_KEY` set. It stops at the
 config's `budget.per_run_usd`.
 
+The [Story Builder GUI](gui.md) does the same from a web page, and also takes your own ideas.
+
 ## What it does
 
 1. **Plan.** Before any prose, the planner makes a sheet for each character:

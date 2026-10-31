@@ -20,6 +20,7 @@ Phase 6 and 7 tooling below remains, tested on fixtures only.
 A separate exploratory attempt to fix the defects the owner found while reading writes
 [continuity stories](docs/continuity.md) from character sheets and a scene clock. After
 reading one on 31 October 2026, the owner decided it works and needs no further proof runs.
+The [Story Builder GUI](docs/gui.md) (`uv run nde gui`) writes and shows them in a local web page.
 
 ## Setup
 
