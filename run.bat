@@ -8,5 +8,7 @@ if not exist ".venv\Scripts\nde.exe" (
     exit /b 1
 )
 rem This batch file ends at once, so Ctrl+C never asks "Terminate batch job (Y/N)?".
-rem The window stays open on an error, so that the message can be read.
-start "" /b cmd /c ".venv\Scripts\nde.exe gui %* || pause"
+rem Story Builder gets its own window: sharing a terminal with PowerShell, its prompt
+rem would take the Ctrl+C. The window stays open on an error, so that the message can be read.
+rem Ctrl+C gives a negative exit code, which "if errorlevel 1" does not count as an error.
+start "Story Builder" cmd /c ".venv\Scripts\nde.exe gui %* & if errorlevel 1 pause"
