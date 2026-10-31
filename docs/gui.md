@@ -1,15 +1,17 @@
 # Story Builder GUI
 
 A local web page for writing and reading [continuity stories](continuity.md), with no
-command line beyond starting it. Run this from the repository folder:
+command line needed. To start it, double-click `run.bat` in the repository folder, or
+type `.\run` in PowerShell in that folder.
 
-```powershell
-uv run nde gui
-```
+The page opens in your browser. Keep the window that opens with it, and press Ctrl+C there
+to stop. If a story is being written, stopping loses it, and the window says so. It needs
+`OPENAI_API_KEY` in the environment or in `.env`, and says so on the page if the key is
+missing.
 
-The page opens in your browser. Keep the window that started it open, and press Ctrl+C
-there to stop it. If a story is being written, stopping loses it, and the window says so. It needs `OPENAI_API_KEY` in the environment or in `.env`, and says so
-on the page if the key is missing.
+`run.bat` needs the `.venv` folder that `uv sync` creates. It is the same as
+`uv run nde gui`, without needing the pinned version of `uv`. Started from PowerShell, it
+gives the prompt back straight away while Story Builder keeps running in that window.
 
 ## What it does
 
