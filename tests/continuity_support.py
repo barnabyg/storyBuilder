@@ -56,11 +56,14 @@ def scene_text(number: int, words: int = 400) -> str:
     )
 
 
-def person(name: str, paragraph: int, *, introduced: bool = True) -> dict[str, Any]:
+def person(
+    name: str, paragraph: int, *, introduced: bool = True, described: bool = True
+) -> dict[str, Any]:
     return {
         "name": name,
         "first_paragraph": paragraph,
         "introduced": introduced,
+        "described": described,
         "why": "The narrator says who they are." if introduced else "Nothing is said of them.",
     }
 

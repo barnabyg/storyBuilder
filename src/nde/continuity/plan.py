@@ -25,6 +25,11 @@ KNOWLEDGE_RULE = (
     "A character may act only on what their sheet says they know at the start, or on "
     "what they have seen, heard or worked out earlier on the page."
 )
+APPEARANCE_RULE = (
+    "In the scene a character enters, tell the reader at least two details of their body "
+    "from their sheet: age, height, build, hair or face. Clothes and belongings do not "
+    "count. Work the details into what happens, in a sentence or two."
+)
 
 
 _TITLES = frozenset({"mr", "mrs", "ms", "miss", "dr", "sir", "lady", "captain", "officer"})
@@ -37,7 +42,11 @@ def _name_words(name: str) -> set[str]:
 
 class CharacterSheet(Strict):
     name: str = Field(min_length=1, description="the character's full name")
-    appearance: str = Field(min_length=1, description="what a stranger would notice about them")
+    appearance: str = Field(
+        min_length=1,
+        description="what they look like: age, height, build, hair and face, and then any "
+        "clothes or belongings a stranger would notice",
+    )
     back_story: str = Field(
         min_length=1, description="who they are and what happened to them before the story"
     )
@@ -190,7 +199,10 @@ def _clock_note(scene: PlannedScene) -> str:
 
 def scene_specs(plan: ContinuityPlan) -> list[SceneSpec]:
     """The planned scenes for the shared prose steps, with the sheets and rules as notes."""
-    notes = f"Character sheets:\n\n{render_sheets(plan)}\n\n{KNOWLEDGE_RULE}\n\n{PLAIN_STYLE_RULES}"
+    notes = (
+        f"Character sheets:\n\n{render_sheets(plan)}\n\n{KNOWLEDGE_RULE}\n\n{APPEARANCE_RULE}\n\n"
+        f"{PLAIN_STYLE_RULES}"
+    )
     return [
         SceneSpec(
             summary=scene.summary, beats=scene.beats, notes=f"{_clock_note(scene)}\n\n{notes}"

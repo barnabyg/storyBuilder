@@ -39,7 +39,7 @@ SCENE_PROMPT = PromptRef(template="continuity_scene", version=1)
 AUDITS: tuple[Audit[Any], ...] = (
     Audit(
         "introductions",
-        PromptRef(template="continuity_introductions", version=1),
+        PromptRef(template="continuity_introductions", version=2),
         IntroductionAudit,
         check_introductions,
     ),

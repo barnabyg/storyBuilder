@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from nde.cli import main
-from nde.continuity.plan import PLAIN_STYLE_RULES, ContinuityPlan
+from nde.continuity.plan import APPEARANCE_RULE, PLAIN_STYLE_RULES, ContinuityPlan
 from nde.continuity.story import NumberedStory
 from nde.stories.normalise import normalise
 from tests.conftest import REPO, write_config
@@ -129,6 +129,62 @@ def test_a_sheeted_character_with_no_introduction_is_flagged(
     [flag] = flags_of(folder, INTRODUCTION)
     assert "Tom appears with no introduction" in flag["reason"]
     assert flag["passage"].startswith("Scene2 first")
+
+
+def test_a_character_the_reader_never_sees_physically_is_flagged_with_their_sheet_details(
+    continuity_llm: FakeOpenAI,
+    tmp_path: Path,
+) -> None:
+    continuity_llm.default = fake_continuity(
+        _with_people(person("Elsie Marr", 1), person("Tom", 3, described=False))
+    )
+
+    _, folder = run_continuity(tmp_path, continuity_llm)
+
+    assert flags_of(folder, INTRODUCTION) == []
+    [flag] = flags_of(folder, "missing_description")
+    assert "Tom" in flag["reason"]
+    assert "Tom Reyes is tall and wears a grey coat." in flag["reason"]
+    assert flag["passage"].startswith("Scene2 first")
+    assert flag["paragraph"] == 3
+
+
+def test_a_missing_description_goes_to_repair_like_any_other_problem(
+    continuity_llm: FakeOpenAI,
+    tmp_path: Path,
+) -> None:
+    flagged = fake_continuity(
+        _with_people(person("Elsie Marr", 1), person("Tom", 3, described=False))
+    )
+    clean = fake_continuity()
+    rounds = [0]
+
+    def fixed_after_one_round(body: Json) -> Reply:
+        if "List every named person" in last_user_message(body):
+            rounds[0] += 1
+            return (flagged if rounds[0] == 1 else clean)(body)
+        return flagged(body)
+
+    continuity_llm.default = fixed_after_one_round
+
+    _, folder = run_continuity(tmp_path, continuity_llm, repair_tries=1)
+
+    assert result(folder)["unresolved_problems"] == []
+    assert "A repaired paragraph." in (folder / "story.md").read_text(encoding="utf-8")
+
+
+def test_the_writer_and_the_checker_are_told_clothes_alone_are_not_a_description(
+    continuity_llm: FakeOpenAI,
+    tmp_path: Path,
+) -> None:
+    run_continuity(tmp_path, continuity_llm)
+
+    prompts = [last_user_message(r.body) for r in continuity_llm.requests]
+    [scene] = [p for p in prompts if "Now write scene 1 of" in p]
+    assert APPEARANCE_RULE in scene
+    assert "Clothes and belongings do not count" in APPEARANCE_RULE
+    [audit] = [p for p in prompts if "List every named person" in p]
+    assert "Clothes and belongings do not count" in audit
 
 
 def test_a_character_entering_in_the_wrong_scene_is_flagged(
