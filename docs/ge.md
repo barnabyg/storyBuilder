@@ -49,7 +49,9 @@ they are restricted to local fake providers and produce test-only evidence.
 ## Registration
 
 Paths are relative to the registration file. All fields are required unless
-noted; unknown fields are rejected, so no threshold can be added that the
+noted: `protected_populations` and `neighbours` (default 3) are optional, and
+`g3_population` is optional only for test-only registrations, because genuine
+authority is blocked without it. Unknown fields are rejected, so no threshold can be added that the
 protocol does not register.
 
 ```json

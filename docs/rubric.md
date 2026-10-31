@@ -47,5 +47,6 @@ stay interpretable after the wording changes.
 
 ## Status
 
-Rubric v1 was drafted by an agent. The owner confirms or edits its wording
-before the reader and judges are used for a gate.
+Rubric v1 was drafted by an agent and has not changed since. G-instr used it. No
+separate owner sign-off of the wording is recorded; confirm or version it before
+a new gate registers it.

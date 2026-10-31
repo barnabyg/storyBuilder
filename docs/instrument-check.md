@@ -1,6 +1,11 @@
 # Instrument check (gate G-instr)
 
-Gate G-instr asks whether the evaluation instrument (the owner reading blind,
+**Status: closed 20 October 2026 through the pre-registered fail action.** In
+attempt 2, the owner's coherence scoring passed at 9/10 and judge agreement failed
+at 70%. The owner's coherence scoring is the instrument, and the LLM judge is
+diagnostic only. The steps below are the historical procedure.
+
+Gate G-instr asked whether the evaluation instrument (the owner reading blind,
 plus the LLM judge panel) detects a known, deliberately caused degradation:
 Baseline B against **B-scrambled**, the same outline told in a shuffled scene
 order with freshly written prose. See P1.8 and the Phase 1 exit gate in
@@ -52,7 +57,7 @@ Expected:
 Every step is cached: re-running any of them costs nothing for the calls
 already made.
 
-**Do not read the pairs yet.** Reading is the gate itself (the next ticket):
+**Do not read the pairs yet.** Reading is the gate itself:
 calibrate first, confirm and commit the pre-registration, and wait at least
 48 hours after you last worked on the generating code. Stop the reader with
 Ctrl+C; it resumes where it left off.

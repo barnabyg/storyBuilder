@@ -53,4 +53,4 @@ It replays a genuine passed G2, requires unchanged model/extraction settings,
 preserves earlier frozen assignments, checks registered size and spending
 caps, and uses the same pilot orchestration. Protected authors cannot enter
 training through expansion. Pending, stale, failed or synthetic G2 evidence
-cannot authorise real scaling. No Phase 6 training is implemented here.
+cannot authorise real scaling. This workflow does not start Phase 6 training; see [reconstruction training](reconstruction-training.md).

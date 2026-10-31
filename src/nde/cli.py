@@ -25,6 +25,7 @@ from nde.conditional import generation as conditional_generate
 from nde.conditional import layout as conditional_layout
 from nde.conditional import report as conditional_report
 from nde.conditional import training as conditional_train
+from nde.continuity import cli as continuity_cli
 from nde.corpus import cli as corpus_cli
 from nde.corpus import exemplars, extraction_cli, provenance
 from nde.corpus import export as corpus_export
@@ -62,6 +63,41 @@ EXIT_USAGE = 2
 def _check_option(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--check", action="store_true", help="report unrecorded or changed versions; write nothing"
+    )
+
+
+def _run_options(run: argparse.ArgumentParser) -> None:
+    """The options of every command that runs a config."""
+    run.add_argument(
+        "--runs-dir", type=Path, default=Path("runs"), help="where run directories go (./runs)"
+    )
+    run.add_argument(
+        "--cache",
+        type=Path,
+        default=Path(os.environ.get("NDE_CACHE", DEFAULT_CACHE_PATH)),
+        help="response cache file (env NDE_CACHE, default .nde/cache.sqlite)",
+    )
+    run.add_argument(
+        "--ledger",
+        type=Path,
+        default=Path(os.environ.get("NDE_LEDGER", DEFAULT_LEDGER_PATH)),
+        help="cost ledger with the daily totals (env NDE_LEDGER, default .nde/ledger.sqlite)",
+    )
+    cache_mode = run.add_mutually_exclusive_group()
+    cache_mode.add_argument(
+        "--no-cache",
+        dest="cache_mode",
+        action="store_const",
+        const="bypass",
+        default="use",
+        help="neither read nor write the response cache",
+    )
+    cache_mode.add_argument(
+        "--refresh-cache",
+        dest="cache_mode",
+        action="store_const",
+        const="refresh",
+        help="call the provider for every request and replace the stored responses",
     )
 
 
@@ -167,38 +203,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = commands.add_parser("run", help="run an experiment config and record a run directory")
     run.add_argument("config", type=Path, help="experiment config (YAML)")
-    run.add_argument(
-        "--runs-dir", type=Path, default=Path("runs"), help="where run directories go (./runs)"
-    )
+    _run_options(run)
 
-    run.add_argument(
-        "--cache",
+    continuity = commands.add_parser(
+        "continuity", help="write one dev brief's story with character sheets and checks"
+    )
+    continuity.add_argument("brief", help="development brief id, such as brief-01")
+    continuity.add_argument(
+        "--config",
         type=Path,
-        default=Path(os.environ.get("NDE_CACHE", DEFAULT_CACHE_PATH)),
-        help="response cache file (env NDE_CACHE, default .nde/cache.sqlite)",
+        default=continuity_cli.DEFAULT_CONFIG,
+        help=f"the models and budget ({continuity_cli.DEFAULT_CONFIG.as_posix()})",
     )
-    run.add_argument(
-        "--ledger",
-        type=Path,
-        default=Path(os.environ.get("NDE_LEDGER", DEFAULT_LEDGER_PATH)),
-        help="cost ledger with the daily totals (env NDE_LEDGER, default .nde/ledger.sqlite)",
-    )
-    cache_mode = run.add_mutually_exclusive_group()
-    cache_mode.add_argument(
-        "--no-cache",
-        dest="cache_mode",
-        action="store_const",
-        const="bypass",
-        default="use",
-        help="neither read nor write the response cache",
-    )
-    cache_mode.add_argument(
-        "--refresh-cache",
-        dest="cache_mode",
-        action="store_const",
-        const="refresh",
-        help="call the provider for every request and replace the stored responses",
-    )
+    _run_options(continuity)
 
     report = commands.add_parser("report", help="regenerate a run directory's report")
     report.add_argument("run_dir", type=Path)
@@ -261,22 +278,35 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _run(args: argparse.Namespace) -> int:
-    options = RunOptions(
+def _options(args: argparse.Namespace) -> RunOptions:
+    return RunOptions(
         runs_dir=args.runs_dir,
         environ=dict(os.environ),
         cache_path=args.cache,
         cache_mode=args.cache_mode,
         ledger_path=args.ledger,
     )
+
+
+def _run(args: argparse.Namespace) -> int:
     try:
-        run_dir = run_experiment(args.config, options)
+        run_dir = run_experiment(args.config, _options(args))
     except ConfigError as error:
         print(f"nde run: {error}", file=sys.stderr)
         return EXIT_USAGE
     manifest = read_manifest(run_dir)
     print(f"run {manifest.status}: {run_dir}")
     return EXIT_OK if manifest.status == "succeeded" else EXIT_RUN_FAILED
+
+
+def _continuity(args: argparse.Namespace) -> int:
+    try:
+        status, report = continuity_cli.run_brief(args.brief, args.config, _options(args))
+    except ConfigError as error:
+        print(f"nde continuity: {error}", file=sys.stderr)
+        return EXIT_USAGE
+    print(report)
+    return EXIT_OK if status == "succeeded" else EXIT_RUN_FAILED
 
 
 def _report(args: argparse.Namespace) -> int:
@@ -394,6 +424,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "annotate": annotation_cli.run,
     "plan": narrative_cli.run,
     "run": _run,
+    "continuity": _continuity,
     "report": _report,
     "eval": eval_cli.run,
     "rubric": _rubric_lock,

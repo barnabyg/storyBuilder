@@ -25,6 +25,6 @@ stories:
 The complete config must also supply the original selected C planner/prose
 bindings, a separate-family critic binding, prices, hard per-run/day caps,
 provider settings, seed and versioned prompt directory. No concrete model or
-scientific defaults are selected by this example. Remove the illustrative lock
-unless the generated plan has that actual scene ID. Generation/failure tests use
+scientific defaults are selected by this example. Add a lock only for a
+selector that exists in the generated plan. Generation/failure tests use
 fake providers exclusively. G-D admission is a separate protocol-bound workflow.

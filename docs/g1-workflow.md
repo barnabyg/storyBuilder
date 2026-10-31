@@ -1,5 +1,8 @@
 # Registered G1 workflow
 
+**Status: G1 and its one permitted retest did not pass on 30 October 2026, so the
+diffusion track has stopped.** See the [protocols, results and runbook](g1-four-pairs.md).
+
 G1 generation and reading are separate from software acceptance. Actual G1 needs
 a passed **owner** G-schema packet, an actual owner-selected tier backed by dev
 reviews, and a committed pre-registration. Phase 2 software completion alone
@@ -19,12 +22,16 @@ Create a JSON `G1Protocol` (schema exported by
 
 - `id`, `schema_version: "1"`, `test_only: false`, `tier`;
 - `cohort`: the [strict readiness registration](gate-readiness.md), with C first,
-  B second, exactly 30 distinct frozen **test** brief IDs/checksums, one repetition,
+  B second, at least 4 distinct frozen brief IDs/checksums from one split, one repetition,
   registered length and generation-token budget tolerances;
 - `candidate: "C"`, `comparator: "B"`, `primary: "coherence"`,
-  `ties: "non_wins"`, `win_threshold: 21` (or the explicit registered threshold),
+  `ties: "non_wins"`, `win_threshold: 3` (or the explicit registered threshold),
   `required_dimensions: ["coherence", "originality"]`;
-- `originality: {"analysis": "mean_paired_difference", "margin": NUMBER}`.
+- `selection_overrides` (optional): `settings_sha256` and/or `models_sha256`, for a
+  registered follow-up that deliberately changes settings from the tier selection, such
+  as a stronger model in both conditions;
+- `originality: {"analysis": "mean_paired_difference", "margin": NUMBER}`, or omit it
+  with `required_dimensions: ["coherence"]` when coherence alone decides.
   The margin must be specified before reading. This supported descriptive
   safeguard requires mean paired C-minus-B originality **at least minus the
   margin**. It makes no inferential noninferiority claim. Other analysis names
@@ -43,11 +50,15 @@ Create a JSON `G1Protocol` (schema exported by
 The supported command sequence (run each command on one line):
 
 ```text
-uv run nde eval g1-check protocol.json configs/g1.yaml --selection selection.json --schema-evidence schema-packet --out g1-check
-uv run nde eval g1-run protocol.json configs/g1.yaml --selection selection.json --schema-evidence schema-packet --runs-dir runs
-uv run nde eval g1-batch protocol.json configs/g1.yaml --selection selection.json --schema-evidence schema-packet --name g1 --from runs/RUN C --from runs/RUN B --seed 123
+uv run nde eval g1-check protocol.json G1-CONFIG.yaml --selection selection.json --schema-evidence schema-packet --out g1-check
+uv run nde eval g1-run protocol.json G1-CONFIG.yaml --selection selection.json --schema-evidence schema-packet --runs-dir runs
+uv run nde eval g1-batch protocol.json G1-CONFIG.yaml --selection selection.json --schema-evidence schema-packet --name g1 --from runs/RUN C --from runs/RUN B --seed 123
 uv run nde eval serve --batch g1
 ```
+
+`schema-packet` is a directory containing `evidence.json` and `inputs.json`; for
+the passed review, extract `evidence-indexed/` from
+`docs/evidence/g-schema-2026-10-27/evidence.zip`.
 
 `g1-check` makes no provider calls, writes JSON/Markdown and exits 0 when ready,
 2 when blocked. `g1-run` rechecks prerequisites before calling a provider, records
@@ -67,7 +78,7 @@ the builder never overwrites an existing batch.
 
 Optional `g1-batch --owner-code-work-at ISO8601_WITH_TIMEZONE` records the owner's
 reported latest code-work time. Omission remains unknown, never confirmed
-blinding. Keep at least the registered reading delay and record condition guesses
+blinding. Keep at least the fixed 48-hour reading delay and record condition guesses
 where possible. The reader serves only the blind view and scores; sealed files,
 plans and ledger metadata have no reader HTTP route. Missing required scores
 prevent submission and closure, including incomplete scores already on disk.

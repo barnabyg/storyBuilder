@@ -1,0 +1,22 @@
+{
+  "people": [
+    {
+      "name": "Kari Lund",
+      "first_paragraph": 1,
+      "introduced": true,
+      "why": "Kari is named and shown checking ice-pick straps beside the cabin, with a split thumbnail and a patched orange jacket."
+    },
+    {
+      "name": "Ingrid",
+      "first_paragraph": 2,
+      "introduced": false,
+      "why": "Ingrid reads out equipment, but her relationship to Kari and her appearance are not given until paragraph 3."
+    },
+    {
+      "name": "Erik",
+      "first_paragraph": 7,
+      "introduced": true,
+      "why": "Erik is identified as their father and shown in a photograph wearing a red hat above a square beard."
+    }
+  ]
+}

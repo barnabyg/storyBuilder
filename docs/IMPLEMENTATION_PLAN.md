@@ -1,8 +1,8 @@
 # Narrative Diffusion Engine — Implementation Plan
 
-**Status:** Working plan v3; tooling through Phase 7 on `main`; G-schema passed
+**Status:** Working plan v3; tooling through Phase 7 implemented; G-schema passed; G1 and its retest did not pass; diffusion track stopped; separate continuity approach accepted by the owner
 **Created:** 18 October 2026
-**Updated:** 29 October 2026, recording the G-schema result, the dev M tier selection and Phase 6–7 issue closure
+**Updated:** 31 October 2026, recording the owner's decision on the continuity approach
 **Source:** [Narrative_Diffusion_Writing_Engine_Proposal.md](../Narrative_Diffusion_Writing_Engine_Proposal.md)
 
 ## Current position
@@ -26,13 +26,29 @@
   datasets, local denoising/matched AR training, scoring, audits, sweeps, G3
   reporting and the optional augmentation workflow. Issues #66–75 are closed.
 - **Implementation is not a scientific pass.** Beyond the dated G-schema result,
-  no genuine G1, G-D, G2 or G3 outcome is recorded in this plan. Synthetic fixture criteria can
+  G1 did not pass, and no genuine G-D, G2 or G3 outcome is recorded in this plan. Synthetic fixture criteria can
   pass while the scientific outcome remains pending. Closed implementation
   tickets and green verification do not authorise later research phases.
-- **Next research work:** with the dev M tier selected, commit a G1 protocol before generation and
-  blind reading. Real D/corpus experiments require G1; real reconstruction
-  requires G1 and G2. Phase 7 remains conditional on G3: its tooling is
-  implemented on fixtures only, and Phase 8 is not implemented.
+- **G1 is now four pairs:** on 30 October, before any reading, the owner decided
+  that four pairs are enough to judge whether there is a consistent difference. The
+  [G1 protocol](g1-four-pairs.md) was registered on the four generated M/B pairs.
+- **G1 did not pass on 30 October:** C won 0 coherence pairs of 4, tying 1, and fell
+  short on originality. See the [frozen decision and evidence](evidence/g1-2026-10-30/README.txt).
+- **The retest did not pass on 30 October:** on four held-out pairs with `gpt-6.1-sol`
+  and equal editing, decided on coherence alone, C won 2 of 4 against the 3 required.
+  See the [retest result](g1-four-pairs.md#retest) and
+  [evidence](evidence/g1-retest-2026-10-30/README.txt).
+- **The diffusion track has stopped under the registered fail action.** The schema,
+  benchmark, harness and planner are the result (proposal §14). Real D/corpus,
+  reconstruction and E experiments are not authorised: they still require a passed G1.
+  Phase 6–7 tooling remains, tested on fixtures only, and Phase 8 is not implemented.
+- **The owner accepted the separate [continuity approach](continuity.md) on 31 October:**
+  character sheets, a scene clock, knowledge checks, targeted repair and plain-style
+  rules. After reading one story on a development brief, the owner scored coherence 4
+  of 5, reported none of the four defects, and decided no blind comparison or further
+  proof runs are needed: "it clearly works right now". This is the owner's judgement,
+  not a blind result or a gate. It does not reopen G1 or restart the diffusion track.
+  See the [evidence](evidence/continuity-2026-10-31/README.txt).
 
 | Phase | Implementation status on `main` | Implementation issues | Operating guide |
 | --- | --- | --- | --- |
@@ -43,8 +59,8 @@
 | P6 | Codec/tasks, datasets, CPU ML models, paired evaluation, audits/sweeps, G3 and augmentation | [#66–75](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP6%5D%22), closed | [Training](reconstruction-training.md), [experiments](reconstruction-experiments.md), [G3](reconstruction-evaluation.md) |
 | P7 | Conditional examples, variable layouts, brief-conditioned training with guidance, bounded generation, text completion, D/E inpainting, the Candidate E run pipeline, adherence/diversity/similarity reporting, registered G-E preparation and the G-E decision report; no G-E result | [#76–85](https://github.com/barnabyg/storyBuilder/issues?q=is%3Aissue+%22%5BP7%5D%22): closed | [Data](conditional-data.md), [generation](conditional-generation.md), [inpainting](conditional-inpainting.md), [E](candidate-e.md), [evidence](conditional-report.md), [G-E](ge.md) |
 
-Status above was checked against `main` at `39692ae` and GitHub Issues on
-29 October 2026. The dated G0/G-instr results below remain historical records;
+Status above was checked against `main` at `de0beaf` and GitHub Issues on
+30 October 2026. The dated G0/G-instr results below remain historical records;
 the task tables retain their original plan IDs, which differ from GitHub issue
 numbers. Operating guides describe the implemented interfaces. Future changes
 to scientific criteria require a new committed protocol, not reinterpretation
@@ -62,7 +78,7 @@ of a completed result.
 ### Working assumptions (change any of these if they are wrong)
 
 - One developer, part-time. Effort is given in relative sizes, not dates.
-- Gate evaluations use stories of about **2,000 words with 5–8 scenes**. That is long enough for setup/payoff and arc shape to matter, and short enough to read about 30 pairs in roughly 10 hours.
+- Gate evaluations use stories of about **2,000 words with 5–8 scenes**. That is long enough for setup/payoff and arc shape to matter, and short enough to read a pair in about 20 minutes.
 - Implementation verification uses tiny local CPU models and needs no GPU or model downloads. Before real Phase 6 training, select compatible local pretrained weights and measure resource requirements; neither the current tests nor a nominal GPU memory size establishes feasibility. Other model architectures need an explicit adapter.
 - The corpus is public-domain only at first (Standard Ebooks, Project Gutenberg). Licensed modern fiction is out of scope until Phase 6 shows that data volume is the bottleneck.
 
@@ -96,7 +112,7 @@ P0 Foundations ─► P1 Benchmark + instrument check ─► P2 Schema v0 ─►
 Phases 4 and 5 are independent and can run in parallel, for example on separate branches or worktrees.
 
 This diagram describes scientific prerequisites. Fixture-based software has
-been implemented through Phase 6 ahead of those decisions; real workflows
+been implemented through Phase 7 ahead of those decisions; real workflows
 retain evidence checks and do not infer permission from code availability.
 
 ## 3. Cross-cutting foundations
@@ -179,20 +195,21 @@ This protocol applies to future gates and incorporates the Phase 1 decisions.
 - **Splits.** About 40 briefs are split into 10 **dev** briefs, used freely during development, and 30 **test** briefs. Outputs for test briefs are generated only for gate runs and read only blind.
   - **The test split is frozen (20 October 2026):** `brief-11` to `brief-40`, checksums in `benchmark/frozen.json`. The briefs were LLM-drafted through `configs/draft-briefs.yaml` (run `20261020T195417Z-draft-briefs-7b48ae`, 40 drafts), given a first curation pass by Claude (10 rejected, light edits) and reviewed and accepted by the owner. Drafts 2, 7, 8, 11, 20, 22, 23, 26, 28 and 37 were rejected; the rest became `brief-11` to `brief-40` in draft order. The run directory and drafts are local only (`runs/` and `benchmark/drafts/` are gitignored).
 - **Sample unit and size.** A story-comparison gate uses one pair per distinct
-  brief at a fixed, pre-registered sample size. G1 defaults to the 30 frozen
-  test briefs. A null result at that size does not rule out a moderate effect.
+  brief at a fixed, pre-registered sample size. G1 uses four pairs, by owner
+  decision. Its result describes a consistent difference for this reader and does
+  not rule out a moderate effect when it fails.
   About 80 distinct briefs is a planning target for a larger confirmation or
   final comparison; calculate power for its primary metric, expected ties and
   chosen threshold before committing that protocol. Additional seeds on one
   brief do not create independent brief-level observations.
-- **No automatic extension.** Reading 30 pairs does not authorise topping up
-  the same significance test to 80. A larger follow-up requires a separate,
+- **No automatic extension.** Reading a gate's pairs does not authorise topping
+  up the same test to a larger size. A larger follow-up requires a separate,
   pre-registered fixed-size experiment on fresh held-out briefs, reported
   separately. The existing frozen test split must remain unchanged; a new
   benchmark version, checksums and tooling support are prerequisites. Any
   sequential or pooled analysis needs its stopping rule and error control
   specified before the first relevant batch is read.
-- **Reading cost.** At about 2,000 words per story, budget about 20 minutes per pair, so about 10 hours for a 30-pair gate.
+- **Reading cost.** At about 2,000 words per story, budget about 20 minutes per pair, so about 80 minutes for the four-pair G1.
 - **Leakage controls.**
   - All conditions use the same prose model and prose prompt template.
   - Story length is held within ±10% of target. Regenerate outside that range
@@ -481,6 +498,13 @@ The [immutable selection](evidence/dev-tier-selection-2026-10-27/selection.json)
 binds the actual reviews and generation settings. All tiers incurred full-L
 planning before projection. G1 registration and held-out evaluation remain open.
 
+**Reading decision (30 October 2026):** the owner declined a 30-pair read on
+27 October and on 30 October set G1 at four pairs, before any reading: "Four pairs
+of stories is more than enough for me to determine if there is a consistent
+difference." The [registered protocol](g1-four-pairs.md) uses the four already
+generated dev-brief pairs. Their briefs were not used to choose the tier. The
+originality decision, no average loss (margin 0), is preserved.
+
 **Goal:** answer the first real question. **Do multi-channel plans produce better stories than beat-only plans at equal budget?**
 
 | Ticket | Work |
@@ -491,20 +515,21 @@ planning before projection. G1 registration and held-out evaluation remain open.
 | P3.3 | Plan-conditioned prose: each scene is realised from its scene record plus the ledger summary, using the same prose model and template as Baseline B |
 | P3.4 | **Realisation check:** review whether prose realises planned deltas (belief change, trust change, information reveal, tension shape). Report owner-reviewed realisation on a specified dev sample; any LLM estimate is diagnostic and reported separately. This separates planner failure from prose failure. |
 | P3.5 | Tier ablation (S/M/L) on dev briefs, screened with validators and a budgeted owner-reviewed sample. LLM judgements are diagnostic only unless separately validated under §4. Freeze the chosen tier before the test run. This answers proposal §13 decision 1, the smallest useful representation. |
-| P3.6 | **Gate run:** C (the chosen tier, first in the batch sources) against B on the 30 frozen test briefs at equal budget, admitted through P3.0. Owner blind reading requires coherence and originality scores for both stories, plus overall preference. Judges, if run, are diagnostic only. |
+| P3.6 | **Gate run:** C (the chosen tier, first in the batch sources) against B on four frozen briefs at equal budget, admitted through P3.0. Owner blind reading requires coherence and originality scores for both stories, plus overall preference. Judges, if run, are diagnostic only. |
 
 **Exit gate (Gate 1, the thesis):**
-- C scores strictly higher than B on **coherence in ≥21 of 30 pairs**; ties
-  count as non-wins (two-sided exact binomial p ≈ 0.043 at 21 wins). This is
-  the default positive-direction threshold, to be confirmed in the
-  pre-registration. Overall preference is secondary.
-- C meets the pre-registered "not worse" safeguard on **originality**, with
-  required scores for both stories and an explicit margin and analysis.
+- C scores strictly higher than B on **coherence in at least 3 of 4 pairs**;
+  ties count as non-wins. The owner's retest decides on this alone. This is a judgement of consistency by the owner, not a
+  statistical test: with no real difference and no ties, chance alone gives 3 or 4
+  wins about 31% of the time. Overall preference is secondary.
+- For the first G1 only: C meets the pre-registered "not worse" safeguard on
+  **originality**, with required scores for both stories and an explicit margin and
+  analysis. On 30 October 2026 the owner dropped originality from later reviews.
 
-**Promising but inconclusive** (for example, 17–20 coherence wins of 30): G1
-has not passed. At most one follow-up is allowed: either a larger unchanged
-comparison on fresh held-out briefs under §4, or the diagnostic retry below.
-Do not add pairs to the completed test or tune against its revealed stories.
+**Promising but inconclusive** (for example, 2 coherence wins of 4 with no
+losses): G1 has not passed. At most one follow-up is allowed: either a comparison
+on fresh briefs under §4, or the diagnostic retry below. Do not add pairs to the
+completed test or tune against its revealed stories.
 
 **Fail action:**
 - First diagnose using dev briefs. If owner-reviewed realisation is low, retry
@@ -700,7 +725,7 @@ the outcome is recorded.
 | G0 (passed, 18 Oct 2026) | P0 | Can low-cost models produce our structures? | ≥95% schema validity after repair | Simplify the schema, or use a mid-tier planner model |
 | G-instr (closed, 20 Oct 2026) | P1 | Does the instrument detect known damage? | Historical: owner ≥9/10 coherence wins, judge ≥80% agreement | Owner 9/10; judge 70%. Closed through the fail action: owner coherence is the instrument, judges diagnostic only |
 | G-schema (passed, 27 Oct 2026) | P2 | Is the schema expressive and practical? | 44/44 categories caught; all three owner reviews under two hours; meaningful qualitative differences confirmed | Cut channels |
-| **G1** (not recorded) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in ≥21/30 pairs; ties are non-wins; originality safeguard met | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
+| **G1** (failed/inconclusive, 30 Oct 2026; 0 of 4 coherence wins, [evidence](evidence/g1-2026-10-30/README.txt); retest 2 of 4, [evidence](evidence/g1-retest-2026-10-30/README.txt)) | P3 | **Do multi-channel plans help?** | C higher on owner coherence in at least 3 of 4 pairs; ties are non-wins; originality safeguard met (first G1 only) | At most one fresh-held-out follow-up (larger confirmation or diagnostic retry), then stop the diffusion track |
 | G-D (not recorded) | P4 | Does refinement help? | D meets pre-registered coherence comparison against C, originality safeguard and controllability targets | C becomes the reference baseline |
 | **G2** (not recorded) | P5 | Can core channels be extracted? | Core channels reliable; ≥80% defensible | Reduce the representation, or stop before training |
 | **G3** (not recorded) | P6 | Does denoising beat AR on long-range structure? | Pre-registered validator target and positive long-range margin over matched AR | Stop; D or C is the result |
@@ -748,9 +773,10 @@ operational work. Keep missing evidence pending rather than repeating fixture
 checks as a substitute for owner judgement.
 
 1. **Research gates:** G-schema and the sampled dev review/M selection are complete.
-   Next are committed G1 registration and blind reading. Follow with independently registered
-   G-D/G2 work and genuine G1/G2 prerequisites for G3. Record each actual
-   outcome; existing gate commands already enforce admission.
+   [G1 and its one permitted retest did not pass](g1-four-pairs.md), so the diffusion
+   track stops. Any return to it needs a new owner decision, and would then follow with independently registered G-D/G2 work and
+   genuine G1/G2 prerequisites for G3. Record each actual outcome; existing gate
+   commands already enforce admission.
 2. **Issue close-out:** Phase 6 and 7 implementation issues (#66–85) are closed.
    Tooling on `main` is not a reason to manufacture a scientific result.
 3. **Fresh held-out briefs, before a G1 follow-up or Phase 8:** plan authorship,

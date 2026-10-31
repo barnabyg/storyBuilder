@@ -9,13 +9,13 @@ plans:
   briefs_dir: ../benchmark
   briefs: {ids: [brief-01]}
   params:
-    saved_plan: ../examples/narrative-plan.json
+    saved_plan: ../examples/trajectory-rising.plan.json
     revision:
       version: '1'
       mask:
         channels: [arcs, reader_affect]
         units: []
-      locks: [arcs/arc-keeper/reading, scenes/scene-0, constraints]
+      locks: [arcs/a1/reading, scenes/s1, constraints]
       instruction: Give the unlocked arc and affect records a new trajectory.
 ```
 

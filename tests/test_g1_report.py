@@ -16,7 +16,14 @@ from tests.eval_helpers import reader
 from tests.test_realisation import create_packet, packet_source
 
 
-def synthetic_batch(tmp_path: Path, wins: int, *, ties: int = 0, originality: int = 3) -> Path:
+def synthetic_batch(
+    tmp_path: Path,
+    wins: int,
+    *,
+    ties: int = 0,
+    originality: int = 3,
+    coherence_only: bool = False,
+) -> Path:
     batch = tmp_path / "batch"
     (batch / "sealed").mkdir(parents=True)
     rubric = load_rubric(REPO / "benchmark/rubric", 1)
@@ -58,8 +65,11 @@ def synthetic_batch(tmp_path: Path, wins: int, *, ties: int = 0, originality: in
                 "strength": "1",
                 "score-a-coherence": str(c_score),
                 "score-b-coherence": "3",
-                "score-a-originality": str(originality),
-                "score-b-originality": "3",
+                **(
+                    {}
+                    if coherence_only
+                    else {"score-a-originality": str(originality), "score-b-originality": "3"}
+                ),
             },
         )
         assert response.status_code == 200
@@ -79,7 +89,7 @@ def synthetic_batch(tmp_path: Path, wins: int, *, ties: int = 0, originality: in
         "budget_measure": "generation_tokens",
         "budget_tolerance": 0.1,
     }
-    protocol = {
+    protocol: dict[str, Any] = {
         "id": "synthetic-test-only",
         "test_only": True,
         "cohort": cohort,
@@ -98,6 +108,9 @@ def synthetic_batch(tmp_path: Path, wins: int, *, ties: int = 0, originality: in
             "per_day_usd": 5,
         },
     }
+    if coherence_only:
+        del protocol["originality"]
+        protocol["required_dimensions"] = ["coherence"]
     protocol_file = tmp_path / "protocol.json"
     protocol_file.write_text(json.dumps(protocol))
     admitted_pairs: list[dict[str, Any]] = []
@@ -175,6 +188,22 @@ def test_ties_are_non_wins_and_originality_is_an_independent_safeguard(tmp_path:
     assert result["coherence"]["ties"] == 9
     assert result["originality"]["mean_candidate_minus_comparator"] == -1
     assert result["criteria_outcome"] == "failed_inconclusive"
+
+
+@pytest.mark.parametrize(("wins", "expected"), [(21, "passed"), (20, "failed_inconclusive")])
+def test_a_coherence_only_protocol_is_decided_by_coherence_alone(
+    tmp_path: Path, wins: int, expected: str
+) -> None:
+    batch = synthetic_batch(tmp_path, wins, coherence_only=True)
+    out = tmp_path / "decision"
+    assert main(["g1-report", str(batch), "--out", str(out)]) == 0
+    result = json.loads((out / "decision.json").read_text())
+    assert result["pending"] == [
+        "Synthetic test-only judgements cannot establish a scientific gate."
+    ]
+    assert result["criteria_outcome"] == expected
+    assert result["originality"] == {"analysis": "not_registered"}
+    assert "Coherence decides this gate." in (out / "decision.md").read_text()
 
 
 @pytest.mark.parametrize("change", ["artifact", "missing_score", "invalid_score", "cohort", "open"])

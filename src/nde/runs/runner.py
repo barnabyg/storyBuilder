@@ -25,6 +25,7 @@ from nde.llm.structured import StructuredOutputError
 from nde.plan.execute import PlanRun, PreparedPlans, prepare_plans, run_plans
 from nde.runs.benchmark import benchmark_rows
 from nde.runs.config import (
+    BriefSelection,
     CallSpec,
     ConfigError,
     ExperimentConfig,
@@ -86,9 +87,16 @@ class PreparedRun:
     plans: PreparedPlans | None = None
 
 
-def prepare(config_path: Path, environ: Mapping[str, str]) -> PreparedRun:
-    """Load and fully validate a config; raises ConfigError before any network call."""
+def prepare(
+    config_path: Path, environ: Mapping[str, str], *, briefs: BriefSelection | None = None
+) -> PreparedRun:
+    """Load and fully validate a config; raises ConfigError before any network call.
+
+    `briefs` replaces the config's story selection, for commands that name a brief.
+    """
     loaded = load_config(config_path)
+    if briefs is not None:
+        loaded = loaded.with_briefs(briefs)
     config = loaded.config
     templates: dict[str, PromptTemplate] = {}
     for call in config.calls:

@@ -170,6 +170,8 @@ class EqualBudgetSummary(_Record):
     matches: list[BudgetMatch] = Field(default_factory=list[BudgetMatch])
     # The registered resource comparison policy (`EqualBudgetConfig.resource_policy`).
     resource_policy: dict[str, str] | None = Field(default=None, exclude_if=absent)
+    # Both conditions' registered revision passes (`EqualBudgetConfig.fixed_revision_passes`).
+    fixed_revision_passes: int | None = Field(default=None, exclude_if=absent)
 
 
 class StoriesSummary(_Record):

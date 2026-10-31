@@ -9,8 +9,8 @@ through the host keyring. Desktop connector authentication is separate.
 
 Completed work means a GitHub issue closed with reason `completed`, labelled
 `ready-for-agent`, and outside the configured hygiene/control/cancelled/duplicate
-exclusions. Owner-only `ready-for-human` issues do not count. Implementation has
-been committed directly to `main`, so a linked merged PR is not required. Immutable
+exclusions. Owner-only `ready-for-human` issues do not count. Work may reach `main`
+directly or through a PR, so a linked merged PR is not required. Immutable
 issue IDs prevent counting reopened/reclosed work twice. All API pages are read;
 an outage preserves the checkpoint and leaves a diagnostic.
 

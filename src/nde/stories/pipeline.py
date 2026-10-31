@@ -9,6 +9,8 @@ phases:
 - `write` makes the prose calls and returns the raw story text. Length control
   calls it again with a new seed when the story is out of range.
 
+A pipeline may also work on the chosen story afterwards, in `finish`.
+
 Every call goes through a `StoryContext`, which records the brief, condition
 and step it served, and keeps intermediate outputs beside the story.
 """
@@ -173,6 +175,8 @@ class Pipeline[PlanT](ABC):
     # Whether the pipeline runs a local conditional model, whose work is reported in
     # its own units and needs a registered resource policy in equal-budget comparisons.
     local_model: ClassVar[bool] = False
+    # Whether the pipeline may only run on dev briefs; a config naming others is rejected.
+    dev_only: ClassVar[bool] = False
 
     def required_roles(self) -> tuple[RoleName, ...]:
         """Roles needed by the configured pipeline, including optional stages."""
@@ -201,6 +205,21 @@ class Pipeline[PlanT](ABC):
     @abstractmethod
     def write(self, ctx: StoryContext, plan: PlanT, *, seed: int) -> str:
         """The prose calls; returns the raw story text."""
+
+    def finish(
+        self,
+        ctx: StoryContext,  # noqa: ARG002 - an optional hook; most pipelines have none
+        plan: PlanT,  # noqa: ARG002
+        story: str,
+        *,
+        attempt: int,  # noqa: ARG002
+    ) -> str:
+        """Work on the chosen story after length control; returns its final text.
+
+        `attempt` is the chosen draft's length-control attempt. Most pipelines have
+        nothing to do here. Kept files sit beside the story.
+        """
+        return story
 
 
 # Builds a pipeline from a condition's params; raises pydantic.ValidationError.

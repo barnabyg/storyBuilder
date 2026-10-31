@@ -1,0 +1,109 @@
+"""Targeted repair: rewrite only the flagged passages and leave every other word alone."""
+
+from collections.abc import Sequence
+from typing import Self
+
+from pydantic import Field, model_validator
+
+from nde.continuity.flags import Flag
+from nde.continuity.plan import KNOWLEDGE_RULE, PLAIN_STYLE_RULES, ContinuityPlan, render_plan
+from nde.continuity.story import NumberedStory
+from nde.llm.config import Strict
+from nde.runs.config import PromptRef
+from nde.stories.normalise import normalise
+from nde.stories.pipeline import Step, StoryContext, derive_seed
+
+REPAIR_PROMPT = PromptRef(template="continuity_repair", version=2)
+REPAIR_VARIABLES = frozenset({"plan", "story", "passage", "before", "after", "problems", "rules"})
+START_OF_STORY = "(This is the start of the story.)"
+END_OF_STORY = "(This is the end of the story.)"
+
+
+class RepairedPassage(Strict):
+    replacement: str = Field(
+        min_length=1, description="the new text for the passage, as one paragraph"
+    )
+
+    @model_validator(mode="after")
+    def _one_paragraph(self) -> Self:
+        if "\n" in self.replacement.strip():
+            raise ValueError("the replacement must be one paragraph, with no line breaks")
+        return self
+
+
+class Change(Strict):
+    """One rewritten passage, with what it addressed and the text before and after."""
+
+    attempt: int
+    paragraph: int
+    problems: list[Flag]
+    before: str
+    after: str
+
+
+def group_by_passage(flags: Sequence[Flag]) -> list[list[Flag]]:
+    """The flags to repair together: one group per distinct passage, in first-seen order."""
+    groups: dict[tuple[int | None, str], list[Flag]] = {}
+    for flag in flags:
+        groups.setdefault((flag.paragraph, flag.passage), []).append(flag)
+    return list(groups.values())
+
+
+def locate(story: NumberedStory, flag: Flag) -> int | None:
+    """The paragraph holding a flag's passage: the one it names, else an exact, else any match."""
+    numbers = range(1, len(story) + 1)
+    named = flag.paragraph
+    if named is not None and named in numbers and flag.passage in story.paragraph(named):
+        return named
+    for number in numbers:
+        if flag.passage == story.paragraph(number):
+            return number
+    return next((number for number in numbers if flag.passage in story.paragraph(number)), None)
+
+
+def _render_problems(flags: Sequence[Flag]) -> str:
+    return "\n".join(f"- {flag.problem_type}: {flag.reason}" for flag in flags)
+
+
+def repair_passage(
+    ctx: StoryContext,
+    plan: ContinuityPlan,
+    story: NumberedStory,
+    flags: Sequence[Flag],
+    *,
+    attempt: int,
+) -> tuple[NumberedStory, Change] | None:
+    """Rewrite the passage `flags` share; None if the story no longer contains it.
+
+    Nothing outside the passage can change: the model only supplies the new text,
+    and code splices it into the one paragraph that holds the passage.
+    """
+    passage = flags[0].passage
+    number = locate(story, flags[0])
+    if number is None:
+        return None
+    step = Step(
+        f"repair-{attempt}-p{number:03d}",
+        "prose",
+        REPAIR_PROMPT,
+        {
+            "plan": render_plan(plan),
+            "story": story.render(),
+            "passage": passage,
+            "before": story.paragraph(number - 1) if number > 1 else START_OF_STORY,
+            "after": story.paragraph(number + 1) if number < len(story) else END_OF_STORY,
+            "problems": _render_problems(flags),
+            "rules": f"{KNOWLEDGE_RULE}\n\n{PLAIN_STYLE_RULES}",
+        },
+    )
+    seed = derive_seed(ctx.seed, "repair", attempt, number)
+    repaired = ctx.structured(step, RepairedPassage, seed=seed)
+    replacement = " ".join(normalise(repaired.replacement).split())
+    if not replacement:
+        return None
+    before = story.paragraph(number)
+    after = before.replace(passage, replacement, 1)
+    change = Change(
+        attempt=attempt, paragraph=number, problems=list(flags), before=before, after=after
+    )
+    return story.with_paragraph(number, after), change

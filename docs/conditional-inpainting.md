@@ -11,7 +11,7 @@ plans:
   briefs: {ids: [brief-01]}
   repeat: 3                      # three independent alternatives
   params:
-    saved_plan: ../examples/narrative-plan.json
+    saved_plan: path/to/plan.json     # a plan saved by nde plan generate; the IDs below are illustrative
     revision:
       version: '1'
       mask: {units: [states/belief/key, knowledge_facts/lamp-fact/description]}

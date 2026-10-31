@@ -11,9 +11,9 @@ realisation reports. Packet story hashes must belong to the admitted cohort;
 stale and absent evidence remains explicit. Optional judge agreement is
 available in the ordinary `nde eval report` output and remains diagnostic.
 
-The immutable output folder contains `decision.json` and `decision.md`,
-including protocol, run/admission identities, a result checksum, costs,
-reading caveats, failure tags and secondary overall preferences. Choose a new
+The immutable output folder contains the complete `decision.json` (protocol,
+run/admission identities, result checksum, costs, reading caveats, failure tags
+and secondary overall preferences) and a summary `decision.md`. Choose a new
 folder to regenerate a report; completed outputs cannot be overwritten.
 
 C wins coherence only when its score is strictly higher than B's. Ties are

@@ -1,0 +1,1135 @@
+[
+  {
+    "scene": 1,
+    "entries": [
+      {
+        "character": "Kari Lund",
+        "fact": "Ice picks, a probing pole, a throw line and spare clothing are relevant crossing equipment.",
+        "acted_paragraph": 1,
+        "how_learned": "Her work as a winter guide supplies this practical knowledge.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The crossing equipment and spare clothes need checking before departure.",
+        "acted_paragraph": 2,
+        "how_learned": "She has the packing list and ordinary knowledge of their planned winter outing.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "She earns her living guiding winter trips.",
+        "acted_paragraph": 4,
+        "how_learned": "She knows her own occupation.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The packed equipment, clothing and sled lashings have been checked.",
+        "acted_paragraph": 6,
+        "how_learned": "She checks the bundle, pole, line and sled herself.",
+        "source": "on_page",
+        "learned_paragraph": 6,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The map and attached photograph belonged to their father.",
+        "acted_paragraph": 7,
+        "how_learned": "These are familiar family belongings.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The displayed map records an old winter.",
+        "acted_paragraph": 9,
+        "how_learned": "She reads its date.",
+        "source": "on_page",
+        "learned_paragraph": 8,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their father's maps do not guarantee present ice safety.",
+        "acted_paragraph": 9,
+        "how_learned": "Her starting knowledge distinguishes historical ice records from present conditions.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 3
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The map is dated and records an earlier winter.",
+        "acted_paragraph": 10,
+        "how_learned": "She can read the unfolded map and has heard Kari identify its age.",
+        "source": "on_page",
+        "learned_paragraph": 9,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their father used to call Ingrid sensible and Kari fearless.",
+        "acted_paragraph": 11,
+        "how_learned": "She remembers her own childhood experiences.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their father's ashes are in the screw-top tin inside the waterproof bag.",
+        "acted_paragraph": 13,
+        "how_learned": "This location is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 1
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The tin of ashes is being secured inside the sled's waterproof bag.",
+        "acted_paragraph": 13,
+        "how_learned": "She holds the bag while Kari closes it and helps secure it.",
+        "source": "on_page",
+        "learned_paragraph": 13,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their father asked for his ashes to be scattered on the far shore.",
+        "acted_paragraph": 15,
+        "how_learned": "His request is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 4
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their father's mapped crossing is three kilometres long.",
+        "acted_paragraph": 16,
+        "how_learned": "The route's length is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 2
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "There have been several days of thaw.",
+        "acted_paragraph": 17,
+        "how_learned": "The recent thaw is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 5
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Uncertain ice safety is a reason to abandon the crossing.",
+        "acted_paragraph": 17,
+        "how_learned": "Ordinary ice-safety knowledge supports the retreat rule she proposes.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Ingrid proposes turning back if testing cannot establish safe ice.",
+        "acted_paragraph": 20,
+        "how_learned": "She hears Ingrid state the proposed rule.",
+        "source": "on_page",
+        "learned_paragraph": 17,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The cabin stove can be prepared for their return.",
+        "acted_paragraph": 21,
+        "how_learned": "She knows the family cabin and its stove.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their preparations have taken fifteen minutes.",
+        "acted_paragraph": 21,
+        "how_learned": "Elapsed time during her own preparations is ordinarily available to her.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      }
+    ]
+  },
+  {
+    "scene": 2,
+    "entries": [
+      {
+        "character": "Kari Lund",
+        "fact": "Ice ahead must be tested before she steps onto it.",
+        "acted_paragraph": 22,
+        "how_learned": "Her guiding work supplies this ice-travel practice.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The sisters should keep their weight separated on the ice.",
+        "acted_paragraph": 23,
+        "how_learned": "Her winter-guiding experience supplies this precaution.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari wants ten metres of separation and is marking a tested route.",
+        "acted_paragraph": 24,
+        "how_learned": "She hears Kari's instruction and sees her probing ahead.",
+        "source": "on_page",
+        "learned_paragraph": 23,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Changes in snow cover warrant further ice testing.",
+        "acted_paragraph": 25,
+        "how_learned": "This follows from her winter-guiding experience.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Her right snowshoe strap is repeatedly loosening.",
+        "acted_paragraph": 26,
+        "how_learned": "She feels the loose fit and repeatedly tightens it.",
+        "source": "on_page",
+        "learned_paragraph": 26,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Ingrid needs help with her snowshoe.",
+        "acted_paragraph": 28,
+        "how_learned": "She can observe Ingrid's repeated stops and hears her request to wait.",
+        "source": "on_page",
+        "learned_paragraph": 27,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The snowshoe buckle contains ice and needs clearing and rethreading.",
+        "acted_paragraph": 30,
+        "how_learned": "She examines the buckle while repairing it.",
+        "source": "on_page",
+        "learned_paragraph": 30,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The repaired strap holds better under her weight.",
+        "acted_paragraph": 38,
+        "how_learned": "She stamps and takes a test step.",
+        "source": "on_page",
+        "learned_paragraph": 37,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "They are about five hundred metres from the cabin after twenty-five minutes.",
+        "acted_paragraph": 40,
+        "how_learned": "She has travelled the route and checks their position against the visible shore.",
+        "source": "on_page",
+        "learned_paragraph": 40,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their father's map marks this section as thick clear ice.",
+        "acted_paragraph": 41,
+        "how_learned": "She unfolds and reads the map at their current position.",
+        "source": "on_page",
+        "learned_paragraph": 40,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The current surface includes a breakable crust, water and cloudy ice.",
+        "acted_paragraph": 43,
+        "how_learned": "Her probe breaks the crust, and she clears snow to inspect underneath.",
+        "source": "on_page",
+        "learned_paragraph": 42,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The current ice shows warning signs despite the old map.",
+        "acted_paragraph": 44,
+        "how_learned": "She is present as Kari exposes water and cloudy ice.",
+        "source": "on_page",
+        "learned_paragraph": 43,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari agreed to turn back if their tests could not establish safety.",
+        "acted_paragraph": 45,
+        "how_learned": "She heard Kari accept the retreat rule.",
+        "source": "on_page",
+        "learned_paragraph": 20,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "A nearby exposed strip appears clear enough to investigate.",
+        "acted_paragraph": 47,
+        "how_learned": "She looks left and sees the exposed ice less than twenty metres away.",
+        "source": "on_page",
+        "learned_paragraph": 46,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "There is water at their present position.",
+        "acted_paragraph": 48,
+        "how_learned": "She can see the water exposed by Kari's probing.",
+        "source": "on_page",
+        "learned_paragraph": 42,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The alternative strip still needs testing before use.",
+        "acted_paragraph": 49,
+        "how_learned": "Her guiding knowledge does not treat clear appearance alone as proof of safety.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      }
+    ]
+  },
+  {
+    "scene": 3,
+    "entries": [
+      {
+        "character": "Kari Lund",
+        "fact": "The exposed strip offers a visible direction for a possible detour.",
+        "acted_paragraph": 51,
+        "how_learned": "She has seen the strip beside their route.",
+        "source": "on_page",
+        "learned_paragraph": 46,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari intends to investigate the strip while avoiding the wet snow.",
+        "acted_paragraph": 53,
+        "how_learned": "She hears Kari's directions.",
+        "source": "on_page",
+        "learned_paragraph": 52,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The detour has taken thirteen minutes.",
+        "acted_paragraph": 54,
+        "how_learned": "She checks her watch.",
+        "source": "on_page",
+        "learned_paragraph": 54,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "A seam crosses their path beneath a drift.",
+        "acted_paragraph": 55,
+        "how_learned": "She encounters and observes it at the end of the detour.",
+        "source": "on_page",
+        "learned_paragraph": 54,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The seam gives way under the pole and contains water.",
+        "acted_paragraph": 55,
+        "how_learned": "Her probe breaks through with a splash, and she sees the hole fill.",
+        "source": "on_page",
+        "learned_paragraph": 55,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The detour has reached another unsafe-looking wet seam.",
+        "acted_paragraph": 56,
+        "how_learned": "She is present for the probe breaking through and the water appearing.",
+        "source": "on_page",
+        "learned_paragraph": 55,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Ingrid proposed the attempt to complete their father's journey.",
+        "acted_paragraph": 60,
+        "how_learned": "The purpose and proposer of their shared outing are ordinary shared planning knowledge.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari recommended the shortcut their father took.",
+        "acted_paragraph": 64,
+        "how_learned": "Kari's recommendation is part of Ingrid's starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 3
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their father's last crossing ended in his death.",
+        "acted_paragraph": 64,
+        "how_learned": "His fatal crossing is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 1
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "She told her father about a shortcut she had previously crossed.",
+        "acted_paragraph": 66,
+        "how_learned": "Her recommendation is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 4
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Her father crossed alone and drowned.",
+        "acted_paragraph": 68,
+        "how_learned": "The circumstances of his death are part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 1
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "She declined her father's invitation because she had work.",
+        "acted_paragraph": 69,
+        "how_learned": "She knows her own past decision and reason for it.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their father asked Ingrid to accompany him, and she declined because of work.",
+        "acted_paragraph": 70,
+        "how_learned": "Ingrid tells her directly.",
+        "source": "on_page",
+        "learned_paragraph": 69,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The way back is along their outward track rather than toward the far shore.",
+        "acted_paragraph": 73,
+        "how_learned": "She has just travelled the route and can see their marks.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari has agreed to retreat.",
+        "acted_paragraph": 73,
+        "how_learned": "She hears Kari say they are going back.",
+        "source": "on_page",
+        "learned_paragraph": 72,
+        "sheet_item": null
+      }
+    ]
+  },
+  {
+    "scene": 4,
+    "entries": [
+      {
+        "character": "Kari Lund",
+        "fact": "The ice has broken under her and she must arrest her fall.",
+        "acted_paragraph": 75,
+        "how_learned": "She experiences the ice breaking beneath her snowshoe.",
+        "source": "on_page",
+        "learned_paragraph": 74,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Her ice picks can provide purchase on the surface.",
+        "acted_paragraph": 76,
+        "how_learned": "Her guiding experience includes use of the rescue equipment she carries.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Approaching the break would put Ingrid in danger.",
+        "acted_paragraph": 77,
+        "how_learned": "Her ice-safety knowledge applies to the break she has just fallen through.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari has fallen through and needs a rescue line.",
+        "acted_paragraph": 78,
+        "how_learned": "She witnesses the fall and hears Kari.",
+        "source": "on_page",
+        "learned_paragraph": 75,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "She should stay back, spread her weight and throw the line.",
+        "acted_paragraph": 78,
+        "how_learned": "Her basic ice-rescue training is ordinary acquired practical knowledge.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The rescue line is available among their checked equipment.",
+        "acted_paragraph": 78,
+        "how_learned": "She participated in the equipment check and packing.",
+        "source": "on_page",
+        "learned_paragraph": 6,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The first throw has landed out of reach.",
+        "acted_paragraph": 80,
+        "how_learned": "She reaches for it and cannot grasp it.",
+        "source": "on_page",
+        "learned_paragraph": 79,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "She needs to throw the line again.",
+        "acted_paragraph": 81,
+        "how_learned": "She sees the unsuccessful throw and hears Kari request another.",
+        "source": "on_page",
+        "learned_paragraph": 80,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The second throw has reached her wrist.",
+        "acted_paragraph": 81,
+        "how_learned": "She feels the loop strike her wrist.",
+        "source": "on_page",
+        "learned_paragraph": 81,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Her snowshoe is trapped beneath the edge.",
+        "acted_paragraph": 83,
+        "how_learned": "She tries to pull free and feels the snowshoe hold.",
+        "source": "on_page",
+        "learned_paragraph": 82,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari is not yet ready to be pulled.",
+        "acted_paragraph": 84,
+        "how_learned": "Kari tells her not to pull yet.",
+        "source": "on_page",
+        "learned_paragraph": 83,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Her foot has come free of the snowshoe while her boot remains on.",
+        "acted_paragraph": 86,
+        "how_learned": "She feels her heel slip out as she turns and kicks.",
+        "source": "on_page",
+        "learned_paragraph": 85,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari is ready for her to pull.",
+        "acted_paragraph": 87,
+        "how_learned": "Kari gives the signal.",
+        "source": "on_page",
+        "learned_paragraph": 86,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their marked track leads away from the break over previously tested ice.",
+        "acted_paragraph": 89,
+        "how_learned": "She made the tests during their outward journey and can identify the marks.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari is clear of the water and crawling toward the tested track.",
+        "acted_paragraph": 89,
+        "how_learned": "She watches Kari escape and move away.",
+        "source": "on_page",
+        "learned_paragraph": 87,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The sled remains behind them on firm ice.",
+        "acted_paragraph": 90,
+        "how_learned": "Its position is visible during the rescue.",
+        "source": "on_page",
+        "learned_paragraph": 75,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari has reached their tested marks before the sled is retrieved.",
+        "acted_paragraph": 90,
+        "how_learned": "She observes Kari reach the marks.",
+        "source": "on_page",
+        "learned_paragraph": 90,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari needs shelter and replacement clothing after immersion.",
+        "acted_paragraph": 91,
+        "how_learned": "She witnessed the immersion and has ordinary winter-safety knowledge.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their sled carries spare clothing.",
+        "acted_paragraph": 91,
+        "how_learned": "She requested the clothing check and was present when Kari checked the bundle.",
+        "source": "on_page",
+        "learned_paragraph": 6,
+        "sheet_item": null
+      }
+    ]
+  },
+  {
+    "scene": 5,
+    "entries": [
+      {
+        "character": "Ingrid Lund",
+        "fact": "A shelter sheet is packed in the sled.",
+        "acted_paragraph": 92,
+        "how_learned": "Its inclusion is ordinary knowledge of the shared equipment they prepared.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Her lower clothing and socks are soaked.",
+        "acted_paragraph": 92,
+        "how_learned": "She experienced water flooding her trousers during the fall.",
+        "source": "on_page",
+        "learned_paragraph": 75,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The sheet needs to be held lower to shelter her while she changes.",
+        "acted_paragraph": 93,
+        "how_learned": "She can see and feel the sheet's current position.",
+        "source": "on_page",
+        "learned_paragraph": 92,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari wants the corner of the sheet lowered.",
+        "acted_paragraph": 94,
+        "how_learned": "Kari asks her directly.",
+        "source": "on_page",
+        "learned_paragraph": 93,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The dry bag can keep her off the ice while she puts on spare clothes.",
+        "acted_paragraph": 95,
+        "how_learned": "She can see the bag and knows the ordinary use of her equipment.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "She wanted to finish the crossing to vindicate her judgement.",
+        "acted_paragraph": 96,
+        "how_learned": "She is describing her own motive.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "She did not ensure her father understood when she had last checked the shortcut.",
+        "acted_paragraph": 98,
+        "how_learned": "She remembers her own advice and what she failed to clarify.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Her father chose to undertake the crossing himself.",
+        "acted_paragraph": 98,
+        "how_learned": "His known solo crossing and her own role as an adviser support this distinction.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "She continued seeking a route after agreeing to turn back if safety was uncertain.",
+        "acted_paragraph": 100,
+        "how_learned": "She remembers her agreement and her subsequent decisions during this outing.",
+        "source": "on_page",
+        "learned_paragraph": 49,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Blaming Kari helped her avoid thinking about her own refusal.",
+        "acted_paragraph": 102,
+        "how_learned": "She is reporting her own emotional motive.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari's guiding work deserves to be distinguished from childhood risk-taking.",
+        "acted_paragraph": 104,
+        "how_learned": "She knows her sister's occupation and their shared family history.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Her legs are shaky but can support her.",
+        "acted_paragraph": 106,
+        "how_learned": "She tries a few steps.",
+        "source": "on_page",
+        "learned_paragraph": 105,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The cabin offers a stove, dry clothes and firewood.",
+        "acted_paragraph": 106,
+        "how_learned": "The cabin's warming resources are part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 5
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "They can return to the cabin without arranging a pickup.",
+        "acted_paragraph": 107,
+        "how_learned": "Their independent return option is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 6
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari wants her to carry the map while Kari checks their old track.",
+        "acted_paragraph": 107,
+        "how_learned": "Kari proposes that division of tasks.",
+        "source": "on_page",
+        "learned_paragraph": 106,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their outward footprints identify the route back.",
+        "acted_paragraph": 107,
+        "how_learned": "She can see the footprints left during their outward travel.",
+        "source": "on_page",
+        "learned_paragraph": 107,
+        "sheet_item": null
+      }
+    ]
+  },
+  {
+    "scene": 6,
+    "entries": [
+      {
+        "character": "Kari Lund",
+        "fact": "Previously tested ice should still be checked on the return.",
+        "acted_paragraph": 108,
+        "how_learned": "Her guiding experience supplies this precaution.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari is asking to take the sled traces at their first stop.",
+        "acted_paragraph": 109,
+        "how_learned": "She sees Kari hold out her hand for them.",
+        "source": "on_page",
+        "learned_paragraph": 109,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "She can take over probing while Kari hauls the sled.",
+        "acted_paragraph": 109,
+        "how_learned": "She has familiar outdoor skills and has watched Kari probe throughout the crossing.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari needs pauses during the return.",
+        "acted_paragraph": 110,
+        "how_learned": "She observes Kari stop to rest.",
+        "source": "on_page",
+        "learned_paragraph": 110,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Dry kindling is already laid in the cabin stove.",
+        "acted_paragraph": 112,
+        "how_learned": "She prepared it before they left.",
+        "source": "on_page",
+        "learned_paragraph": 21,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Some of her remaining clothing and outer gear are damp.",
+        "acted_paragraph": 113,
+        "how_learned": "She can feel and inspect her own clothing after the immersion.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Dry clothes and a blanket are available in the cabin.",
+        "acted_paragraph": 113,
+        "how_learned": "She knows the contents of the family cabin.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The stove can heat water while Kari warms up.",
+        "acted_paragraph": 113,
+        "how_learned": "She knows how to use the family cabin's stove.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The ashes remain in the tin inside the waterproof bag.",
+        "acted_paragraph": 115,
+        "how_learned": "She helped pack the tin, and they have brought the sled back.",
+        "source": "on_page",
+        "learned_paragraph": 13,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "She does not want another crossing to become a contest between the sisters.",
+        "acted_paragraph": 116,
+        "how_learned": "She is stating her own intention after their shared experience.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "A nearby rock ledge is where their father taught them rescue knots.",
+        "acted_paragraph": 118,
+        "how_learned": "She remembers the family place and lessons she attended.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their father's requested destination was the far shore rather than this ledge.",
+        "acted_paragraph": 119,
+        "how_learned": "His request is part of her starting knowledge.",
+        "source": "sheet",
+        "learned_paragraph": null,
+        "sheet_item": 4
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Their father requested scattering on the far shore.",
+        "acted_paragraph": 120,
+        "how_learned": "Ingrid stated the request during their preparations.",
+        "source": "on_page",
+        "learned_paragraph": 15,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari proposes scattering the ashes at the nearby ledge instead.",
+        "acted_paragraph": 122,
+        "how_learned": "She hears Kari identify the ledge and propose scattering there.",
+        "source": "on_page",
+        "learned_paragraph": 120,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Ingrid agrees to scatter the ashes together on the ledge.",
+        "acted_paragraph": 123,
+        "how_learned": "Ingrid explicitly agrees.",
+        "source": "on_page",
+        "learned_paragraph": 122,
+        "sheet_item": null
+      }
+    ]
+  },
+  {
+    "scene": 7,
+    "entries": [
+      {
+        "character": "Kari Lund",
+        "fact": "Her hands have stopped shaking after further warming.",
+        "acted_paragraph": 125,
+        "how_learned": "She can directly feel and observe her own condition.",
+        "source": "on_page",
+        "learned_paragraph": 125,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari is ready to go to the ledge.",
+        "acted_paragraph": 128,
+        "how_learned": "Kari nods in response to her question.",
+        "source": "on_page",
+        "learned_paragraph": 127,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The path behind the cabin leads to the nearby ledge.",
+        "acted_paragraph": 128,
+        "how_learned": "She knows the family cabin's surroundings.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The path behind the cabin leads to the nearby ledge.",
+        "acted_paragraph": 128,
+        "how_learned": "She knows the family cabin's surroundings.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Snow on the path and the ledge require careful footing.",
+        "acted_paragraph": 128,
+        "how_learned": "She sees the surface conditions as they walk.",
+        "source": "on_page",
+        "learned_paragraph": 128,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Ingrid wants to take the tin.",
+        "acted_paragraph": 130,
+        "how_learned": "Ingrid holds out her hand for it.",
+        "source": "on_page",
+        "learned_paragraph": 129,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The tin opens with a screw-top lid.",
+        "acted_paragraph": 130,
+        "how_learned": "She has handled this family container and can inspect its closure.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "A breeze is blowing from the ledge.",
+        "acted_paragraph": 131,
+        "how_learned": "They watch it lift snow for a minute.",
+        "source": "on_page",
+        "learned_paragraph": 130,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari is signalling that they should scatter the ashes now.",
+        "acted_paragraph": 132,
+        "how_learned": "Kari says 'Now.'",
+        "source": "on_page",
+        "learned_paragraph": 131,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Some ashes remain after the first tipping of the tin.",
+        "acted_paragraph": 132,
+        "how_learned": "She can see the contents while they scatter them.",
+        "source": "on_page",
+        "learned_paragraph": 132,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "The tin is empty when they finish scattering.",
+        "acted_paragraph": 132,
+        "how_learned": "She observes it empty as they tip it farther.",
+        "source": "on_page",
+        "learned_paragraph": 132,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "She accused Ingrid of letting their father cross alone.",
+        "acted_paragraph": 133,
+        "how_learned": "She remembers the accusation she made during their argument.",
+        "source": "on_page",
+        "learned_paragraph": 68,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "She blamed Kari for their father's fatal decision.",
+        "acted_paragraph": 135,
+        "how_learned": "She remembers her own accusation at the seam.",
+        "source": "on_page",
+        "learned_paragraph": 64,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their father's map is still available to unfold at the cabin.",
+        "acted_paragraph": 137,
+        "how_learned": "She took custody of it before the return.",
+        "source": "on_page",
+        "learned_paragraph": 107,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "A pencil is in the map's fold.",
+        "acted_paragraph": 137,
+        "how_learned": "She can see or find it as Ingrid unfolds the map.",
+        "source": "on_page",
+        "learned_paragraph": 137,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "She can identify approximately where she broke through on their mapped route.",
+        "acted_paragraph": 137,
+        "how_learned": "She travelled and probed the route and can relate that recent experience to the map.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The seam was weak enough to break beneath her.",
+        "acted_paragraph": 138,
+        "how_learned": "She experienced the break and immersion there.",
+        "source": "on_page",
+        "learned_paragraph": 74,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "The observation should be recorded with the current date.",
+        "acted_paragraph": 137,
+        "how_learned": "She knows the date and understands that ice observations are time-specific.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Kari is adding a dated weak-seam warning to the map.",
+        "acted_paragraph": 139,
+        "how_learned": "She watches Kari write and hears her read the warning.",
+        "source": "on_page",
+        "learned_paragraph": 138,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "Their father's belongings are being divided.",
+        "acted_paragraph": 140,
+        "how_learned": "She knows the family's estate arrangements.",
+        "source": "ordinary",
+        "learned_paragraph": null,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "Ingrid wants them to keep the map together rather than divide it with the estate.",
+        "acted_paragraph": 141,
+        "how_learned": "Ingrid states that intention.",
+        "source": "on_page",
+        "learned_paragraph": 140,
+        "sheet_item": null
+      },
+      {
+        "character": "Kari Lund",
+        "fact": "They have returned to the cabin with the map.",
+        "acted_paragraph": 142,
+        "how_learned": "She is standing at the doorway after walking back from the ledge.",
+        "source": "on_page",
+        "learned_paragraph": 137,
+        "sheet_item": null
+      },
+      {
+        "character": "Ingrid Lund",
+        "fact": "They have returned to the cabin with the map.",
+        "acted_paragraph": 142,
+        "how_learned": "She is standing at the doorway after walking back from the ledge.",
+        "source": "on_page",
+        "learned_paragraph": 137,
+        "sheet_item": null
+      }
+    ]
+  }
+]

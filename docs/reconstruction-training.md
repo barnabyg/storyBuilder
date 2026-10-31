@@ -19,7 +19,7 @@ A JSON training config supplies `dataset`, `base_model`, `objective: "denoising"
 `max_seconds`, `max_output_tokens`, `inference_max_tokens` and `test_only`.
 Run `preflight CONFIG`, `train CONFIG --out RUN`, or `resume CONFIG --out RUN`.
 `--steps-this-call N` deliberately stops at a usable checkpoint for bounded work.
-Real training additionally requires `g1_batch`, `g1_realisation` and `g2_gate`:
+Real training additionally requires `g1_batch` (plus any `g1_realisation` packets) and `g2_gate`:
 genuine passed G1/G2 outcomes and the approved export must match. G-D is not required.
 
 The denoiser receives exactly the saved visible-input whitelist, followed by a fixed

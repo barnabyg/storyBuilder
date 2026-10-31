@@ -1,0 +1,42 @@
+{
+  "brief": "brief-09",
+  "title": "The Shore We Keep",
+  "story": "story.md",
+  "character_sheets": "character-sheets.json",
+  "finished": true,
+  "flagged_problems": [
+    {
+      "problem_type": "character_introduction",
+      "passage": "\"Picks. Probing pole. Throw line,\" Ingrid read.",
+      "reason": "Ingrid appears with no introduction. Ingrid reads out equipment, but her relationship to Kari and her appearance are not given until paragraph 3. Planned introduction: Ingrid stands beside Kari with their father's map and the packing list, identifying herself through her practical preparations, inherited compass, and insistence that they agree on a retreat rule.",
+      "paragraph": 2
+    }
+  ],
+  "flags_by_round": [
+    [
+      {
+        "problem_type": "character_introduction",
+        "passage": "\"Picks. Probing pole. Throw line,\" Ingrid read.",
+        "reason": "Ingrid appears with no introduction. Ingrid reads out equipment, but her relationship to Kari and her appearance are not given until paragraph 3. Planned introduction: Ingrid stands beside Kari with their father's map and the packing list, identifying herself through her practical preparations, inherited compass, and insistence that they agree on a retreat rule.",
+        "paragraph": 2
+      }
+    ]
+  ],
+  "repairs": "repairs.json",
+  "unresolved_problems": [
+    {
+      "problem_type": "character_introduction",
+      "passage": "\"Picks. Probing pole. Throw line,\" Ingrid read.",
+      "reason": "Ingrid appears with no introduction. Ingrid reads out equipment, but her relationship to Kari and her appearance are not given until paragraph 3. Planned introduction: Ingrid stands beside Kari with their father's map and the packing list, identifying herself through her practical preparations, inherited compass, and insistence that they agree on a retreat rule.",
+      "paragraph": 2
+    }
+  ],
+  "cost": {
+    "calls": 12,
+    "input_tokens": 32188,
+    "output_tokens": 17802,
+    "usd": 0.242396,
+    "list_price_usd": 0.242396
+  },
+  "note": "Automated checks are diagnostics that guide repair. Only the owner's reading establishes story quality."
+}

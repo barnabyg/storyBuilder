@@ -1,0 +1,179 @@
+{
+  "title": "The Shore We Keep",
+  "characters": [
+    {
+      "name": "Kari Lund",
+      "appearance": "Thirty-one, with a wind-reddened face, a split thumbnail, and a patched orange guide's jacket.",
+      "back_story": "Kari earns her living guiding mountain and winter trips. Before her father's fatal solo lake crossing last winter, she recommended a shortcut she had used earlier that month. Her older sister blamed that advice, and Kari blamed her sister for letting him go alone. They have spoken only about settling his estate since the funeral.",
+      "enters_scene": 1,
+      "introduction": "Kari kneels beside a supply sled outside the family lakeside cabin, checking rescue equipment while her older sister checks the packing list; establish that Kari is the younger sister and a working guide who hates being supervised.",
+      "knows_at_start": [
+        "Their father drowned during a solo crossing last winter, and his ashes are in a screw-top tin inside the sled's waterproof bag.",
+        "The lake is three kilometres wide along their father's mapped route.",
+        "Their father's ice maps record conditions from particular winters rather than guaranteeing present safety.",
+        "She recommended the shortcut their father took before he died.",
+        "The cabin has a working stove, dry clothes, and firewood.",
+        "Her sister learned basic ice rescue from their father."
+      ]
+    },
+    {
+      "name": "Ingrid Lund",
+      "appearance": "Thirty-six, with a blunt dark bob under a wool cap, clean blue waterproofs, and their father's brass compass hanging from her neck.",
+      "back_story": "Ingrid handled their father's bills and funeral while Kari worked away. She declined his invitation to join his final crossing because she could not leave work. She proposed scattering his ashes on the far shore to complete the journey, but intends to turn back if the ice is unsafe.",
+      "enters_scene": 1,
+      "introduction": "Ingrid stands beside Kari with their father's map and the packing list, identifying herself through her practical preparations, inherited compass, and insistence that they agree on a retreat rule.",
+      "knows_at_start": [
+        "Their father's unfinished crossing ended in his death last winter.",
+        "She refused his request to accompany him on that crossing.",
+        "Kari recommended his shortcut.",
+        "Their father wanted his ashes scattered on the far shore if he died.",
+        "The current winter has included several days of thaw.",
+        "She and Kari can return to the cabin without depending on anyone collecting them."
+      ]
+    },
+    {
+      "name": "Erik Lund",
+      "appearance": "In the photograph clipped to his map, he has a square grey beard, heavy eyebrows, and a red knitted hat.",
+      "back_story": "Erik was the sisters' father, a devoted winter walker who mapped the lake over several decades and taught both daughters outdoor skills. He repeatedly praised Ingrid's caution and Kari's nerve, helping fix them in rival roles. He drowned before completing last winter's crossing.",
+      "enters_scene": 1,
+      "introduction": "He is introduced only as their deceased father when Ingrid unfolds his map and exposes his photograph; Kari remembers him calling Ingrid sensible and Kari fearless, and the tin of ashes establishes his physical absence.",
+      "knows_at_start": [
+        "Before his death, he knew that Kari had recently used the shortcut.",
+        "Before his death, he knew Ingrid would not accompany him.",
+        "Before his death, he knew lake ice changed between crossings.",
+        "Before his death, he had asked for his ashes to be scattered on the far shore."
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "summary": "At the family cabin, Kari and Ingrid prepare to carry their father's ashes across the lake and agree to retreat if they encounter unsafe ice.",
+      "beats": [
+        "Kari checks ice picks, a probing pole, a throw line, spare clothing, and the low supply sled while Ingrid reads their packing list aloud.",
+        "Ingrid unfolds Erik's dated map, revealing his photograph; Kari remembers how he assigned caution to Ingrid and courage to her.",
+        "They secure the ashes inside the sled's waterproof bag, and Ingrid touches the far shore on the map while repeating their father's request.",
+        "Kari reluctantly agrees that any ice their tests cannot establish as safe will mean retreat; Ingrid leaves dry stove kindling ready inside the unlocked cabin."
+      ],
+      "elapsed_minutes": 15.0,
+      "key_events": [
+        {
+          "event": "The sisters check equipment, pack the sled, and prepare the cabin for their return.",
+          "expected_min_minutes": 10.0,
+          "expected_max_minutes": 20.0
+        }
+      ]
+    },
+    {
+      "summary": "The sisters advance onto the lake, where Kari's practical skill briefly eases their rivalry before the first warning contradicts the old map.",
+      "beats": [
+        "They travel roughly five hundred metres, spaced apart, with Kari probing ahead and pulling the lightly loaded sled on a loose haul line.",
+        "Ingrid struggles with a slipping snowshoe strap, and Kari fixes it without making the joke Ingrid expects.",
+        "At a point Erik marked as thick clear ice, Kari scrapes away snow and finds cloudy ice with water beneath the snow crust.",
+        "Ingrid asks to turn around; Kari points toward a nearby strip of exposed clear ice and argues for testing that before abandoning the crossing."
+      ],
+      "elapsed_minutes": 25.0,
+      "key_events": [
+        {
+          "event": "The sisters cover approximately five hundred metres while probing the route and stopping to fix a snowshoe strap.",
+          "expected_min_minutes": 20.0,
+          "expected_max_minutes": 35.0
+        }
+      ]
+    },
+    {
+      "summary": "A short detour reveals more weak ice, and the argument about retreat becomes an accusation over their father's death.",
+      "beats": [
+        "Kari leads a two-hundred-metre detour along the exposed strip, keeping away from the wet snow.",
+        "The probing pole punches through a snow-covered seam ahead, and Ingrid reminds Kari of their retreat agreement.",
+        "Kari accuses Ingrid of wanting the credit for finishing their father's journey without accepting any risk; Ingrid answers that Kari's shortcut advice already helped kill him.",
+        "Kari says Ingrid let him cross alone, then turns sharply toward their outward track instead of continuing toward the far shore."
+      ],
+      "elapsed_minutes": 15.0,
+      "key_events": [
+        {
+          "event": "The sisters probe and follow a two-hundred-metre detour before stopping at the weak seam.",
+          "expected_min_minutes": 10.0,
+          "expected_max_minutes": 18.0
+        }
+      ]
+    },
+    {
+      "summary": "Kari breaks through the edge of the weak seam, and Ingrid uses their rescue equipment to help her escape.",
+      "beats": [
+        "During her angry turn, Kari steps off the tested strip; the ice collapses beneath one snowshoe, dropping her to her hips while the sled remains on firm ice.",
+        "Kari spreads her arms and catches the edge with her ice picks, but cannot drag her trapped snowshoe free.",
+        "Ingrid lies down well back from the break, throws Kari the rescue line, and braces as Kari kicks free and works herself onto the surface.",
+        "Kari crawls away from the hole; Ingrid retrieves the sled by its haul line only after Kari reaches the tested track."
+      ],
+      "elapsed_minutes": 4.0,
+      "key_events": [
+        {
+          "event": "Kari arrests her fall, receives the rescue line, and escapes the water.",
+          "expected_min_minutes": 1.0,
+          "expected_max_minutes": 3.0
+        },
+        {
+          "event": "Both sisters move away from the break and retrieve the sled from firm ice.",
+          "expected_min_minutes": 1.0,
+          "expected_max_minutes": 2.0
+        }
+      ]
+    },
+    {
+      "summary": "While changing out of wet clothing, Kari accepts responsibility for her decisions without accepting sole blame for their father's death.",
+      "beats": [
+        "On the previously tested ice, Ingrid holds a windproof shelter sheet around Kari while Kari replaces her soaked lower layers and socks with the dry spares.",
+        "Kari admits that she wanted the completed crossing to prove her judgement had not killed Erik, and tells Ingrid that recommending a route was not the same as choosing it for him.",
+        "Ingrid admits that blaming Kari spared her from facing her own refusal to accompany him; she apologizes for treating Kari's work as an extension of childhood recklessness.",
+        "Still shivering but able to walk, Kari says they are returning to the cabin, and asks Ingrid to carry the map while she checks their old track."
+      ],
+      "elapsed_minutes": 12.0,
+      "key_events": [
+        {
+          "event": "Kari removes wet clothing and puts on dry layers under a windproof shelter sheet.",
+          "expected_min_minutes": 6.0,
+          "expected_max_minutes": 10.0
+        }
+      ]
+    },
+    {
+      "summary": "The sisters retrace their route to the cabin and decide together that keeping the ashes is not the only alternative to reaching the far shore.",
+      "beats": [
+        "They follow their outward marks back, probing again and taking turns pulling the sled instead of arguing over who should lead.",
+        "At the cabin, Ingrid lights the prepared stove while Kari removes her damp outer gear and wraps herself in a blanket.",
+        "As they drink something hot, Ingrid takes the ashes from the waterproof bag and says she cannot face scheduling another crossing as another test of which sister is right.",
+        "Kari proposes the rock ledge beside the cabin, where their father taught them to tie rescue knots; Ingrid agrees to scatter the ashes there."
+      ],
+      "elapsed_minutes": 55.0,
+      "key_events": [
+        {
+          "event": "The sisters retrace approximately seven hundred metres of tested route to shore.",
+          "expected_min_minutes": 25.0,
+          "expected_max_minutes": 40.0
+        },
+        {
+          "event": "They light the stove, change remaining damp clothing, and warm up before making another decision.",
+          "expected_min_minutes": 20.0,
+          "expected_max_minutes": 30.0
+        }
+      ]
+    },
+    {
+      "summary": "On their own shore, Kari and Ingrid scatter their father's ashes together and keep his map without treating it as an instruction.",
+      "beats": [
+        "Once Kari is warm and steady, they walk the short cleared path to the rock ledge, with the unreached far shore visible across the lake.",
+        "Ingrid unscrews the tin, Kari steadies it, and they tip the ashes together into a light breeze carrying them away from the ledge over the lake.",
+        "Kari apologizes for saying Ingrid let Erik die; Ingrid takes her hand and says she should never have made Kari carry his decision alone.",
+        "Back at the cabin door, they date a warning about the weak seam on Erik's map, then carry it inside together rather than dividing it with the rest of his belongings."
+      ],
+      "elapsed_minutes": 12.0,
+      "key_events": [
+        {
+          "event": "The sisters walk to the nearby ledge, scatter the ashes, and return to the cabin.",
+          "expected_min_minutes": 8.0,
+          "expected_max_minutes": 15.0
+        }
+      ]
+    }
+  ]
+}

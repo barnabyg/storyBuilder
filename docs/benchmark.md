@@ -3,7 +3,8 @@
 Gate G0 asks whether low-cost models can reliably produce the project's nested
 structures. A model passes when it reaches **at least 95% schema validity
 after repair** on a moderately nested schema. See Phase 0 in
-[the implementation plan](IMPLEMENTATION_PLAN.md).
+[the implementation plan](IMPLEMENTATION_PLAN.md). **Result: passed 18 October
+2026.**
 
 ## What it measures
 

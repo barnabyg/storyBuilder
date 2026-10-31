@@ -90,6 +90,51 @@ def test_equal_budget_mode_gives_the_cheaper_condition_revision_passes(
     assert story_text(2000)[:200] in revision
 
 
+def test_fixed_revision_passes_edit_both_stories_equally_and_record_it(
+    fake_llm: FakeOpenAI, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "test-key")
+    fake_llm.default = _reply
+    config = story_config(
+        fake_llm.base_url,
+        [BASELINE_A, BASELINE_B],
+        briefs={"ids": ["brief-01"]},
+        equal_budget={
+            "conditions": ["A", "B"],
+            "tolerance": 0.9,
+            "max_revision_passes": 2,
+            "fixed_revision_passes": 2,
+        },
+    )
+    result = run(tmp_path, config)
+
+    summary = manifest(result)["stories"]["equal_budget"]
+    assert summary["fixed_revision_passes"] == 2
+    assert summary["matches"][0]["revised"] == "both"
+    assert summary["matches"][0]["passes"] == 2
+    assert {record["condition"]: record["revision_passes"] for record in stories(result)} == {
+        "A": 2,
+        "B": 2,
+    }
+
+
+def test_fixed_revision_passes_cannot_exceed_the_registered_limit(
+    fake_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    config = story_config(
+        fake_llm.base_url,
+        [BASELINE_A, BASELINE_B],
+        briefs={"ids": ["brief-01"]},
+        equal_budget={
+            "conditions": ["A", "B"],
+            "max_revision_passes": 1,
+            "fixed_revision_passes": 2,
+        },
+    )
+    code = main(["run", str(write_config(tmp_path, config)), "--runs-dir", str(tmp_path / "runs")])
+    assert code != 0
+
+
 def test_comparison_report_identifies_selected_final_prose_and_actual_spend(
     budget_llm: FakeOpenAI, tmp_path: Path
 ) -> None:

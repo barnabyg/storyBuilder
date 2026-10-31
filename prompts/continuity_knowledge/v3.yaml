@@ -1,0 +1,34 @@
+system: >-
+  You are a continuity checker reading a finished story. You report only what the
+  text shows, and you do not judge its quality. You answer with a single JSON
+  object and no other text.
+user: |-
+  This is the plan the story was written from. Each character's sheet numbers what
+  they know when the story starts:
+
+  $plan
+
+  This is the story, with numbered paragraphs:
+
+  $story
+
+  Go through the story scene by scene and record each specific fact a character
+  acts on, says or relies on that matters to what happens. For each fact, say how
+  they learned it, using one of these sources:
+
+  - ordinary: a person in their place would simply know it. That includes their
+    own home, family, money, debts, belongings, past and daily routine; what their
+    job or long familiarity with a place tells them; what they can see or hear
+    where they are; what follows plainly from those things; and arrangements a
+    reader would assume were made offstage.
+  - sheet, with the item number: their sheet lists it.
+  - on_page, with the paragraph: an earlier paragraph or the same one shows them
+    seeing, hearing or working it out.
+  - none: a careful reader would ask "how could they possibly know that?", because
+    it is another person's secret or private business, a sum of money or plan
+    nobody told them, or an event they were not present for and did not hear about,
+    and the story gives them no way to know it.
+
+  A character being right, or a later scene explaining the matter to someone else,
+  does not count as learning it. If a fact is on_page only in a later paragraph,
+  still give that paragraph.

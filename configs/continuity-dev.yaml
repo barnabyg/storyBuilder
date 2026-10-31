@@ -1,0 +1,60 @@
+# The continuity track: see docs/continuity.md. `nde continuity BRIEF` replaces the brief
+# selection below with that one dev brief. Prices are the standard rates on
+# https://developers.openai.com/api/docs/pricing, checked 30 October 2026.
+# A reasoning model: max_completion_tokens also bounds the reasoning tokens.
+name: continuity-dev-v1
+seed: 2100
+prompts_dir: ../prompts
+providers:
+  openai:
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY # pragma: allowlist secret - environment-variable name, no key value
+    json_schema: false
+    timeout_s: 300
+    retry:
+      max_retries: 1
+      base_delay_s: 1
+      max_delay_s: 10
+roles:
+  planner:
+    provider: openai
+    model: gpt-6.1-sol
+    family: openai
+    params:
+      reasoning_effort: medium
+      max_completion_tokens: 32000
+  prose:
+    provider: openai
+    model: gpt-6.1-sol
+    family: openai
+    params:
+      reasoning_effort: medium
+      max_completion_tokens: 12000
+  critic:
+    provider: openai
+    model: gpt-6.1-sol
+    family: openai
+    params:
+      reasoning_effort: medium
+      max_completion_tokens: 32000
+stories:
+  briefs_dir: ../benchmark
+  briefs:
+    split: dev
+    ids:
+    - brief-01
+  repeat: 1
+  length:
+    tolerance: 0.1
+    max_attempts: 4
+  conditions:
+  - name: continuity
+    pipeline: continuity
+structured:
+  max_repairs: 3
+prices:
+  openai/gpt-6.1-sol:
+    input_per_mtok: 2.0
+    output_per_mtok: 10.0
+budget:
+  per_run_usd: 3.0

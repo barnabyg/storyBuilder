@@ -17,6 +17,10 @@ uv run nde eval report demo
 
 ## Building a batch
 
+`nde eval batch` without `--cohort` is for ordinary non-gate batches. Registered
+gates use [gate readiness](gate-readiness.md) and their own workflows, such as
+[G1](g1-workflow.md).
+
 ```powershell
 uv run nde eval batch <name> --from <run dir> <condition> --from <run dir> <condition>
 ```
@@ -44,6 +48,13 @@ uv run nde eval batch <name> --from <run dir> <condition> --from <run dir> <cond
   count against the first condition. With a judge panel, **Judges on the
   primary measure** compares each judge's rubric-mode picks with yours.
   Structure-focused gates use `coherence` this way (plan §4).
+- `--require-score <dimension>` (repeatable) requires that dimension for both
+  stories in every pair, even with `--optional-scores`. The report lists those
+  scores pair by pair, with the mean paired difference between the conditions.
+- `--cohort <file> --benchmark <folder>` builds the batch only when every pair in
+  a registered cohort passes [strict readiness](gate-readiness.md), and stores
+  that evidence under `sealed/readiness/`. It replaces the default, which leaves
+  out failed pairs. Run a protocol-bound G1 through `nde eval g1-batch` instead.
 
 A batch lives in `batches/<name>/` (gitignored; change it with
 `--batches-dir` or `NDE_BATCHES`):
@@ -136,9 +147,10 @@ computed values.
 
 ## LLM judge panel
 
-LLM judges judge the same blind batch the owner reads. They are for
-screening and diagnosis, and every batch report checks them against the
-owner's verdicts. **Judges never pass a gate.** See P1.7 and §4 of the plan.
+LLM judges judge the same blind batch the owner reads. Following G-instr they
+are diagnostic only: they are not used for screening, and every batch report
+checks them against the owner's verdicts. **Judges never pass a gate.** See P1.7
+and §4 of the plan.
 
 ### Configuring the panel
 
@@ -225,7 +237,8 @@ one row per judge (so per family on a typical panel):
 and chance agreement is high when one side wins almost every pair. In the
 instrument check, if you prefer intact B in 10 of 10 pairs, kappa is `n/a`
 for a judge that does the same, and 0 or below for a judge with even one
-inconsistent pair. In that case read agreement, the gate's metric, not kappa.
+inconsistent pair. In that case read agreement rather than kappa. Agreement was
+G-instr's historical judge criterion; it is not a current gate metric.
 
 A **Judge rubric scores** table gives each judge's mean score per dimension
 and condition. If a judge is run again, its latest verdicts count.

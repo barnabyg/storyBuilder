@@ -186,6 +186,11 @@ The revised story replaces the story. The original is kept as
 `story.original.md`, and each pass's files are under `revisions/<n>/`. The
 story's record counts its `revision_passes`.
 
+`fixed_revision_passes: N` (at most `max_revision_passes`) replaces this with equal
+editing: each story gets exactly N passes, whatever they cost, and the two budgets are
+then only compared with `tolerance`. Use it when both conditions should be edited the
+same, and do not describe the result as an equal-budget comparison.
+
 Matching fails, and is reported for that brief rather than accepted, when:
 
 - the budgets are still apart after `max_revision_passes` passes;
@@ -212,6 +217,7 @@ an equal total budget. See [candidate-e.md](candidate-e.md#comparisons-and-the-r
 | `baseline_b_scrambled` | B-scrambled (gate G-instr) | B's outline (the same cached call), scenes shuffled with a seeded permutation that is never the original order, then fresh prose through the shared prose contract; see [instrument-check.md](instrument-check.md) |
 | `baseline_c`, `baseline_d` | Baseline C, Candidate D | see [baseline-c.md](baseline-c.md) and [baseline-d.md](baseline-d.md) |
 | `candidate_e` | Candidate E | a learned conditional proposal on a local checkpoint, hybrid text completion on `planner`, then C's ledger and shared prose; see [candidate-e.md](candidate-e.md) |
+| `continuity` | Continuity (dev briefs only) | character sheets and a scene clock on `planner`, shared prose under plain-style rules, then checks on `critic` and targeted repair on `prose`; see [continuity.md](continuity.md) |
 
 Parameters: `baseline_a` takes `prompt` (default `{template: story_a,
 version: 1}`); `baseline_b` takes `outline_prompt` (default
@@ -292,7 +298,9 @@ A pipeline is a subclass of `nde.stories.pipeline.Pipeline` with:
   `None` if there are none);
 - `write(ctx, plan, seed=...)`: the prose calls; returns the raw story text.
   Length control may call it several times with different seeds, so it must
-  not change the plan.
+  not change the plan;
+- `finish(ctx, plan, story, attempt=...)`, optional: work on the chosen story
+  after length control, returning its final text. Most pipelines have none.
 
 Every call goes through the `StoryContext`: `ctx.complete(step, seed=...)` and
 `ctx.structured(step, Model, seed=...)` take a `Step` (its name in
@@ -484,12 +492,13 @@ check them against the provider's price list.
   outputs cost to produce.
 - Before each provider call, the gateway reserves a conservative estimate of
   its cost: input tokens are estimated at 3 characters per token plus 8 per
-  message, and output tokens at the call's `max_tokens` (or
-  `assumed_output_tokens` when it sets none). If the reservation would take the
+  message, and output tokens at the call's `max_tokens` or
+  `max_completion_tokens` (`assumed_output_tokens` when it sets neither). If the reservation would take the
   run or the day over its cap, the call is not made. The run stops with
   `status: aborted`, `abort_reason: budget`, and still writes its manifest,
-  outputs so far and report. `nde run` then exits 1. Set `max_tokens` on every
-  role: providers stop there, so it bounds the output cost. The input
+  outputs so far and report. `nde run` then exits 1. Set one of them on every
+  role, using `max_completion_tokens` for OpenAI reasoning models: providers stop
+  there, so it bounds the output cost. The input
   estimate is generous for English but is not a hard bound, so a request can
   cost slightly more than its reservation, and the cap can be overshot by that
   difference on the last request. Leave some headroom under a hard limit.
@@ -513,13 +522,13 @@ Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
 | `calls.jsonl` | one line per provider call (including repair attempts): the reported model ID, template, tokens, cost, latency, retries and whether it was a cache hit |
 | `stories.jsonl`, `stories/` | story runs only; see [Story-generation runs](#story-generation-runs) |
 | `judgements.jsonl` | judge-panel runs only: every judge verdict, by pair and shown position; see [evaluation.md](evaluation.md#llm-judge-panel) |
+| `report.md` | generated from the files above |
 
 The manifest records each model's role, provider, model and `family`. Story
 runs add a `stories` section (brief IDs, frozen-split checksums, conditions,
 length settings, out-of-range stories and any equal-budget matches) and
 judge-panel runs a `judges` section (the batch, modes, panel, rubric version
 and verdict counts).
-| `report.md` | generated from the files above |
 
 Regenerate a report with `uv run nde report <run dir>`.
 

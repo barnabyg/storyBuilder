@@ -24,9 +24,10 @@ Run `nde corpus-pilot run pilot.json --out data/pilot-v1`. Use absolute paths
 for portable invocation from different working directories. The family config
 uses [the extraction settings](extraction.md) with `annotators` replacing
 `annotator`: at least two distinct declared families, explicit prices, bounded
-repairs, a per-story `budget.per_run_usd`, and a positive `budget.per_day_usd`
-no greater than the pilot daily cap. Every family shares the story cap;
-every story shares the durable pilot cap and daily ledger.
+repairs, an optional per-story `budget.per_run_usd` (without it no story cap
+applies; the pilot `per_run_usd` still caps the run), and a positive
+`budget.per_day_usd` no greater than the pilot daily cap. Every family shares any
+story cap; every story shares the durable pilot cap and daily ledger.
 
 Before calls, `pilot.json` freezes source/cohort/configuration identities,
 schema, prompt and planned pass inventory. Features are computed locally.
