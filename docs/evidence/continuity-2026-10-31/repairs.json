@@ -1,0 +1,16 @@
+[
+  {
+    "attempt": 1,
+    "paragraph": 2,
+    "problems": [
+      {
+        "problem_type": "character_introduction",
+        "passage": "\"Picks. Probing pole. Throw line,\" Ingrid read.",
+        "reason": "Ingrid appears with no introduction. Ingrid reads out equipment, but her relationship to Kari and her appearance are not given until paragraph 3. Planned introduction: Ingrid stands beside Kari with their father's map and the packing list, identifying herself through her practical preparations, inherited compass, and insistence that they agree on a retreat rule.",
+        "paragraph": 2
+      }
+    ],
+    "before": "\"Picks. Probing pole. Throw line,\" Ingrid read.",
+    "after": "\"Picks. Probing pole. Throw line,\" Ingrid read."
+  }
+]

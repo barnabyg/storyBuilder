@@ -1,0 +1,45 @@
+[
+  {
+    "name": "Kari Lund",
+    "appearance": "Thirty-one, with a wind-reddened face, a split thumbnail, and a patched orange guide's jacket.",
+    "back_story": "Kari earns her living guiding mountain and winter trips. Before her father's fatal solo lake crossing last winter, she recommended a shortcut she had used earlier that month. Her older sister blamed that advice, and Kari blamed her sister for letting him go alone. They have spoken only about settling his estate since the funeral.",
+    "enters_scene": 1,
+    "introduction": "Kari kneels beside a supply sled outside the family lakeside cabin, checking rescue equipment while her older sister checks the packing list; establish that Kari is the younger sister and a working guide who hates being supervised.",
+    "knows_at_start": [
+      "Their father drowned during a solo crossing last winter, and his ashes are in a screw-top tin inside the sled's waterproof bag.",
+      "The lake is three kilometres wide along their father's mapped route.",
+      "Their father's ice maps record conditions from particular winters rather than guaranteeing present safety.",
+      "She recommended the shortcut their father took before he died.",
+      "The cabin has a working stove, dry clothes, and firewood.",
+      "Her sister learned basic ice rescue from their father."
+    ]
+  },
+  {
+    "name": "Ingrid Lund",
+    "appearance": "Thirty-six, with a blunt dark bob under a wool cap, clean blue waterproofs, and their father's brass compass hanging from her neck.",
+    "back_story": "Ingrid handled their father's bills and funeral while Kari worked away. She declined his invitation to join his final crossing because she could not leave work. She proposed scattering his ashes on the far shore to complete the journey, but intends to turn back if the ice is unsafe.",
+    "enters_scene": 1,
+    "introduction": "Ingrid stands beside Kari with their father's map and the packing list, identifying herself through her practical preparations, inherited compass, and insistence that they agree on a retreat rule.",
+    "knows_at_start": [
+      "Their father's unfinished crossing ended in his death last winter.",
+      "She refused his request to accompany him on that crossing.",
+      "Kari recommended his shortcut.",
+      "Their father wanted his ashes scattered on the far shore if he died.",
+      "The current winter has included several days of thaw.",
+      "She and Kari can return to the cabin without depending on anyone collecting them."
+    ]
+  },
+  {
+    "name": "Erik Lund",
+    "appearance": "In the photograph clipped to his map, he has a square grey beard, heavy eyebrows, and a red knitted hat.",
+    "back_story": "Erik was the sisters' father, a devoted winter walker who mapped the lake over several decades and taught both daughters outdoor skills. He repeatedly praised Ingrid's caution and Kari's nerve, helping fix them in rival roles. He drowned before completing last winter's crossing.",
+    "enters_scene": 1,
+    "introduction": "He is introduced only as their deceased father when Ingrid unfolds his map and exposes his photograph; Kari remembers him calling Ingrid sensible and Kari fearless, and the tin of ashes establishes his physical absence.",
+    "knows_at_start": [
+      "Before his death, he knew that Kari had recently used the shortcut.",
+      "Before his death, he knew Ingrid would not accompany him.",
+      "Before his death, he knew lake ice changed between crossings.",
+      "Before his death, he had asked for his ashes to be scattered on the far shore."
+    ]
+  }
+]

@@ -1,8 +1,8 @@
 # Narrative Diffusion Engine — Implementation Plan
 
-**Status:** Working plan v3; tooling through Phase 7 implemented; G-schema passed; G1 and its retest did not pass; diffusion track stopped
+**Status:** Working plan v3; tooling through Phase 7 implemented; G-schema passed; G1 and its retest did not pass; diffusion track stopped; separate continuity approach accepted by the owner
 **Created:** 18 October 2026
-**Updated:** 30 October 2026, changing G1 to four pairs at the owner's decision and recording both results
+**Updated:** 31 October 2026, recording the owner's decision on the continuity approach
 **Source:** [Narrative_Diffusion_Writing_Engine_Proposal.md](../Narrative_Diffusion_Writing_Engine_Proposal.md)
 
 ## Current position
@@ -42,6 +42,13 @@
   benchmark, harness and planner are the result (proposal §14). Real D/corpus,
   reconstruction and E experiments are not authorised: they still require a passed G1.
   Phase 6–7 tooling remains, tested on fixtures only, and Phase 8 is not implemented.
+- **The owner accepted the separate [continuity approach](continuity.md) on 31 October:**
+  character sheets, a scene clock, knowledge checks, targeted repair and plain-style
+  rules. After reading one story on a development brief, the owner scored coherence 4
+  of 5, reported none of the four defects, and decided no blind comparison or further
+  proof runs are needed: "it clearly works right now". This is the owner's judgement,
+  not a blind result or a gate. It does not reopen G1 or restart the diffusion track.
+  See the [evidence](evidence/continuity-2026-10-31/README.txt).
 
 | Phase | Implementation status on `main` | Implementation issues | Operating guide |
 | --- | --- | --- | --- |

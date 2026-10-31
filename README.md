@@ -18,7 +18,8 @@ then produce a [protocol-bound G1 decision](docs/g1-decision.md) after closure.
 diffusion track has stopped: the schema, benchmark, harness and planner are the result.
 Phase 6 and 7 tooling below remains, tested on fixtures only.
 A separate exploratory attempt to fix the defects the owner found while reading writes
-[continuity stories](docs/continuity.md) from character sheets and a scene clock.
+[continuity stories](docs/continuity.md) from character sheets and a scene clock. After
+reading one on 31 October 2026, the owner decided it works and needs no further proof runs.
 
 ## Setup
 

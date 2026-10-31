@@ -1,0 +1,167 @@
+{
+  "events": [
+    {
+      "event": "Check equipment, pack the sled, and prepare the cabin",
+      "paragraph": 21,
+      "prose_minutes": 15.0,
+      "key_event": "K1",
+      "realistic_min_minutes": 10.0,
+      "realistic_max_minutes": 20.0,
+      "why": "Checking the clothing, probe, rope, lashings, and ashes and laying out kindling can take ten to twenty minutes."
+    },
+    {
+      "event": "Probe and travel five hundred metres, including repairing a snowshoe strap",
+      "paragraph": 40,
+      "prose_minutes": 25.0,
+      "key_event": "K2",
+      "realistic_min_minutes": 20.0,
+      "realistic_max_minutes": 35.0,
+      "why": "Repeated probing, spaced travel with a sled, and several stops for a buckle plausibly require twenty to thirty-five minutes."
+    },
+    {
+      "event": "Probe and follow the two-hundred-metre detour",
+      "paragraph": 54,
+      "prose_minutes": 13.0,
+      "key_event": "K3",
+      "realistic_min_minutes": 10.0,
+      "realistic_max_minutes": 18.0,
+      "why": "Scraping away snow and testing before each advance makes ten to eighteen minutes plausible for this distance."
+    },
+    {
+      "event": "Test the seam and argue before agreeing to retreat",
+      "paragraph": 71,
+      "prose_minutes": 2.0,
+      "key_event": null,
+      "realistic_min_minutes": 1.0,
+      "realistic_max_minutes": 4.0,
+      "why": "The thirteen-minute detour and fifteen-minute scene clock leave two minutes for the seam test, pauses, and spoken exchange."
+    },
+    {
+      "event": "Arrest the fall, receive the rescue line, and escape the water",
+      "paragraph": 88,
+      "prose_minutes": 2.5,
+      "key_event": "K4",
+      "realistic_min_minutes": 1.0,
+      "realistic_max_minutes": 3.0,
+      "why": "Two rope throws, releasing a trapped snowshoe, and coordinated hauling and kicking can occupy one to three minutes."
+    },
+    {
+      "event": "Crawl away from the break and retrieve the sled",
+      "paragraph": 91,
+      "prose_minutes": 1.5,
+      "key_event": "K5",
+      "realistic_min_minutes": 1.0,
+      "realistic_max_minutes": 2.0,
+      "why": "Moving a short distance prone and pulling a nearby sled onto tested ice can take one to two minutes."
+    },
+    {
+      "event": "Replace soaked lower layers and socks and refasten boots under shelter",
+      "paragraph": 101,
+      "prose_minutes": 8.0,
+      "key_event": "K6",
+      "realistic_min_minutes": 6.0,
+      "realistic_max_minutes": 10.0,
+      "why": "Removing wet clothing and dressing while cold, crouched, and handling boots plausibly takes six to ten minutes."
+    },
+    {
+      "event": "Finish the conversation, pack wet gear and shelter, and prepare to return",
+      "paragraph": 107,
+      "prose_minutes": 4.0,
+      "key_event": null,
+      "realistic_min_minutes": 2.0,
+      "realistic_max_minutes": 6.0,
+      "why": "The twelve-minute bag-opening clock leaves four minutes after the eight-minute clothing change for packing, conversation, and testing Kari's footing."
+    },
+    {
+      "event": "Retrace approximately seven hundred metres to shore",
+      "paragraph": 111,
+      "prose_minutes": 30.0,
+      "key_event": "K7",
+      "realistic_min_minutes": 25.0,
+      "realistic_max_minutes": 40.0,
+      "why": "Continued probing, exchanging duties, hauling the sled, and resting support a twenty-five- to forty-minute return."
+    },
+    {
+      "event": "Light the stove, change remaining wet clothing, and warm up",
+      "paragraph": 115,
+      "prose_minutes": 25.0,
+      "key_event": "K8",
+      "realistic_min_minutes": 20.0,
+      "realistic_max_minutes": 30.0,
+      "why": "Lighting prepared kindling, changing clothes, and spending time wrapped in a blanket with a hot drink can fit within twenty to thirty minutes."
+    },
+    {
+      "event": "Heat water and prepare tea",
+      "paragraph": 114,
+      "prose_minutes": 25.0,
+      "key_event": null,
+      "realistic_min_minutes": 5.0,
+      "realistic_max_minutes": 25.0,
+      "why": "The tea is served within the twenty-five-minute cabin interval, allowing time for a newly lit stove to heat a small quantity of water."
+    },
+    {
+      "event": "Stand beside the stove before leaving",
+      "paragraph": 125,
+      "prose_minutes": 3.0,
+      "key_event": null,
+      "realistic_min_minutes": 3.0,
+      "realistic_max_minutes": 3.0,
+      "why": "Standing beside a stove is a voluntary action that can last exactly the stated three minutes."
+    },
+    {
+      "event": "Stand together at the ledge watching wind lift snow",
+      "paragraph": 130,
+      "prose_minutes": 1.0,
+      "key_event": null,
+      "realistic_min_minutes": 1.0,
+      "realistic_max_minutes": 1.0,
+      "why": "The text explicitly gives this stationary pause a duration of one minute."
+    },
+    {
+      "event": "Walk to the nearby ledge, scatter the ashes, and return with the map",
+      "paragraph": 142,
+      "prose_minutes": 9.0,
+      "key_event": "K9",
+      "realistic_min_minutes": 8.0,
+      "realistic_max_minutes": 15.0,
+      "why": "The twelve-minute clock includes three minutes beside the stove, leaving at most nine minutes for departure preparations, the nearby walk, scattering, return, and map annotation."
+    }
+  ],
+  "scenes": [
+    {
+      "scene": 1,
+      "paragraph": 21,
+      "prose_minutes": 15.0
+    },
+    {
+      "scene": 2,
+      "paragraph": 40,
+      "prose_minutes": 25.0
+    },
+    {
+      "scene": 3,
+      "paragraph": 71,
+      "prose_minutes": 15.0
+    },
+    {
+      "scene": 4,
+      "paragraph": 91,
+      "prose_minutes": 4.0
+    },
+    {
+      "scene": 5,
+      "paragraph": 107,
+      "prose_minutes": 12.0
+    },
+    {
+      "scene": 6,
+      "paragraph": 115,
+      "prose_minutes": 55.0
+    },
+    {
+      "scene": 7,
+      "paragraph": 142,
+      "prose_minutes": 12.0
+    }
+  ]
+}

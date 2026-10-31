@@ -6,6 +6,19 @@ generated stories: flowery language, characters appearing without introduction,
 characters knowing things they should not, and unrealistic timing. It does not
 reopen G1.
 
+## Result
+
+On 31 October 2026 the owner read one story on dev brief-09, which was not used while
+building. The owner scored coherence 4 of 5, called it "significantly better than the
+previous stories I have read", and reported none of the four defects. The one minor
+criticism was too little physical description. The owner decided that no blind
+comparison or further proof runs are needed: "it clearly works right now".
+
+This is the owner's judgement from one story, read knowing how it was made. It is not
+a blind result or a gate. See the [evidence](evidence/continuity-2026-10-31/README.txt).
+
+## Running it
+
 ```powershell
 uv run nde continuity brief-01
 ```
