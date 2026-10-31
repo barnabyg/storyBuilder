@@ -23,7 +23,7 @@ order with freshly written prose. See P1.8 and the Phase 1 exit gate in
 
 ## From a clean checkout to the reader
 
-In PowerShell 7, from the repository root:
+In PowerShell 7, from the folder that should hold the checkout:
 
 ```powershell
 git clone https://github.com/barnabyg/storyBuilder.git

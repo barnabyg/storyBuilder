@@ -6,9 +6,9 @@ caps before a paid run; this command makes provider calls. It rejects test
 briefs, which require the protocol-bound gate workflow.
 
 The `plans` section accepts `briefs_dir`, `briefs`, `repeat` and `params`.
-Planning parameters are `skeleton_prompt`, `channels_prompt` and an optional
+Planning parameters are `skeleton_prompt`, `channels_prompt`, an optional
 list of explicitly represented `constraints` using the released narrative
-constraint schema. The brief's natural-language ending is carried as a
+constraint schema, and optional `exemplars` ([human-plan exemplars](corpus-exemplars.md)). The brief's natural-language ending is carried as a
 literary requirement, not converted into invented symbolic canon.
 
 The whole-story skeleton establishes stable character/scene/beat identities,

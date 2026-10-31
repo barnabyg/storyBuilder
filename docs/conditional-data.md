@@ -1,5 +1,7 @@
 # Conditional training data
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real training exports need a passed G2, which needs a passed G1, so only test-only exports can reach this workflow. The tooling remains, tested on fixtures only.
+
 `nde conditional-data prepare config.json --out prepared` creates a separate
 version-1 `conditional-dataset`; `nde conditional-data inspect prepared` checks
 its complete source lineage. Phase 6 codecs, reconstruction tasks and datasets

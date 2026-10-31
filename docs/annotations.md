@@ -17,6 +17,11 @@ uv run nde annotate draft owl-creek-bridge --manifest data/manifest.calibration.
 uv run nde annotate status .nde/annotations/owl-creek-bridge
 ```
 
+Draft with the manifest you will report against. G-schema evidence compares each
+session's provenance with its manifest and fails on a mismatch, and
+`data/manifest.calibration.yaml` and `data/manifest.gschema-20261027.yaml` record
+different editions and licence bases for the same stories.
+
 Copy and configure `configs/annotations/local.yaml`: set the annotator provider/model,
 current prices and hard run/day caps before generation. Keys stay in environment
 variables. The prompt is checksum-versioned as `annotate_l@1`. Annotation requests

@@ -1,10 +1,13 @@
 # Local reconstruction training
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real training needs passed G1 and G2 results, so the code refuses it. The tooling remains, tested on fixtures only.
+
 `nde reconstruction-train initialize --out BASE --width 16 --max-positions 4096`
 creates deterministic local random **test-only** weights. It never downloads a model.
 `register-local WEIGHTS CONFIG --out BASE` imports pretrained native backbone
-weights with a model ID, pretraining description and checksummed local provenance
-artifacts. The sealed weights object contains `weights` and an explicit `test_only`
+weights. `CONFIG` must give `width`, `max_positions`, `model_id`,
+`pretraining_description` and `artifacts`, a list of local provenance files to
+checksum. The sealed weights object contains `weights` and an explicit `test_only`
 boolean; fixture weights cannot be registered as real weights.
 
 The supported native architecture is one residual output-query attention/MLP block,
@@ -60,7 +63,7 @@ Both objectives see the same complete visible prefix. AR training shifts gold
 replacement bytes by one position; causal attention hides future target bytes.
 At inference only generated prior bytes enter the target stream. Completion stops
 at EOS or the fixed registered capacity. The denoiser predicts its masked output
-block in one pass. Their different actual forward-pass, token and attention work
+block in one pass. Their different actual token and attention work
 is recorded separately, alongside their common registered caps. This is a declared
 budget comparison, not a claim that unequal realized inference costs are equal.
 The public `inspect_attention` API allows controlled verification of causal future

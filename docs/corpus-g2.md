@@ -1,5 +1,7 @@
 # G2 readiness and training exports
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real G2 needs a complete real pilot, which is refused without a passed G1. The tooling remains, tested on fixtures only.
+
 Complete a frozen [pilot](corpus-pilot.md), then freeze its
 [review packet](corpus-review.md). Register G2 **before owner labels**:
 

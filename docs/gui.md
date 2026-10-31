@@ -83,7 +83,8 @@ asked:
 $env:NDE_BROWSER = "1"; uv run pytest tests/test_gui_browser.py
 ```
 
-`tests/test_run_bat.py` starts Story Builder through `run.bat` and stops it with Ctrl+C. It
+`tests/test_gui_exit.py` checks that Ctrl+C stops `nde gui` calmly and promptly in a
+real process. `tests/test_run_bat.py` starts Story Builder through `run.bat` and stops it with Ctrl+C. It
 opens a real window, so it also only runs when asked, and only on Windows:
 
 ```powershell

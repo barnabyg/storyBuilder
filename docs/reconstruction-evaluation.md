@@ -1,5 +1,7 @@
 # Reconstruction evaluation
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real G3 registration needs passed G1 and G2 results, so the code refuses it. The tooling remains, tested on fixtures only.
+
 `nde reconstruction-score DATASET CANDIDATE COMPARATOR --out OUTPUT` reads a
 protected validation/test dataset and the exact saved denoising and AR prediction
 artifacts. It writes immutable `scores.json`, readable `report.md`, and a
@@ -52,7 +54,7 @@ and evidence before held-out predictions, paired scores or owner meaning labels
 exist. `nde reconstruction-g3 report PROTOCOL.json --out OUTPUT` writes an
 immutable decision and readable report; it never starts training or Phase 7.
 
-The version-1 configuration identifies `training`, protected test `evaluation`,
+The configuration identifies `training`, protected test `evaluation`,
 local `base_model` (`model.json` or its directory), frozen `experiment.json`,
 exact future `score_reports`, `overlap_report`, and the retained C/D `reference`
 artifact. Real readiness also requires `g1_batch` (plus any `g1_realisation`

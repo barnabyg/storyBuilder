@@ -65,22 +65,26 @@ The owner also explained the first result's one preference for C: both pharmacis
 stories scored very low, and "comparing two terrible stories is much harder than
 comparing two reasonable stories." That preference carries little weight.
 
-Originality is no longer scored in new owner reviews. Preference and strength are
-still recorded, and do not decide the gate. The first result stays preserved and is
-not pooled with this one. If the retest does not pass, the diffusion track stops: no
-further follow-up is allowed.
+The retest did not require originality, and the owner dropped it from later reviews.
+The reader still offers it as an optional score. The G1 default and the unused G-D and
+exemplar workflows still require it. Preference and strength were still recorded, and
+did not decide the gate. The first result stays preserved and is not pooled with this
+one. The retest did not pass, so the diffusion track stopped: no further follow-up is
+allowed.
 
-Because budgets are not matched, a pass cannot claim that planning wins at equal cost.
-It would show that, with the same editing, the richer plans give this reader more
-coherent stories at the extra cost of planning.
+Because budgets were not matched, a pass could not have claimed that planning wins at
+equal cost, only that the richer plans gave this reader more coherent stories at the
+extra cost of planning.
 
 The protocol is
 [`benchmark/prereg/g1-retest-20261030.json`](../benchmark/prereg/g1-retest-20261030.json)
 and the config is [`configs/g1-retest-20261030.yaml`](../configs/g1-retest-20261030.yaml).
 A rehearsal of one pair on dev brief-01 cost US$0.41, and the run cost US$1.76 against
-a US$3 cap. The reading batch was `g1-retest-20261030`, built with these files through
-the commands below. Its shuffle seed was chosen automatically so that each method came
-first twice, and the agent did not see the order until the batch closed.
+a US$3 cap. The reading batch was `g1-retest-20261030`, built by running
+the commands below with these files. Its key records seed 3, which makes each
+method come first twice. Those commands do not choose such a seed, and no code or
+protocol field requires a balanced order, so the balance rests on that one recorded
+choice. The agent did not see the order until the batch closed.
 
 ## Why four pairs
 
@@ -101,9 +105,9 @@ G1 passes when both of these hold:
   count as non-wins.
 - C's mean originality is at least B's, the owner's no-average-loss decision.
 
-Overall preference and strength are recorded but do not decide the gate. If G1 does
-not pass, the plan's fail action applies: at most one follow-up on fresh briefs, or
-stop the diffusion track.
+Overall preference and strength were recorded but did not decide the gate. The plan's
+fail action for a G1 that did not pass was at most one follow-up on fresh briefs, or
+stopping the diffusion track. Both have now happened.
 
 The machine-readable protocol is
 [`benchmark/prereg/g1-20261030.json`](../benchmark/prereg/g1-20261030.json).
@@ -117,9 +121,9 @@ generated on 30 October by run
 strict readiness. They were first registered as a
 [development pilot](../benchmark/prereg/dev-mb-pilot-20261027.txt) that could not
 pass G1. Those approved records stay unchanged as history, and the G1 protocol
-supersedes that limit. The 30 frozen test briefs stay untouched. The owner read other
-stories from these four briefs during G-instr on 20 October, so the premises may feel
-familiar.
+supersedes that limit. The first G1 left the 30 frozen test briefs untouched; the
+retest later used four of them. The owner read other stories from these four briefs
+during G-instr on 19 and 20 October, so the premises may have felt familiar.
 
 G1 binds its stories through `nde eval g1-run`. Run
 `20261030T153611Z-dev-M-B-pilot-20261027-v1-c27ddd` replayed the same config entirely
@@ -128,8 +132,8 @@ checksums as the original run.
 
 ## Reading
 
-The agent guides the owner through one story and one question at a time, and enters
-the answers. The owner keeps no notes. For each pair, the owner gives:
+The agent guided the owner through one story and one question at a time, and entered
+the answers. The owner kept no notes. For each pair of the first G1, the owner gave:
 
 1. coherence for each story, from 1 to 5;
 2. originality for each story, from 1 to 5;
@@ -141,19 +145,20 @@ is `g1-20261030-b`. An earlier unread batch, `g1-20261030`, was replaced before 
 because the agent saw that its shown order put the same condition first in every
 pair. The replacement's order was not inspected.
 
-Reading takes about 80 minutes, with breaks whenever the owner likes. The owner
-does not work on the code, so no 48-hour wait applies. The report may still show its
-standard timing caveats. Conditions stay hidden until all four pairs are scored and
-the batch is closed. The agent never opens `sealed/` before then.
+Reading was planned at about 80 minutes, with breaks whenever the owner liked. The
+owner does not work on the code, so no 48-hour wait applied. The report may still show
+its standard timing caveats. Conditions stayed hidden until all four pairs were scored
+and the batch closed, and the agent did not open `sealed/` before then.
 
 ## Commands
 
-Run each command on one line. The agent runs these for the owner:
+These are the commands the agent ran for the first G1, each on one line. They would
+now refuse, because the batch and decision folders already exist:
 
 ```powershell
 uv run nde eval g1-check benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --out runs/g1-check
 uv run nde eval g1-run benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --runs-dir runs
-uv run nde eval g1-batch benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --name g1-20261030-b --from RUN C --from RUN B
+uv run nde eval g1-batch benchmark/prereg/g1-20261030.json configs/dev-mb-pilot-20261027.yaml --selection docs/evidence/dev-tier-selection-2026-10-27/selection.json --schema-evidence .nde/g-schema-packet/evidence-indexed --name g1-20261030-b --from runs/RUN C --from runs/RUN B
 uv run nde eval serve --batch g1-20261030-b
 uv run nde g1-report batches/g1-20261030-b --out runs/g1-decision
 ```

@@ -10,7 +10,7 @@ uv run nde run configs/stories-bc-equal-budget.yaml
 uv run nde report runs/RUN
 ```
 
-Every run writes `comparison.json` and a "Final selected comparison" section
+Every equal-budget story run writes `comparison.json` and a "Final selected comparison" section
 in `report.md`. They enumerate the expected pairs, including absent or failed
 stories. Each selected story has a path, content checksum, final word count,
 revision count, attributable calls/tokens, list-price token cost and actual new

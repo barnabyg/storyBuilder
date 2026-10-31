@@ -47,7 +47,9 @@ as `nde plan revise`.
 
 Each candidate passes schema, semantic, lock and boundary checks. Bounded repairs
 use the run's `structured.max_repairs`. No actionable issues, unchanged outputs,
-two consecutive failed candidates, or iteration exhaustion stop the loop. Provider
+two consecutive failed candidates, or iteration exhaustion stop the loop. If the
+critic's own repairs run out, the loop stops with `critic_failed` and keeps the last
+accepted plan. Provider
 and hard-budget interruption retain the last accepted plan and failed story
 artifacts. All critic/regeneration/repair calls are charged to the story's
 experimental budget. Cached calls keep those tokens with zero new provider spend.
@@ -84,5 +86,6 @@ sequences are validated before prose. Each historical planning, critic, rejected
 regeneration and repair call is attributed exactly once with its original token
 budget and list-price cost, zero new spend and `imported_from` source identity.
 Partial or standalone revision provenance lacking its upstream D planning calls
-cannot enter the comparison with an artificially free planner. Imports preserve
-readability of earlier D initial-planning provenance without critic histories.
+cannot enter the comparison with an artificially free planner. Provenance saved by
+initial planning alone, with no critic history, does not import: import needs the
+call evidence that refinement records. See also [C/D comparisons](cd-comparison.md).

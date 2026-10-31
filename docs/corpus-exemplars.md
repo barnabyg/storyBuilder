@@ -1,5 +1,7 @@
 # Human-plan exemplars in development
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real training exports need a passed G2, which needs a passed G1, so only test-only exports can reach this workflow. The tooling remains, tested on fixtures only.
+
 `nde exemplars` compares an unchanged baseline with an exemplar-conditioned
 version of the same C or D pipeline. It accepts development briefs only. This
 optional workflow does not run or select a held-out gate, and does not block G2.

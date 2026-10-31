@@ -47,11 +47,11 @@ separate constraint's represented value matches.
 
 ## Mutation evidence
 
-`examples/narrative-state.mutations.json` registers the valid control and
-independent injected categories for the aggregate gate report. Each case must
+`tests/test_narrative_state.py` injects the categories below. Each case must
 produce its intended **error code** through saved-plan inspection; rejecting
-unrelated syntax does not count. The integration tests run these mutations
-through the public CLI, saved diagnostics and both card formats.
+unrelated syntax does not count. The aggregate gate report uses its own registry,
+`src/nde/evidence/mutations.json`. `examples/narrative-state.mutations.json` lists
+the same categories for reading only: no code loads it.
 
 | Category | Expected diagnostic |
 | --- | --- |

@@ -1,5 +1,7 @@
 # Protected reconstruction datasets
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real training exports need a passed G2, which needs a passed G1, so only test-only exports can reach this workflow. The tooling remains, tested on fixtures only.
+
 Phase 6 adds separate version 1 artifacts. It does not change the released
 training-only corpus export or narrative-plan schema. All commands below read
 bound source files again and reject changed identities.

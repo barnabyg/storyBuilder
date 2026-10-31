@@ -77,12 +77,14 @@ stories:
   repeat: 1                         # stories per brief and condition
   conditions:
     - name: A                       # a label for reports and blind batches
-      pipeline: baseline_a          # registered in nde.stories.PIPELINES
+      pipeline: baseline_a          # registered in nde.stories.registry.PIPELINES
       params: {}                    # validated by the pipeline; optional
 ```
 
-`calls` and `stories` can appear in the same config; the calls run first. A
-config needs at least one of them.
+A config needs at least one of `calls`, `stories`, `plans` or `judges`. `calls` and
+`stories` can appear in the same config; the calls run first. `plans` cannot be
+combined with `stories` or `judges`. See [generated-plans.md](generated-plans.md) for
+`plans` and [evaluation.md](evaluation.md#llm-judge-panel) for `judges`.
 
 Before any call, `nde run` rejects unknown briefs, unknown pipelines, invalid
 condition parameters, missing or changed prompt templates, a role a pipeline
@@ -102,7 +104,9 @@ These are the story-level leakage controls from §4 of the
 so neither format nor length can reveal which condition wrote a story.
 
 **Normalisation.** Every story is stored raw (`story.raw.md`) and normalised
-(`story.md`). Blind batches and judges only see the normalised form. The rules
+(`story.md`). For a single-call pipeline such as A, the raw file is the model's text.
+For a scene-by-scene condition, it is the already normalised scenes joined together,
+and the model's text is in `scene-NN.md`. Blind batches and judges only see the normalised form. The rules
 (`src/nde/stories/normalise.py`) are deterministic:
 
 - Curly quotation marks become straight ones; an ellipsis character becomes
@@ -140,7 +144,8 @@ An out-of-range story's prose is regenerated on a new seed, up to
 regeneration *k* uses a seed derived deterministically from it, so a re-run is
 still free and byte-identical. Only the prose phase is regenerated: a
 pipeline's plan (such as an outline) is kept. Every attempt is cached and
-costed, and its files are kept under `attempts/<k>/` in the story's folder.
+costed, and its files are kept under `attempts/<k>/` in the story's folder. These folders count
+from 1, while `chosen_attempt` and `story_attempt` in the records count from 0.
 `stories.jsonl` records each attempt's seed, word count and whether it was in
 range, and which one was kept.
 
@@ -217,7 +222,7 @@ an equal total budget. See [candidate-e.md](candidate-e.md#comparisons-and-the-r
 | `baseline_b_scrambled` | B-scrambled (gate G-instr) | B's outline (the same cached call), scenes shuffled with a seeded permutation that is never the original order, then fresh prose through the shared prose contract; see [instrument-check.md](instrument-check.md) |
 | `baseline_c`, `baseline_d` | Baseline C, Candidate D | see [baseline-c.md](baseline-c.md) and [baseline-d.md](baseline-d.md) |
 | `candidate_e` | Candidate E | a learned conditional proposal on a local checkpoint, hybrid text completion on `planner`, then C's ledger and shared prose; see [candidate-e.md](candidate-e.md) |
-| `continuity` | Continuity (dev briefs only) | character sheets and a scene clock on `planner`, shared prose under plain-style rules, then checks on `critic` and targeted repair on `prose`; see [continuity.md](continuity.md) |
+| `continuity` | Continuity (dev briefs only) | character sheets and a scene clock on `planner`, scene prose through its own `continuity_scene@1` under plain-style rules, then checks on `critic` and targeted repair on `prose`; see [continuity.md](continuity.md) |
 
 Parameters: `baseline_a` takes `prompt` (default `{template: story_a,
 version: 1}`); `baseline_b` takes `outline_prompt` (default
@@ -245,10 +250,11 @@ B's prose, never its outline: each attempt's scenes are kept as
 Every structured condition writes its prose through
 `nde.prose.scenes.write_scenes(ctx, scenes, seed=...)`, with the scene-prose
 template `scene_prose@1` (`SCENE_PROSE`) on the `prose` role (`PROSE_ROLE`).
-These are the **shared prose contract**: B, B-scrambled and the later
-conditions C, D and E must reuse them unchanged, so that conditions differ
-only in their plans (a leakage control in §4 of the plan). A new template
-version is a change to every condition at once.
+These are the **shared prose contract**: B, B-scrambled, C, D and E reuse them
+unchanged, so that conditions differ only in their plans (a leakage control in §4
+of the plan). A new template version is a change to all of these at once. The
+exploratory continuity pipeline is outside the contract: it passes its own
+`continuity_scene@1` through the `prompt` argument of `write_scenes`.
 
 A condition supplies a list of `SceneSpec`s: a summary, beats and optional
 free-text `notes` for whatever else its planner wants realised. Each scene is
@@ -270,7 +276,7 @@ passing its own scene list; the tests drive them with a hand-written one.
 
 | File | Contents |
 | --- | --- |
-| `stories/<condition>/<brief>/r<n>/story.md` | the normalised story; `story.raw.md` beside it is the model's text, plan outputs (such as an outline) sit beside it too, and each length-control attempt's files are under `attempts/<k>/` |
+| `stories/<condition>/<brief>/r<n>/story.md` | the normalised story; `story.raw.md` beside it is the unnormalised text (see Normalisation above), plan outputs (such as an outline) sit beside it too, and each length-control attempt's files are under `attempts/<k>/` |
 | `stories.jsonl` | one line per story: brief, condition, pipeline, repetition, seed, status, word count, target, length attempts and its files |
 | `calls.jsonl` | as for every run; each line also names the `brief`, `condition`, pipeline `step` and length-control `story_attempt` it served |
 | `manifest.json` | the `stories` section: brief IDs, the checksum of each frozen split they come from, conditions, repetitions, the length settings and any stories still out of range |
@@ -307,7 +313,7 @@ Every call goes through the `StoryContext`: `ctx.complete(step, seed=...)` and
 `calls.jsonl`, role, template and variables), and `ctx.keep(name, text)` keeps
 an intermediate output as a file beside the story. A pipeline's parameters are
 a Pydantic model it validates in a `from_params` class method. Register the
-class in `PIPELINES` in `src/nde/stories/__init__.py`. Baseline A
+class in `PIPELINES` in `src/nde/stories/registry.py`. Baseline A
 (`src/nde/stories/baseline_a.py`) is the smallest example.
 
 A pipeline that runs a local model sets `local_model = True` and overrides
@@ -517,10 +523,13 @@ Runs are written to `runs/` (gitignored; change it with `--runs-dir`):
 
 | File | Contents |
 | --- | --- |
+| `config.json` | the validated config used for the run |
 | `manifest.json` | git SHA (and whether the tree was dirty), config path and hash, seed, models per role, prompt template versions and checksums, timestamps and run status |
 | `outputs.jsonl` | one line per call: call ID, repetition, model, seed and the raw output text |
 | `calls.jsonl` | one line per provider call (including repair attempts): the reported model ID, template, tokens, cost, latency, retries and whether it was a cache hit |
 | `stories.jsonl`, `stories/` | story runs only; see [Story-generation runs](#story-generation-runs) |
+| `plans.jsonl` | plan-only runs; see [generated-plans.md](generated-plans.md) |
+| `comparison.json` | equal-budget story runs only; see [bc-comparisons.md](bc-comparisons.md) |
 | `judgements.jsonl` | judge-panel runs only: every judge verdict, by pair and shown position; see [evaluation.md](evaluation.md#llm-judge-panel) |
 | `report.md` | generated from the files above |
 
@@ -535,6 +544,8 @@ Regenerate a report with `uv run nde report <run dir>`.
 ## Live tests
 
 `uv run pytest -m live` runs the smoke config against the real provider when
-`DEEPSEEK_API_KEY` is set (in the environment or `.env`), and skips otherwise.
+`DEEPSEEK_API_KEY` is set (in the environment or `.env`), and skips otherwise. It
+also runs `tests/test_continuity_live.py`, which spends real OpenAI money, a few
+cents, when `OPENAI_API_KEY` is set.
 It is excluded from `nde-verify`. Unit tests use a fake OpenAI-compatible server
 on `127.0.0.1` and never call a real provider.

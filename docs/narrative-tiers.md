@@ -9,7 +9,7 @@ uv run nde plan project examples/trajectory-rising.plan.json --tier L --out .nde
 Each command validates the source, projects an independent plan, validates the
 projection and writes the ordinary `plan.json`, `validation.json`, `cards.md`
 and `cards.html`. Invalid source plans cannot be made valid by hiding offending
-channels. Normal inspect/validate commands read every projected plan.
+channels: the command then writes nothing, prints the problem and exits 1. Normal inspect/validate commands read every projected plan.
 
 | Field group | S | M | L |
 | --- | --- | --- | --- |

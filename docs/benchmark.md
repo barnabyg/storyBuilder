@@ -10,7 +10,7 @@ after repair** on a moderately nested schema. See Phase 0 in
 
 `configs/benchmark-g0.yaml` asks every candidate model to plan story outlines
 that must validate against `StoryOutline` (`src/nde/schema/benchmark.py`). The
-schema is shaped like the future narrative schema: nested objects, bounded
+schema is shaped like the narrative schema that came later: nested objects, bounded
 lists, enums, optional fields, and ID references that must resolve across the
 document (scenes point at defined characters, locations and earlier scenes).
 Invalid responses get up to `structured.max_repairs` repair requests carrying

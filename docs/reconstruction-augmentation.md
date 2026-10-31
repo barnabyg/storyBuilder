@@ -1,5 +1,7 @@
 # Synthetic augmentation is a separate ablation
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real training needs passed G1 and G2 results, so the code refuses it. The tooling remains, tested on fixtures only.
+
 `nde reconstruction-augmentation create CONFIG --out DIRECTORY` freezes a new
 optimizer dataset without changing its parent. `inspect DIRECTORY` validates
 the entire source chain and regenerates expected content before accepting it.

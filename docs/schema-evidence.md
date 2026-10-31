@@ -13,8 +13,9 @@ uv run nde schema-evidence --replay .nde/g-schema/inputs.json --out .nde/g-schem
 The first command reads local saved inputs only. It never downloads a source,
 calls a provider, starts a timer or creates an owner review. Annotation sessions
 are read from `<annotations>/<story-id>/session.json` using the story IDs in the
-provenance manifest. Use `nde annotate draft --out .nde/annotations/<story-id>`
-when preparing each story. `data/manifest.gschema-20261027.yaml` records the
+provenance manifest. Use `nde annotate draft --manifest <this manifest> --out .nde/annotations/<story-id>`
+when preparing each story: a session drafted from a different manifest fails the
+provenance check. `data/manifest.gschema-20261027.yaml` records the
 three works in the passed review: *An Occurrence at Owl Creek Bridge*, *The Gift
 of the Magi* and *The Lady, or the Tiger?*. The report measures extracted word
 counts when local sources exist. Missing sources and lengths outside roughly
@@ -61,9 +62,9 @@ failures separately from mechanical validator results.
 Exit codes are **0 passed**, **1 failed**, **2 malformed/unreadable command
 input**, and **3 pending**. Passing fixture tests, validators or generated drafts
 cannot pass G-schema. Missing annotation, current-revision owner review,
-literary notes, completed correction intervals, or trajectory comparisons keeps
-it pending. In-flight/recovery-required generations cannot pass. Known invalid
-sources/corrections, missed mechanical thresholds, explicit owner rejection,
+completed correction intervals, or trajectory comparisons keeps it pending. In-flight/recovery-required generations cannot pass. Known invalid
+sources/corrections, missed mechanical thresholds, explicit owner rejection, blank
+review notes, an accepted review without `--meaningful-trajectories`,
 non-discriminating trajectories, or correction time at/above 7,200 seconds fail
 the corresponding criterion. The report retains every unresolved diagnostic.
 
@@ -86,7 +87,8 @@ literary confirmation.
    human constraints or missing/ambiguous locked facts.
 4. Pause the timer and explicitly review the **latest** correction using
    `nde annotate review ... --owner ... --notes ... --accept` and, only after
-   comparison, `--meaningful-trajectories`. Earlier-revision reviews do not
+   comparison, `--meaningful-trajectories`. An accepted review without that flag
+   fails the gate until a later review replaces it. Earlier-revision reviews do not
    establish approval of a newer correction. Regenerate the report.
 
 The target is under about two hours of measured correction per story. Fail

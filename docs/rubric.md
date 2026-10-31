@@ -15,8 +15,8 @@ in [the implementation plan](IMPLEMENTATION_PLAN.md).
 - **Failure tags:** a fixed vocabulary of named failures (unearned change,
   dropped thread, continuity error, melodrama, generic, rushed ending,
   repetition), each with a one-line definition and an example. The reader also
-  accepts free-text tags; this list is the vocabulary the judges use and that
-  reports count.
+  accepts free-text tags; this list is the vocabulary the judges use. Pair-batch
+  reports count these and free-text tags; calibration reports count only these.
 
 The file is validated by `nde.eval.rubric.Rubric`: IDs must be unique, every
 dimension needs all three anchors, and the file's `version` must match its

@@ -1,5 +1,7 @@
 # Conditional full generation
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real generation needs a passed G3, so the code refuses it. The tooling remains, tested on fixtures only.
+
 `nde conditional-generate generate request.json --out proposal-run` generates a
 structural proposal from an identified conditional checkpoint, permitted
 conditions and explicit caller authority. It never accepts a target annotation,
