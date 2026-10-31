@@ -16,7 +16,14 @@ gives the prompt back straight away while Story Builder keeps running in that wi
 ## What it does
 
 - **Write a new story.** Fill in the idea, or choose an example and press **Fill in** to
-  start from one of the development briefs. Then press **Write this story**.
+  start from it. Then press **Write this story**.
+- **Manage the examples.** **Manage examples** lists them, starting with the development
+  briefs. **Add an example** saves a new idea without writing a story, and each example
+  has **Use**, **Edit** and **Delete**. Deleting asks you to confirm. Editing an original
+  example saves your changed copy in its place, at the end of the list. Deleting an
+  original, or replacing it by editing, can be undone with **Restore the original
+  examples**, which keeps your own examples as they are. Deleting your own example is
+  permanent. Stories already written keep their idea whatever happens to the example.
 - **Watch it being written.** The page shows the current step and what has been spent so
   far. It opens the story when it is ready. Only one story is written at a time.
 - **Read it.** The story page shows the story, and under **Behind the story** the idea,
@@ -44,12 +51,14 @@ budget is still shown if it got as far as its checks, marked as unfinished.
 | --- | --- |
 | Stories | `runs/<run>/stories/continuity/<brief>/r1/`, the same files as [`nde continuity`](continuity.md#what-it-saves) |
 | Typed ideas | `.nde/gui-briefs/dev/brief-1001.yaml` and upward |
+| Your examples | `.nde/gui-briefs/examples/dev/`, numbered along with the typed ideas |
+| Original examples you removed | `.nde/gui-briefs/examples/removed-benchmark-examples.yaml` |
 
-Both folders are ignored by git, so keep your own copy of anything you want to last.
+These folders are ignored by git, so keep your own copy of anything you want to last.
 
-Typed ideas never go into `benchmark/`, so the development and held-out splits stay as
-they are. Held-out briefs are never opened or offered. A story from a typed idea is not
-benchmark evidence.
+Typed ideas and changes to examples never go into `benchmark/`, so the development and
+held-out splits stay as they are. Held-out briefs are never opened or offered. A story from a typed idea or a
+changed example is not benchmark evidence.
 
 Unlike the command line, the GUI never uses the response cache: writing the same idea
 again gives a new story, at full cost.
@@ -57,7 +66,7 @@ again gives a new story, at full cost.
 ## Options
 
 `nde gui --help` lists them: `--port` (8771 by default), `--no-browser`, `--config`,
-`--runs-dir`, `--ledger` and `--ideas-dir`.
+`--runs-dir`, `--ledger` and `--ideas-dir`, which also holds your examples.
 
 ## Safety
 

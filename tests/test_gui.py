@@ -407,3 +407,149 @@ def test_unknown_addresses_are_not_found(client: TestClient, path: str) -> None:
 )
 def test_progress_is_described_in_plain_words(call: str | None, expected: str) -> None:
     assert describe_step(call) == expected
+
+
+def _benchmark_files() -> dict[Path, bytes]:
+    return {path: path.read_bytes() for path in (REPO / "benchmark").rglob("*") if path.is_file()}
+
+
+def test_an_added_example_is_offered_edited_and_deleted(client: TestClient) -> None:
+    added = client.post("/examples", data=IDEA)
+    assert added.status_code == 303
+    assert "Added" in client.get(added.headers["location"]).text
+    assert '<option value="brief-1001">' in client.get("/").text
+    filled = client.get("/", params={"idea": "brief-1001"})
+    assert 'value="Elsie Marr"' in filled.text
+    assert '<option value="brief-1001" selected>' in filled.text
+
+    form = client.get("/examples/brief-1001/edit").text
+    assert "lamp &lt;lit&gt;" in form
+
+    changed = client.post("/examples/brief-1001/edit", data={**IDEA, "genre": "horror"})
+    assert changed.status_code == 303
+    assert "horror: A lighthouse" in client.get("/").text
+    assert 'value="brief-1002"' not in client.get("/").text
+
+    assert "cannot be undone" in client.get("/examples/brief-1001/delete").text
+    assert 'value="brief-1001"' in client.get("/").text
+    deleted = client.post("/examples/brief-1001/delete")
+    assert deleted.status_code == 303
+    assert 'value="brief-1001"' not in client.get("/").text
+    assert client.get("/examples/brief-1001/edit").status_code == 404
+    assert client.post("/examples/brief-1001/delete").status_code == 404
+
+
+def test_an_example_with_a_missing_answer_keeps_what_was_typed_and_saves_nothing(
+    client: TestClient, tmp_path: Path
+) -> None:
+    page = client.post("/examples", data={**IDEA, "genre": " "})
+    assert page.status_code == 422
+    assert "Please fill in: Genre." in page.text
+    assert 'value="Elsie Marr"' in page.text
+    assert not list((tmp_path / "ideas").rglob("*.yaml"))
+
+    edited = client.post("/examples/brief-09/edit", data={**IDEA, "genre": ""})
+    assert edited.status_code == 422
+    assert 'value="brief-09"' in client.get("/").text
+
+
+def test_changing_benchmark_examples_leaves_the_benchmark_alone_and_can_be_undone(
+    client: TestClient,
+) -> None:
+    before = _benchmark_files()
+    original = client.get("/", params={"idea": "brief-09"})
+    assert 'value="Kari Lund"' in original.text
+
+    assert client.post("/examples/brief-09/edit", data=IDEA).status_code == 303
+    home = client.get("/")
+    assert 'value="brief-09"' not in home.text
+    assert '<option value="brief-1001">' in home.text
+    assert client.get("/examples/brief-09/edit").status_code == 404
+
+    assert client.post("/examples/brief-1001/delete").status_code == 303
+    manage = client.get("/examples")
+    assert "Restore the original examples (1)" in manage.text
+
+    assert "Restore the original" in client.get("/examples/brief-01/delete").text
+    assert client.post("/examples/brief-01/delete").status_code == 303
+    assert "Restore the original examples (2)" in client.get("/examples").text
+
+    assert client.post("/examples/restore").status_code == 303
+    home = client.get("/")
+    assert 'value="brief-09"' in home.text
+    assert 'value="brief-01"' in home.text
+    assert "Restore the original" not in client.get("/examples").text
+    assert _benchmark_files() == before
+
+
+def test_a_story_keeps_its_idea_when_its_example_changes(
+    client: TestClient, studio: Studio
+) -> None:
+    assert client.post("/examples", data=IDEA).status_code == 303
+    address = _write_story(client, IDEA)
+    assert _story_at(studio, address).brief == "brief-1002"
+
+    client.post("/examples/brief-1001/edit", data={**IDEA, "protagonist_name": "Someone Else"})
+    story = client.get(address).text
+    assert "Elsie Marr" in story
+    assert "Someone Else" not in story
+
+
+def test_a_benchmark_brief_stays_readable_on_a_story_after_its_example_is_removed(
+    client: TestClient, studio: Studio
+) -> None:
+    assert client.post("/examples/brief-09/delete").status_code == 303
+    idea = studio.find_idea("brief-09")
+    assert idea is not None
+    assert idea.protagonist.name == "Kari Lund"
+
+
+def test_typed_ideas_and_examples_never_share_an_id(client: TestClient, studio: Studio) -> None:
+    address = _write_story(client, IDEA)
+    assert _story_at(studio, address).brief == "brief-1001"
+    assert client.post("/examples", data=IDEA).status_code == 303
+    assert 'value="brief-1002"' in client.get("/").text
+    assert _story_at(studio, _write_story(client, IDEA)).brief == "brief-1003"
+
+
+def test_deleting_every_example_still_leaves_a_way_back(client: TestClient, studio: Studio) -> None:
+    for example in studio.examples():
+        assert client.post(f"/examples/{example.id}/delete").status_code == 303
+    home = client.get("/")
+    assert "No example ideas." in home.text
+    assert 'href="/examples"' in home.text
+    assert "Restore the original examples" in client.get("/examples").text
+
+
+def test_a_failed_example_save_says_so_and_keeps_what_was_typed(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(_path: Path, _text: str) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("nde.gui.studio._replace_text", refuse)
+    page = client.post("/examples", data=IDEA)
+    assert page.status_code == 500
+    assert "disk full" in page.text
+    assert 'value="Elsie Marr"' in page.text
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/examples", "/examples/brief-09/edit", "/examples/brief-09/delete", "/examples/restore"],
+)
+def test_another_website_cannot_change_examples(
+    client: TestClient, tmp_path: Path, path: str
+) -> None:
+    page = client.post(path, data=IDEA, headers={"origin": "https://evil.example"})
+    assert page.status_code == 403
+    assert not (tmp_path / "ideas").exists()
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/examples/brief-11/edit", "/examples/brief-11/delete", "/examples/nonsense/edit"],
+)
+def test_a_held_out_or_unknown_brief_is_no_example(client: TestClient, path: str) -> None:
+    assert client.get(path).status_code == 404
+    assert client.post(path, data=IDEA).status_code == 404

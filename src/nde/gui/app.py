@@ -10,7 +10,7 @@ from html import escape
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from pydantic import ValidationError
 
@@ -47,8 +47,13 @@ button, .button { display: inline-block; padding: 0.6rem 1.1rem; font: inherit; 
                   cursor: pointer; text-decoration: none; }
 button.quiet, .button.quiet { background: #e6e2d8; color: #1d1d1f; }
 button.danger, .button.danger { background: #8b2e2e; color: #fff; }
-.inline { display: flex; gap: 0.5rem; align-items: stretch; }
-.inline select { flex: 1; min-width: 0; }
+.inline { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: stretch; }
+.inline select { flex: 1 1 12rem; min-width: 0; }
+.inline p { flex: 1; margin: auto 0; }
+.examples li { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.example-idea { flex: 1 1 16rem; }
+.examples .actions { margin: 0; }
+.library.examples a { font-family: inherit; font-size: inherit; }
 .notice { background: #f6e7c8; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
 .problems { background: #f8d7d3; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
 .problems ul { margin: 0.25rem 0 0; padding-left: 1.25rem; }
@@ -198,7 +203,12 @@ def _example_label(brief: Brief) -> str:
     return f"{brief.genre}: {premise}"
 
 
+_MANAGE_EXAMPLES = '<a class="button quiet" href="/examples">Manage examples</a>'
+
+
 def _examples(examples: list[Brief], chosen: str | None) -> str:
+    if not examples:
+        return f'<div class="inline"><p class="meta">No example ideas.</p>{_MANAGE_EXAMPLES}</div>'
     options = "".join(
         f'<option value="{escape(brief.id)}"{" selected" if brief.id == chosen else ""}>'
         f"{escape(_example_label(brief))}</option>"
@@ -207,22 +217,19 @@ def _examples(examples: list[Brief], chosen: str | None) -> str:
     return (
         '<form method="get" action="/" class="inline" aria-label="Start from an example">'
         f'<select name="idea" aria-label="Example idea">{options}</select>'
-        '<button class="quiet">Fill in</button></form>'
+        f'<button class="quiet">Fill in</button>{_MANAGE_EXAMPLES}</form>'
     )
 
 
-def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str:
+def _alert(problems: list[str]) -> str:
     listed = "".join(f"<li>{escape(problem)}</li>" for problem in problems)
-    alert = f'<div class="problems" role="alert"><ul>{listed}</ul></div>' if problems else ""
+    return f'<div class="problems" role="alert"><ul>{listed}</ul></div>' if problems else ""
+
+
+def _idea_fields(values: Mapping[str, str]) -> str:
     endings = [(kind.value, kind.value.capitalize()) for kind in EndingKind]
     lengths = [(str(words), f"About {words:,} words") for words in _LENGTHS]
-    cap = studio.cap_usd
-    limit = "" if cap is None else f" It stops at {_usd(cap)} at the very most."
     return f"""
-    <h2>Write a new story</h2>
-    {_examples(studio.examples(), values.get("idea"))}
-    {alert}
-    <form method="post" action="/stories">
       {_field("genre", "Genre", "What kind of story is it?", values)}
       {_field("premise", "The situation", "Where does the story start?", values, long=True)}
       <div class="pair">
@@ -248,6 +255,18 @@ def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str
             "target_words", "Length", lengths, values.get("target_words", str(DEFAULT_TARGET_WORDS))
         )
     }
+    """
+
+
+def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str:
+    cap = studio.cap_usd
+    limit = "" if cap is None else f" It stops at {_usd(cap)} at the very most."
+    return f"""
+    <h2>Write a new story</h2>
+    {_examples(studio.examples(), values.get("idea"))}
+    {_alert(problems)}
+    <form method="post" action="/stories">
+      {_idea_fields(values)}
       <p class="cost">A 2,000-word story has taken 5 to 12 minutes and cost about US$0.25 to
       US$0.60. Longer stories take longer and cost more.{limit}</p>
       <button>Write this story</button>
@@ -290,6 +309,92 @@ def _home(
         f"<section>{_library(studio.stories())}</section></div>"
     )
     return _page("Story Builder", banner + columns, status=status)
+
+
+def _examples_page(
+    studio: Studio, notice: str | None = None, problem: str | None = None, *, status: int = 200
+) -> HTMLResponse:
+    banner = "" if notice is None else f'<div class="notice" role="status">{escape(notice)}</div>'
+    alert = "" if problem is None else _alert([problem])
+    items = "".join(
+        f'<li><span class="example-idea">{escape(_example_label(brief))}</span>'
+        '<span class="actions">'
+        f'<a class="button quiet" href="/?{urlencode({"idea": brief.id})}" '
+        f'aria-label="Use: {escape(_example_label(brief))}">Use</a>'
+        f'<a class="button quiet" href="/examples/{escape(brief.id)}/edit" '
+        f'aria-label="Edit: {escape(_example_label(brief))}">Edit</a>'
+        f'<a class="button danger" href="/examples/{escape(brief.id)}/delete" '
+        f'aria-label="Delete: {escape(_example_label(brief))}">Delete</a>'
+        "</span></li>"
+        for brief in studio.examples()
+    )
+    listed = f'<ul class="library examples">{items}</ul>' if items else "<p>No example ideas.</p>"
+    removed = studio.removed_example_count()
+    restore = (
+        ""
+        if not removed
+        else '<form method="post" action="/examples/restore">'
+        f'<button class="quiet">Restore the original examples ({removed})</button></form>'
+    )
+    body = f"""
+    <div class="reading">
+      {banner}{alert}
+      <h2>Example ideas</h2>
+      <p>Changing an example does not change any story already written from it.</p>
+      {listed}
+      <div class="actions">
+        <a class="button" href="/examples/new">Add an example</a>
+        {restore}
+        <a class="button quiet" href="/">Back to Story Builder</a>
+      </div>
+    </div>
+    """
+    return _page("Example ideas", body, status=status)
+
+
+def _example_form_page(
+    heading: str,
+    action: str,
+    values: Mapping[str, str],
+    problems: list[str] | None = None,
+    *,
+    status: int = 200,
+) -> HTMLResponse:
+    body = f"""
+    <div class="reading">
+      <h2>{escape(heading)}</h2>
+      {_alert(problems or [])}
+      <form method="post" action="{escape(action)}">
+        {_idea_fields(values)}
+        <div class="actions">
+          <button>Save example</button>
+          <a class="button quiet" href="/examples">Cancel</a>
+        </div>
+      </form>
+    </div>
+    """
+    return _page(heading, body, status=status)
+
+
+def _delete_example_page(studio: Studio, example: Brief) -> HTMLResponse:
+    label = _example_label(example)
+    outcome = (
+        "You can bring it back with <strong>Restore the original examples</strong>."
+        if studio.is_benchmark_example(example.id)
+        else "It cannot be undone."
+    )
+    body = f"""
+    <div class="reading">
+      <h2>Delete this example?</h2>
+      <p>“{escape(label)}”</p>
+      <p>{outcome} Stories already written from it are kept.</p>
+      <form method="post" action="/examples/{escape(example.id)}/delete" class="actions">
+        <button class="danger">Delete example</button>
+        <a class="button quiet" href="/examples">Keep this example</a>
+      </form>
+    </div>
+    """
+    return _page("Delete this example?", body)
 
 
 def _problem_type(name: str) -> str:
@@ -436,9 +541,95 @@ def _from_this_app(request: Request) -> bool:
     return origin is None or urlsplit(origin).netloc == host
 
 
+async def _form_values(request: Request) -> dict[str, str]:
+    form = await request.form()
+    return {name: value for name, value in form.items() if isinstance(value, str)}
+
+
 def _file_name(title: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
     return f"{slug or 'story'}.md"
+
+
+def _example_routes(studio: Studio) -> APIRouter:
+    router = APIRouter()
+
+    def _existing_example(brief_id: str) -> Brief:
+        example = studio.example(brief_id)
+        if example is None:
+            raise HTTPException(404, "no such example")
+        return example
+
+    def _after_example_change(notice: str) -> Response:
+        return RedirectResponse(f"/examples?{urlencode({'notice': notice})}", status_code=303)
+
+    @router.get("/examples", response_class=HTMLResponse)
+    def examples(notice: str | None = None) -> HTMLResponse:
+        return _examples_page(studio, notice)
+
+    @router.get("/examples/new", response_class=HTMLResponse)
+    def new_example() -> HTMLResponse:
+        return _example_form_page("Add an example", "/examples", {})
+
+    @router.post("/examples")
+    async def add_example(request: Request) -> Response:
+        values = await _form_values(request)
+        content, problems = parse_idea(values)
+        if content is None:
+            return _example_form_page("Add an example", "/examples", values, problems, status=422)
+        try:
+            saved = studio.add_example(content)
+        except OSError as error:
+            problems = [f"The example could not be saved: {error}"]
+            return _example_form_page("Add an example", "/examples", values, problems, status=500)
+        return _after_example_change(f"Added “{_example_label(saved)}”.")
+
+    @router.get("/examples/{brief_id}/edit", response_class=HTMLResponse)
+    def edit_example(brief_id: str) -> HTMLResponse:
+        example = _existing_example(brief_id)
+        return _example_form_page(
+            "Edit this example", f"/examples/{example.id}/edit", _values_of(example)
+        )
+
+    @router.post("/examples/{brief_id}/edit")
+    async def save_example(brief_id: str, request: Request) -> Response:
+        example = _existing_example(brief_id)
+        action = f"/examples/{example.id}/edit"
+        values = await _form_values(request)
+        content, problems = parse_idea(values)
+        if content is None:
+            return _example_form_page("Edit this example", action, values, problems, status=422)
+        try:
+            saved = studio.update_example(example.id, content)
+        except OSError as error:
+            problems = [f"The example could not be saved: {error}"]
+            return _example_form_page("Edit this example", action, values, problems, status=500)
+        return _after_example_change(f"Saved “{_example_label(saved)}”.")
+
+    @router.get("/examples/{brief_id}/delete", response_class=HTMLResponse)
+    def confirm_delete_example(brief_id: str) -> HTMLResponse:
+        return _delete_example_page(studio, _existing_example(brief_id))
+
+    @router.post("/examples/{brief_id}/delete")
+    def delete_example(brief_id: str) -> Response:
+        example = _existing_example(brief_id)
+        try:
+            studio.delete_example(example.id)
+        except OSError as error:
+            problem = f"The example could not be deleted: {error}"
+            return _examples_page(studio, problem=problem, status=500)
+        return _after_example_change(f"Deleted “{_example_label(example)}”.")
+
+    @router.post("/examples/restore")
+    def restore_examples() -> Response:
+        try:
+            studio.restore_examples()
+        except OSError as error:
+            problem = f"The examples could not be restored: {error}"
+            return _examples_page(studio, problem=problem, status=500)
+        return _after_example_change("The original examples are back.")
+
+    return router
 
 
 def create_app(studio: Studio) -> FastAPI:
@@ -452,6 +643,8 @@ def create_app(studio: Studio) -> FastAPI:
             return PlainTextResponse("Requests from other sites are not accepted.", status_code=403)
         return await call_next(request)
 
+    app.include_router(_example_routes(studio))
+
     @app.get("/", response_class=HTMLResponse)
     def home(idea: str | None = None, deleted: str | None = None) -> HTMLResponse:
         chosen = None if idea is None else studio.find_idea(idea)
@@ -460,8 +653,7 @@ def create_app(studio: Studio) -> FastAPI:
 
     @app.post("/stories")
     async def write(request: Request) -> Response:
-        form = await request.form()
-        values = {name: value for name, value in form.items() if isinstance(value, str)}
+        values = await _form_values(request)
         content, problems = parse_idea(values)
         if content is None:
             return _home(studio, values, problems, status=422)

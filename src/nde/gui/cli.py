@@ -47,7 +47,7 @@ def configure(parser: argparse.ArgumentParser) -> None:
         "--ideas-dir",
         type=Path,
         default=DEFAULT_OWN_BRIEFS,
-        help=f"where typed ideas are saved ({DEFAULT_OWN_BRIEFS.as_posix()})",
+        help=f"where typed ideas and examples are saved ({DEFAULT_OWN_BRIEFS.as_posix()})",
     )
 
 
