@@ -8,6 +8,7 @@ offered as examples; held-out briefs are never opened.
 import json
 import re
 import secrets
+import shutil
 import threading
 import time
 from dataclasses import dataclass, field
@@ -271,6 +272,20 @@ class Studio:
     def story(self, run: str, brief: str) -> SavedStory | None:
         # Matched against what is on disk, so the URL can never name another path.
         return next((s for s in self.stories() if (s.run, s.brief) == (run, brief)), None)
+
+    def delete(self, story: SavedStory) -> None:
+        """Permanently remove a story's files; raises StudioBusyError if its run is still going.
+
+        The run's folder goes too unless it holds other stories. The cost ledger and the
+        typed idea stay: money spent stays spent, and the idea can be used again.
+        """
+        run_dir = story.folder.parents[3]
+        with self._lock:
+            running = self.current
+            if running is not None and read_manifest(run_dir).status == "running":
+                raise StudioBusyError(running)
+            others = [path for path in run_dir.glob("stories/*/*/*") if path != story.folder]
+            shutil.rmtree(story.folder if others else run_dir)
 
 
 def problems_in(error: ValidationError) -> list[tuple[str, str]]:

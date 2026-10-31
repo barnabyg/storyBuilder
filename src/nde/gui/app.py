@@ -8,7 +8,7 @@ import re
 from collections.abc import Awaitable, Callable, Mapping
 from html import escape
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
@@ -46,6 +46,7 @@ button, .button { display: inline-block; padding: 0.6rem 1.1rem; font: inherit; 
                   border: none; border-radius: 4px; background: #2f4f4f; color: #fff;
                   cursor: pointer; text-decoration: none; }
 button.quiet, .button.quiet { background: #e6e2d8; color: #1d1d1f; }
+button.danger, .button.danger { background: #8b2e2e; color: #fff; }
 .inline { display: flex; gap: 0.5rem; align-items: stretch; }
 .inline select { flex: 1; min-width: 0; }
 .notice { background: #f6e7c8; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
@@ -272,6 +273,7 @@ def _home(
     problems: list[str] | None = None,
     *,
     status: int = 200,
+    deleted: str | None = None,
 ) -> HTMLResponse:
     running = studio.current
     banner = (
@@ -280,6 +282,8 @@ def _home(
         else f'<div class="notice">A story is being written. '
         f'<a href="/jobs/{running.id}">See how it is going</a>.</div>'
     )
+    if deleted is not None:
+        banner += f'<div class="notice" role="status">Deleted “{escape(deleted)}”.</div>'
     columns = (
         f'<div class="columns"><section>{_form(studio, values or {}, problems or [])}</section>'
         f"<section>{_library(studio.stories())}</section></div>"
@@ -326,6 +330,10 @@ def _idea(idea: Brief | None) -> str:
     return "".join(f"<p>{escape(line)}</p>" for line in idea.describe().splitlines())
 
 
+def _address(story: SavedStory) -> str:
+    return f"/stories/{escape(story.run)}/{escape(story.brief)}"
+
+
 def _story_page(studio: Studio, story: SavedStory) -> HTMLResponse:
     paragraphs = "".join(f"<p>{escape(p)}</p>" for p in story.text.split("\n\n") if p.strip())
     idea = studio.find_idea(story.brief)
@@ -340,7 +348,8 @@ def _story_page(studio: Studio, story: SavedStory) -> HTMLResponse:
         else f'<a class="button quiet" href="/?idea={escape(story.brief)}">Use this idea again</a>'
     )
     unresolved = f"Problems the checks could not fix ({len(story.unresolved)})"
-    link = f"/stories/{escape(story.run)}/{escape(story.brief)}/story.md"
+    address = _address(story)
+    link = f"{address}/story.md"
     written = f"{escape(story.written_on)}, {story.words:,} words, {_usd(story.cost_usd)}"
     body = f"""
     <div class="reading">
@@ -352,6 +361,7 @@ def _story_page(studio: Studio, story: SavedStory) -> HTMLResponse:
         <a class="button" href="{link}">Save as a file</a>
         {again}
         <a class="button quiet" href="/">Back to all stories</a>
+        <a class="button danger" href="{address}/delete">Delete this story</a>
       </div>
       <h2>Behind the story</h2>
       <p class="meta">{escape(QUALITY_NOTE)}</p>
@@ -362,6 +372,26 @@ def _story_page(studio: Studio, story: SavedStory) -> HTMLResponse:
     </div>
     """
     return _page(story.title, body)
+
+
+def _delete_page(
+    story: SavedStory, problem: str | None = None, *, status: int = 200
+) -> HTMLResponse:
+    alert = "" if problem is None else f'<div class="problems" role="alert">{escape(problem)}</div>'
+    address = _address(story)
+    body = f"""
+    <div class="reading">
+      {alert}
+      <h2>Delete “{escape(story.title)}”?</h2>
+      <p>This permanently deletes the story and everything saved with it. It cannot be undone.
+      The money it cost stays spent, and its idea stays available.</p>
+      <form method="post" action="{address}/delete" class="actions">
+        <button class="danger">Delete permanently</button>
+        <a class="button quiet" href="{address}">Keep this story</a>
+      </form>
+    </div>
+    """
+    return _page("Delete this story?", body, status=status)
 
 
 def _job_page(job: Job) -> HTMLResponse:
@@ -422,9 +452,9 @@ def create_app(studio: Studio) -> FastAPI:
         return await call_next(request)
 
     @app.get("/", response_class=HTMLResponse)
-    def home(idea: str | None = None) -> HTMLResponse:
+    def home(idea: str | None = None, deleted: str | None = None) -> HTMLResponse:
         chosen = None if idea is None else studio.find_idea(idea)
-        return _home(studio, None if chosen is None else _values_of(chosen))
+        return _home(studio, None if chosen is None else _values_of(chosen), deleted=deleted)
 
     @app.post("/stories")
     async def write(request: Request) -> Response:
@@ -448,6 +478,9 @@ def create_app(studio: Studio) -> FastAPI:
             raise HTTPException(404, "no such job")
         if not job.finished:
             return _job_page(job)
+        if job.run_dir is not None and not job.run_dir.exists():
+            # Its story has since been deleted.
+            return RedirectResponse("/", status_code=303)
         story, reason = studio.outcome(job)
         if story is None:
             return _failed_page(job, reason)
@@ -459,6 +492,28 @@ def create_app(studio: Studio) -> FastAPI:
         if story is None:
             raise HTTPException(404, "no such story")
         return _story_page(studio, story)
+
+    @app.get("/stories/{run}/{brief}/delete", response_class=HTMLResponse)
+    def confirm_delete(run: str, brief: str) -> HTMLResponse:
+        story = studio.story(run, brief)
+        if story is None:
+            raise HTTPException(404, "no such story")
+        return _delete_page(story)
+
+    @app.post("/stories/{run}/{brief}/delete")
+    def delete(run: str, brief: str) -> Response:
+        story = studio.story(run, brief)
+        if story is None:
+            raise HTTPException(404, "no such story")
+        try:
+            studio.delete(story)
+        except StudioBusyError:
+            problem = "This story is still being written. Try again when it has finished."
+            return _delete_page(story, problem, status=409)
+        except OSError as error:
+            problem = f"The story could not be fully deleted: {error}"
+            return _delete_page(story, problem, status=500)
+        return RedirectResponse(f"/?{urlencode({'deleted': story.title})}", status_code=303)
 
     @app.get("/stories/{run}/{brief}/story.md")
     def download(run: str, brief: str) -> PlainTextResponse:

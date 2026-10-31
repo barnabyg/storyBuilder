@@ -23,6 +23,9 @@ gives the prompt back straight away while Story Builder keeps running in that wi
   the characters, the problems the checks could not fix and the passages they repaired.
   **Save as a file** downloads it, and **Use this idea again** returns to the form with
   the idea filled in, ready to change.
+- **Delete it.** **Delete this story** asks you to confirm, then permanently removes the
+  story and everything saved with it. There is no undo, and git cannot bring it back. What
+  it cost stays in the cost ledger, and its idea stays available.
 
 Every story in the runs folder is listed, including those written with `nde continuity`.
 

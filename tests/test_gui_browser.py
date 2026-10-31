@@ -22,7 +22,7 @@ from tests.fake_openai import FakeOpenAI
     os.environ.get("NDE_BROWSER") != "1",
     reason="set NDE_BROWSER=1 to run acceptance with installed Chrome (or NDE_BROWSER_CHANNEL)",
 )
-def test_an_example_idea_becomes_a_story_read_and_saved_in_the_browser(
+def test_an_example_idea_becomes_a_story_read_saved_and_deleted_in_the_browser(
     fake_llm: FakeOpenAI, tmp_path: Path
 ) -> None:
     fake_llm.default = fake_continuity()
@@ -88,6 +88,19 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
 
             page.get_by_role("link", name="Use this idea again").click()
             expect(page.get_by_label("Main character's name")).to_have_value("Kari Lund")
-            expect(page.get_by_role("link", name="The Last Lamp")).to_be_visible()
+            library = page.get_by_role("link", name="The Last Lamp")
+            expect(library).to_be_visible()
+
+            library.click()
+            page.get_by_role("link", name="Delete this story").click()
+            page.get_by_role("link", name="Keep this story").click()
+            expect(page.get_by_role("heading", name="The Last Lamp")).to_be_visible()
+            page.get_by_role("link", name="Delete this story").click()
+            page.get_by_role("button", name="Delete permanently").click()
+            expect(page.get_by_role("status")).to_contain_text("The Last Lamp")
+            expect(page.get_by_role("link", name="The Last Lamp")).to_have_count(0)
+            page.reload()
+            expect(page.get_by_text("Stories you write will appear here.")).to_be_visible()
+            assert not list((tmp_path / "runs").iterdir())
         finally:
             browser.close()

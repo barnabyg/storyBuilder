@@ -9,7 +9,7 @@ import yaml
 from fastapi.testclient import TestClient
 
 from nde.gui.app import create_app, parse_idea
-from nde.gui.studio import Studio, describe_step
+from nde.gui.studio import SavedStory, Studio, describe_step
 from nde.runs.runner import RunOptions
 from tests.conftest import REPO, write_config
 from tests.continuity_support import continuity_config, fake_continuity
@@ -62,6 +62,13 @@ def _write_story(client: TestClient, idea: dict[str, str] = IDEA) -> str:
         assert "Writing your story" in page.text
         time.sleep(0.02)
     raise AssertionError("the story did not finish")
+
+
+def _story_at(studio: Studio, address: str) -> SavedStory:
+    _, _, run, brief = address.split("/")
+    story = studio.story(run, brief)
+    assert story is not None
+    return story
 
 
 def test_typing_an_idea_writes_a_story_that_can_be_read_and_saved(
@@ -218,6 +225,132 @@ def test_a_story_stopped_early_is_shown_as_unfinished(client: TestClient, studio
     assert "unfinished" in client.get("/").text
 
 
+def test_deleting_a_story_asks_first_then_removes_only_that_story(
+    client: TestClient, studio: Studio, tmp_path: Path
+) -> None:
+    keep = _write_story(client)
+    doomed = _write_story(client)
+    kept_story = _story_at(studio, keep)
+    doomed_run = _story_at(studio, doomed).folder.parents[3]
+    assert keep != doomed
+    assert doomed_run.is_dir()
+
+    # Asking changes nothing, and offers a way back.
+    question = client.get(f"{doomed}/delete")
+    assert "The Last Lamp" in question.text
+    assert "cannot be undone" in question.text
+    assert f'href="{doomed}"' in question.text
+    assert doomed_run.is_dir()
+    assert client.get(doomed).status_code == 200
+
+    gone = client.post(f"{doomed}/delete")
+
+    assert gone.status_code == 303
+    assert "Deleted" in client.get(gone.headers["location"]).text
+    assert not doomed_run.exists()
+    assert client.get(doomed).status_code == 404
+    assert client.get(keep).status_code == 200
+    assert kept_story.text
+    assert [story.run for story in studio.stories()] == [kept_story.run]
+    # The ledger and the typed ideas are untouched, so the idea can be used again.
+    assert (tmp_path / "ledger.sqlite").is_file()
+    assert sorted(p.name for p in (tmp_path / "ideas" / "dev").iterdir()) == [
+        "brief-1001.yaml",
+        "brief-1002.yaml",
+    ]
+    assert 'value="Elsie Marr"' in client.get("/", params={"idea": "brief-1002"}).text
+
+
+def test_deleting_keeps_the_rest_of_a_run_that_holds_other_stories(
+    client: TestClient, studio: Studio
+) -> None:
+    address = _write_story(client)
+    [story] = studio.stories()
+    other = story.folder.parent.parent / "brief-1999" / "r1"
+    other.mkdir(parents=True)
+    (other / "story.md").write_text("Another story.", encoding="utf-8")
+
+    assert client.post(f"{address}/delete").status_code == 303
+
+    assert not story.folder.exists()
+    assert (other / "story.md").is_file()
+
+
+def test_a_story_being_written_cannot_be_deleted_and_others_can(
+    client: TestClient, fake_llm: FakeOpenAI, studio: Studio
+) -> None:
+    still_running = _write_story(client)
+    finished = _write_story(client)
+    manifest = _story_at(studio, still_running).folder.parents[3] / "manifest.json"
+    recorded = json.loads(manifest.read_text(encoding="utf-8"))
+    manifest.write_text(json.dumps(recorded | {"status": "running"}), encoding="utf-8")
+    reply = fake_continuity()
+    released = threading.Event()
+
+    def slow(body: Json) -> Reply:
+        released.wait(timeout=30)
+        return reply(body)
+
+    fake_llm.default = slow
+    client.post("/stories", data=IDEA)
+
+    refused = client.post(f"{still_running}/delete")
+    allowed = client.post(f"{finished}/delete")
+
+    job = studio.current
+    assert job is not None
+    assert job.thread is not None
+    released.set()
+    job.thread.join(timeout=30)
+    assert refused.status_code == 409
+    assert "still being written" in refused.text
+    assert client.get(still_running).status_code == 200
+    assert allowed.status_code == 303
+    assert client.get(finished).status_code == 404
+    assert job.run_dir is not None
+    assert json.loads((job.run_dir / "manifest.json").read_text(encoding="utf-8"))["status"] == (
+        "succeeded"
+    )
+
+
+def test_a_failed_delete_says_so(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    address = _write_story(client)
+
+    def locked(_: Path) -> None:
+        raise PermissionError("the file is open in another program")
+
+    monkeypatch.setattr("nde.gui.studio.shutil.rmtree", locked)
+    page = client.post(f"{address}/delete")
+
+    assert page.status_code == 500
+    assert "could not be fully deleted" in page.text
+    assert "open in another program" in page.text
+
+
+def test_another_website_cannot_delete_a_story(client: TestClient, studio: Studio) -> None:
+    address = _write_story(client)
+
+    page = client.post(f"{address}/delete", headers={"origin": "https://evil.example"})
+
+    assert page.status_code == 403
+    assert len(studio.stories()) == 1
+    assert client.get(address).status_code == 200
+
+
+def test_opening_a_finished_jobs_page_after_deleting_its_story_returns_home(
+    client: TestClient,
+) -> None:
+    job = client.post("/stories", data=IDEA).headers["location"]
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline and client.get(job).status_code != 303:
+        time.sleep(0.02)
+    address = client.get(job).headers["location"]
+
+    client.post(f"{address}/delete")
+
+    assert client.get(job).headers["location"] == "/"
+
+
 @pytest.mark.parametrize(
     "headers",
     [
@@ -244,7 +377,13 @@ def test_a_page_of_this_app_may_submit(client: TestClient) -> None:
 
 
 @pytest.mark.parametrize(
-    "path", ["/stories/nothing/brief-01", "/stories/..%2F..%2Fsecret/brief-01", "/jobs/nothing"]
+    "path",
+    [
+        "/stories/nothing/brief-01",
+        "/stories/nothing/brief-01/delete",
+        "/stories/..%2F..%2Fsecret/brief-01",
+        "/jobs/nothing",
+    ],
 )
 def test_unknown_addresses_are_not_found(client: TestClient, path: str) -> None:
     assert client.get(path).status_code == 404
