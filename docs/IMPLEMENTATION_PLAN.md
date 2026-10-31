@@ -2,7 +2,7 @@
 
 **Status:** Working plan v3; tooling through Phase 7 implemented; G-schema passed; G1 and its retest did not pass; diffusion track stopped; separate continuity approach accepted by the owner
 **Created:** 18 October 2026
-**Updated:** 31 October 2026, recording the owner's decision on the continuity approach
+**Updated:** 31 October 2026, recording the owner's decision on the continuity approach and the Story Builder GUI
 **Source:** [Narrative_Diffusion_Writing_Engine_Proposal.md](../Narrative_Diffusion_Writing_Engine_Proposal.md)
 
 ## Current position
@@ -49,6 +49,8 @@
   proof runs are needed: "it clearly works right now". This is the owner's judgement,
   not a blind result or a gate. It does not reopen G1 or restart the diffusion track.
   See the [evidence](evidence/continuity-2026-10-31/README.txt).
+- **The [Story Builder GUI](gui.md) is on `main`:** a local web page that writes and
+  shows continuity stories, started with `run.bat`.
 
 | Phase | Implementation status on `main` | Implementation issues | Operating guide |
 | --- | --- | --- | --- |
@@ -70,7 +72,7 @@ of a completed result.
 
 | Topic | Decision | Consequence |
 | --- | --- | --- |
-| Primary goal | Research first: answer the gates in proposal §11 | Minimal UI. CLI plus generated HTML/Markdown reports. The one exception is a small local reader app for blind evaluation. No plan-editor UI until the core thesis passes. |
+| Primary goal | Research first: answer the gates in proposal §11 | Minimal UI. CLI plus generated HTML/Markdown reports. The exceptions are a small local reader app for blind evaluation and, since the owner accepted the continuity approach, the local [Story Builder GUI](gui.md). No plan-editor UI until the core thesis passes. |
 | Stack | Python throughout | One schema language (Pydantic) from extraction through to diffusion training. No cross-language contract. |
 | LLMs | Mix of low-cost APIs (e.g. DeepSeek Flash (`deepseek-flash`), GPT-6 Luna (`gpt-6-luna`)), plus local models if they prove good enough | A provider-agnostic gateway behind an OpenAI-compatible interface, with model choice set per role in config. Structured-output reliability on cheap models becomes an early, measured risk. |
 | Evaluators | The project owner is the only human evaluator for now | Owner reading time is the scarcest resource and drives the evaluation design (§4). Results describe one reader's judgement. Any external claim later needs a panel. |
@@ -146,7 +148,7 @@ These pieces are built once in Phase 0 and used by every later phase.
 - One canonical, non-mutating verification command, `uv run nde-verify`, runs the gates in order:
   1. format check (`ruff format --check`)
   2. lint (`ruff check`, warnings as errors)
-  3. type check (`pyright --strict`)
+  3. type check (`pyright` in strict mode, warnings as errors)
   4. static bug rules (the bugbear and security rule sets in ruff; anything not covered is documented)
   5. tests (`pytest`)
   6. dependency audit (`pip-audit`) and a secret scan
@@ -158,7 +160,7 @@ These pieces are built once in Phase 0 and used by every later phase.
   variable separately in PowerShell). It runs actual parameter updates,
   checkpoint recovery and paired inference without downloading weights. The
   ordinary dependency set stays lightweight; optional ML tests may skip there.
-- LLM calls are never made in unit tests. Tests use recorded cache fixtures. A separate opt-in `live` test marker exercises the real providers.
+- LLM calls are never made in unit tests. Tests use a fake OpenAI-compatible server on localhost. A separate opt-in `live` test marker exercises the real providers.
 - Automated command/file/report tests are the primary implementation acceptance
   evidence. Browser tests cover critical reader flows when the documented
   installed-browser prerequisite is enabled. Remaining owner work is literary
@@ -180,6 +182,11 @@ src/nde/
   evidence/   reproducible G-schema evidence and mutation registry
   corpus/     acquisition, splits, segmentation/features, extraction, G2/export
   reconstruction/ codec, datasets, native ML, scoring, audits, sweeps and G3
+  conditional/ conditional data, layouts, training, generation, completion, reporting and G-E
+  stories/    story pipelines, normalisation, length control and story runs
+  continuity/ character sheets, scene clock, checks and targeted repair
+  gui/        the local Story Builder web page
+  verify/     the nde-verify gates and live dashboard
 prompts/      versioned prompt templates
 configs/      experiment configs
 benchmark/    briefs (dev/test), rubric, pre-registrations, gold annotations
@@ -223,7 +230,7 @@ This protocol applies to future gates and incorporates the Phase 1 decisions.
     This does not retroactively alter G-instr's explicit allowance for short
     stories.
   - Headers and markup are stripped.
-  - Reading happens at least 48 hours after the owner last worked on the generating code.
+  - Reading happens at least 48 hours after the owner last worked on the generating code. The owner does not work on the code, so no wait applies to this owner; the reader's warning can still appear for any commit.
   - If the owner's condition guesses are right in more than about 70% of pairs, the gate is flagged as possibly unblinded.
 - **LLM judge panel.** Judges are diagnostic only following G-instr. When run,
   use at least two model families, with pairwise comparisons in both orders,
@@ -485,7 +492,7 @@ the renderer. Keep the ticket IDs stable even though P2.6 precedes P2.5.
 P3.0 strict readiness. Generated/imported C plans retain planning provenance
 and costs; all tiers use B's shared prose contract. Real G1 additionally
 requires a passed owner G-schema packet, current dev selection and committed
-protocol. No real G1 result is added by this status update.
+protocol. G1's dated results are under [Current position](#current-position).
 
 **Development decision (27 October 2026):** the owner selected **M** after
 reviewing three versions of one dev brief with tier labels concealed. M scored
@@ -496,7 +503,7 @@ tiers. Six fixed sampled intentions were accepted (M: 2 of 4 represented items;
 L: 4 of 15); the remaining intentions and the reserve brief remain unreviewed.
 The [immutable selection](evidence/dev-tier-selection-2026-10-27/selection.json)
 binds the actual reviews and generation settings. All tiers incurred full-L
-planning before projection. G1 registration and held-out evaluation remain open.
+planning before projection. G1 was later registered and read, and did not pass.
 
 **Reading decision (30 October 2026):** the owner declined a 30-pair read on
 27 October and on 30 October set G1 at four pairs, before any reading: "Four pairs
@@ -610,8 +617,7 @@ replayed scientific evidence. Available software is not evidence that the
 
 ### Phase 6 — Denoising feasibility (L) — proposal Stage 4; requires Gates 1 and 2
 
-**Implementation:** tooling present on `main`; issues #66–75 are still open
-and need acceptance/closure reconciliation. The codec, corruption tasks,
+**Implementation:** tooling present on `main`; issues #66–75 are closed. The codec, corruption tasks,
 author-safe datasets, CPU models, paired scoring, overlap audit, bounded
 sweeps, registered G3 and optional augmentation are documented below. No
 scientific G3 pass or real pretrained-model result is recorded here.
@@ -739,7 +745,7 @@ Mapped to the uncertainties in proposal §9.
 | Risk | § | Where it is tested | Mitigation |
 | --- | --- | --- | --- |
 | Low-cost models are unreliable on nested structured output | — | P0.7 | Per-model validity metrics; smaller sub-schemas; a mid-tier fallback for one role only |
-| Single-evaluator bias or broken blinding | §9.10 | P1.8, every gate | Condition-guess tracking, 48-hour delay, sealed keys, pre-registration |
+| Single-evaluator bias or broken blinding | §9.10 | P1.8, every gate | Condition-guess tracking, 48-hour delay if the owner worked on the code, sealed keys, pre-registration |
 | The prose model dilutes the plans | §9.7 | P3.4 | Owner-reviewed realisation reported separately from coherence and overall preference |
 | Unvalidated judges steer variant selection | §9.10 | P3.5, P7 | Deterministic checks and owner-reviewed dev samples; judges diagnostic until separately validated |
 | Gate inputs or sample size change after results are known | §9.10 | P3.0, every gate | Exact pair, length and budget checks before reading; fixed n, explicit tie rules and fresh held-out follow-ups |

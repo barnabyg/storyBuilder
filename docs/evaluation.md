@@ -112,7 +112,9 @@ last commit touching `src/nde/stories`, `src/nde/plan`, `src/nde/prose`,
 `src/nde/llm` and `prompts`. If that is less than 48 hours ago, or those paths
 have uncommitted changes, or the working directory is not a git repository,
 `nde eval serve` prints a warning, every reader page shows it, and the batch
-report records it. The reader still works: the warning is for the record.
+report records it. The reader still works: the warning is for the record. The check
+sees any commit, whoever made it. The owner does not work on the code, so no wait
+is needed for the owner's reading, and the warning can still appear.
 
 ## Reporting a batch
 
@@ -148,8 +150,8 @@ computed values.
 ## LLM judge panel
 
 LLM judges judge the same blind batch the owner reads. Following G-instr they
-are diagnostic only: they are not used for screening, and every batch report
-checks them against the owner's verdicts. **Judges never pass a gate.** See P1.7
+are diagnostic only: they are not used for screening, and a batch report with judge
+records checks them against the owner's verdicts. **Judges never pass a gate.** See P1.7
 and §4 of the plan.
 
 ### Configuring the panel

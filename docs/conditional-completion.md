@@ -1,5 +1,7 @@
 # Restricted completion of generated proposals
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real Candidate E work needs a passed G3, so only fixture proposals can reach this workflow. The tooling remains, tested on fixtures only.
+
 `nde conditional-complete run CONFIG --out DIRECTORY` completes the free-text
 manifest on a saved conditional structural proposal. It is a hybrid step:
 learned structure stays fixed and the language model supplies only authorised

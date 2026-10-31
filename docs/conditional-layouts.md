@@ -1,5 +1,7 @@
 # Conditional layouts
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real conditional training needs a passed G3, so the code refuses it. The tooling remains, tested on fixtures only.
+
 Phase 7 adds `nde-conditional-layout` version 1 alongside the released Phase 6
 byte codec. Reconstruction still observes collection lengths and canonical IDs,
 and retains its 10–70% corruption policy. Full generation predicts an entire
@@ -34,7 +36,8 @@ attention architecture is fully fine-tuned from identified local base weights.
 The config binds the approved conditional dataset, capacity, adaptation, seed,
 optimizer policy and token/attention/time allowances. Checkpoints atomically save
 parameters, Adam state, RNG, sampler position and accumulated resource use.
-Resume rejects changed inputs and retains interrupted work reservations and time.
+Resume rejects changed inputs and retains interrupted work reservations and time; see
+[conditional training](conditional-training.md) for what an interruption costs.
 
 Tiny random CPU weights and synthetic datasets require `test_only: true`.
 Real Phase 7 training requires a current, genuine passed G3 protocol; synthetic

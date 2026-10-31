@@ -1,5 +1,7 @@
 # Corpus channel review
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). The real pilot this reviews is refused without a passed G1. The tooling remains, tested on fixtures only.
+
 `nde corpus-review freeze review.json --out data/review-v1` freezes the population,
 criteria and deterministic sample before any owner labels. Paths in configurations
 are resolved from the working directory; absolute paths make saved experiments
@@ -12,8 +14,8 @@ unambiguous. A minimal registration is:
     "work_id": "story-id",
     "work_dir": "data/story-id",
     "segmentation": "data/story-segments/segmentation.json",
-    "features": "data/story-features/features.json",
-    "families": "data/story-families",
+    "features": "data/pilot-v1/features/story-id/features.json",
+    "families": "data/pilot-v1/stories/story-id",
     "gold_session": "data/owner-corrected-session"
   }],
   "per_stratum": 1,
@@ -25,6 +27,10 @@ unambiguous. A minimal registration is:
   "weak_owner": 0.5
 }
 ```
+
+G2 registration checks these inputs against its pilot: `work_dir` and `segmentation`
+must match the pilot's work, and `families` and `features` must be the pilot's own
+`stories/<work>` and `features/<work>/features.json`.
 
 The default channels are plot, causality, information, goal, belief,
 relationships and interpretation. Sampling strata combine channel, period,

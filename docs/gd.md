@@ -1,5 +1,7 @@
 # Registered G-D evaluation
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real G-D needs a passed G1, so the code refuses it. The tooling remains, tested on fixtures only.
+
 `nde gd check PROTOCOL CONFIG --selection SELECTION --g1-batch CLOSED_G1
 --g1-decision DECISION_JSON --out CHECK` is a no-spend prerequisite check.
 It recomputes the closed G1 result and its bound artifacts. A passed issue,
@@ -64,8 +66,8 @@ does not open a sealed key before closure.
 Coherence, originality and every registered control predicate must pass.
 Overall preference is secondary. The report retains the exact final story and
 plan identities, experimental tokens, list-price cost, new spend, planning and
-revision provenance, owner realisation evidence where supplied, and diagnostic
-critic/judge separation. It records prior benchmark exposure, reading delay
+revision provenance, owner realisation evidence where supplied, and a fixed statement that critic and
+judge results are diagnostic only. It records prior benchmark exposure, reading delay
 limitations, missing guesses and condition-guess accuracy as blinding caveats.
 
 Only a complete actual scientific pass creates `reference-baseline.json` naming

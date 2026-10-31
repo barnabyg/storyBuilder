@@ -1,5 +1,7 @@
 # G1 decision reports
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Both decisions are recorded in [G1 on four pairs](g1-four-pairs.md). This page describes how the report works.
+
 After completing and closing a protocol-bound G1 batch:
 
 ```powershell
@@ -33,7 +35,8 @@ information cannot confirm blinding.
 
 The report describes at most one separately pre-registered follow-up on fresh
 held-out briefs. It never generates one, extends n, pools results or changes the
-completed protocol. Real owner reading, actual tier choice, passed G-schema
+completed protocol. This text is fixed, so the retest's own decision still mentions a
+follow-up, although the retest was the one follow-up allowed. Real owner reading, actual tier choice, passed G-schema
 evidence and the scientific decision remain separate from software fixtures.
 
 Exit 0 means a report was written (inspect its outcome, which may be pending),

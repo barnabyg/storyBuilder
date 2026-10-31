@@ -17,14 +17,17 @@ realised. Replay leaves the source plan unchanged and produces identical output
 for identical represented input.
 
 Chronology follows the scene list. Initial knowledge includes only explicit
-initial holders. Reveals add each holder after their scene, setups open after
+initial holders. Reveals add each holder after their scene, so a fact revealed and used in the same
+scene is missing from that scene's `planned_state_before`, although the
+[validator](narrative-structure.md) accepts it as held from the scene's start.
+Setups open after
 their scene and close after their payoff scene, and motifs accumulate only at
 completed occurrences. Knowledge uses are attached to their scene separately.
 State and relationship keys enter the ledger from their first explicit
 `before` reading when replay reaches that scene; later transitions never supply
 earlier state. Unknown and ambiguous readings retain status, confidence and
-alternatives. A multi-scene motif's completed occurrence IDs accumulate without
-exposing later occurrence IDs.
+alternatives. A multi-scene motif's record accumulates the IDs of its completed scenes without
+exposing later ones.
 
 The compact summary uses a deterministic relevance policy, rather than a
 character cutoff that might discard hard facts. It includes every recorded

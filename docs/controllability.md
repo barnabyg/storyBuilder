@@ -51,8 +51,9 @@ Each target includes its full request and canonical request checksum so a
 registered target cannot be replaced with an easier predicate under the same ID.
 
 An accepted-revision claim also requires `revision_provenance` from the
-operator: its accepted/no-op status, source identity, exact mask/locks and
-output identity must match the request. Without it the difference can still
+operator: its accepted/no-op status, source identity, exact revision request (mask, locks,
+instruction and prompt) and output identity must match the request; a mismatch makes
+the overall result a failure. Without it the difference can still
 be inspected, but overall success remains unknown and `accepted_revision`
 is false. G-D admission additionally requires that record and its source/output
 artifacts to belong to the actual D story and match an accepted refinement

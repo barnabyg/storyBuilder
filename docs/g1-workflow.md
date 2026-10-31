@@ -1,5 +1,7 @@
 # Registered G1 workflow
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Both results are in [G1 on four pairs](g1-four-pairs.md). This page describes how the workflow works. Running it again would need a new owner decision.
+
 **Status: G1 and its one permitted retest did not pass on 30 October 2026, so the
 diffusion track has stopped.** See the [protocols, results and runbook](g1-four-pairs.md).
 
@@ -11,8 +13,9 @@ does not establish those prerequisites. Synthetic fixtures are always marked
 to localhost. It cannot establish the scientific gate.
 
 Prepare an experiment configuration using exactly `C: baseline_c` and
-`B: baseline_b`, the selected C tier, the shared prose role/template, the exact
-frozen test brief cohort, equal generation-token budgets and explicit positive
+`B: baseline_b`, the selected C tier, the shared prose role/template, the registered
+brief cohort from one frozen split (the first G1 used dev briefs, the retest test
+briefs), generation-token budgets within the registered tolerance and explicit positive
 per-run and per-day dollar caps. Arbitrary extra calls and judge tuning inputs
 are rejected. Keep dev comparison files, owner review records and the immutable
 tier selection available for validation.
@@ -37,7 +40,7 @@ Create a JSON `G1Protocol` (schema exported by
   margin**. It makes no inferential noninferiority claim. Other analysis names
   are rejected;
 - `reading_mode: "full"` (all rubric marks and condition guesses required) or
-  `"required_only"` (coherence/originality for both stories, preference and strength
+  `"required_only"` (the `required_dimensions` for both stories, preference and strength
   required; other marks/guesses optional), and `rubric_version: 1`;
 - `config_sha256` from `load_config(path).hash`, `selection_sha256` and
   `schema_evidence_sha256` (LF-normalized file hashes, the latter for
@@ -55,6 +58,9 @@ uv run nde eval g1-run protocol.json G1-CONFIG.yaml --selection selection.json -
 uv run nde eval g1-batch protocol.json G1-CONFIG.yaml --selection selection.json --schema-evidence schema-packet --name g1 --from runs/RUN C --from runs/RUN B --seed 123
 uv run nde eval serve --batch g1
 ```
+
+`g1-batch` always writes under `batches/` and ignores `NDE_BATCHES`, which `eval serve`
+honours, so leave that variable unset here.
 
 `schema-packet` is a directory containing `evidence.json` and `inputs.json`; for
 the passed review, extract `evidence-indexed/` from
@@ -78,8 +84,8 @@ the builder never overwrites an existing batch.
 
 Optional `g1-batch --owner-code-work-at ISO8601_WITH_TIMEZONE` records the owner's
 reported latest code-work time. Omission remains unknown, never confirmed
-blinding. Keep at least the fixed 48-hour reading delay and record condition guesses
-where possible. The reader serves only the blind view and scores; sealed files,
+blinding. Keep the 48-hour reading delay if the owner has worked on the generating
+code. This owner does not, so no wait applies. Record condition guesses where possible. The reader serves only the blind view and scores; sealed files,
 plans and ledger metadata have no reader HTTP route. Missing required scores
 prevent submission and closure, including incomplete scores already on disk.
 

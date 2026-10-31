@@ -1,5 +1,7 @@
 # Brief-conditioned denoising and guidance
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real conditional training needs a passed G3, so the code refuses it. The tooling remains, tested on fixtures only.
+
 The conditional checkpoint representation is `nde-conditional-denoising-v1`.
 This uses the registered native attention architecture with a fully masked,
 fixed-capacity output block. Layout/count/identity/reference and structural-value
@@ -53,7 +55,9 @@ renaming an unconditioned reconstruction checkpoint cannot make it conditional.
 Unsupported checkpoint kinds or representation identities fail clearly.
 Checkpoints retain model, optimizer, RNG, sampler position, selected conditioning
 modes, accumulated work and interrupted-step reservations. Resume revalidates all
-transitive inputs and continues the original allowances. Inspecting/sampling a
+transitive inputs and continues the original allowances. An interrupted step uses up
+the whole time allowance, so resume then stops at once with `resource-stop`. An
+interrupted checkpoint save leaves a `step-N.pending` file that makes resume refuse. Inspecting/sampling a
 saved checkpoint is self-contained: persisted base dimensions and weights suffice
 after training files are removed; provenance paths are not inference inputs.
 

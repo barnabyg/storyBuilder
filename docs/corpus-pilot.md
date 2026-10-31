@@ -1,5 +1,7 @@
 # Extraction pilot
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). A real pilot needs a passed G1, so the code refuses it. The tooling remains, tested on fixtures only.
+
 The pilot reuses the independent-family engine; it does not introduce another
 annotation format. Configure a frozen cohort and each expected work:
 
@@ -47,7 +49,8 @@ by completed stories, expose incomplete coverage, and assume unchanged story
 length, models, passes and retry distribution. They are not automatic scaling
 authorisation.
 
-Real runs replay the recorded G1 evidence before extraction. G-D is not a
+Real runs replay the recorded G1 evidence before extraction and refuse unless it
+passed. G-D is not a
 prerequisite. Deterministic development fixtures set `test_only: true`, omit
 G1 evidence and use local fixture-provider endpoints. Their output cannot
 establish scientific success. Normal pilot runs are bounded to 50 works;

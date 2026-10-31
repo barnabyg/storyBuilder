@@ -1,5 +1,7 @@
 # Registered G-E development comparison
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real G-E needs a passed G3, so no real protocol can be registered. The tooling remains, tested on fixtures only.
+
 G-E asks whether Candidate E is competitive enough with the reference planner
 to justify Phase 8's owner reading. `nde ge` prepares and runs that comparison
 on frozen **dev** briefs, assembles the owner's structural review packet and,
@@ -24,7 +26,8 @@ uv run nde ge replay decisions/ge-1
 
 Exit codes: **0** ready, current or complete (for `decide`, a complete actual pass
 or failure); **1** blocked, stale, pending, inconsistent, or a run that did not
-succeed; **2** malformed or unsupported input. Every command except `run` makes
+succeed; **2** malformed or unsupported input, a blocked `register`, or a repeat `run`
+refused because the protocol's run is already claimed. Every command except `run` makes
 no provider call and runs no model.
 
 ## Readiness: genuine G3 only
@@ -49,7 +52,7 @@ they are restricted to local fake providers and produce test-only evidence.
 ## Registration
 
 Paths are relative to the registration file. All fields are required unless
-noted: `protected_populations` and `neighbours` (default 3) are optional, and
+noted: `test_only`, `version`, `protected_populations` and `neighbours` (default 3) are optional, and
 `g3_population` is optional only for test-only registrations, because genuine
 authority is blocked without it. Unknown fields are rejected, so no threshold can be added that the
 protocol does not register.
@@ -172,7 +175,8 @@ frozen evidence, so a protocol re-sealed with edited sections does not check.
 It then claims the protocol's single run by creating the sealed
 `PROTOCOL.run-claim.json` (kind `ge-run-claim`) beside the protocol, and only
 then runs the bound configuration through the shared experiment machinery
-(`--runs-dir`, `--cache`, `--ledger` as for `nde run`). It builds the [evidence report](conditional-report.md) over E's
+(`--runs-dir`, `--cache`, `--ledger`; unlike `nde run`, it ignores `NDE_CACHE` and
+`NDE_LEDGER` and has no cache-bypass options). It builds the [evidence report](conditional-report.md) over E's
 stories and the reference outputs in `ge-evidence/`, then writes the sealed
 `ge-run.json` (kind `ge-dev-run`, `run_version` 1) and `ge-run.md` in the run
 folder:
@@ -422,7 +426,8 @@ found from file names). Keep Phase 8's held-out cohort in its own frozen
 benchmark version all the same. Fixture runs use test-only checkpoints and selections and are
 software evidence only: they never establish G3, G-E, condition adherence or
 literary quality, and every fixture decision stays pending. No genuine G3 pass
-exists yet, so no real G-E protocol can be registered. Tests in `tests/test_ge.py`
+exists, and with the diffusion track stopped none is expected, so no real G-E protocol
+can be registered. Tests in `tests/test_ge.py`
 and `tests/test_ge_decision.py` use a real tiny CPU checkpoint and fake-provider
 calls. Genuine outcomes are exercised only by promotion inside a test: the G3
 authority replay and the evidence report's test-only flag are promoted in memory,

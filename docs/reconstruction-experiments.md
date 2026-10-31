@@ -1,5 +1,7 @@
 # Reconstruction learning curves
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real training needs passed G1 and G2 results, so the code refuses it. The tooling remains, tested on fixtures only.
+
 `nde reconstruction-experiment register CONFIG --out EXPERIMENT` freezes a
 versioned `experiment.json` before training. It binds local base weights,
 approved training datasets, a separately authorized fixed held-out evaluation

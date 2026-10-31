@@ -1,5 +1,7 @@
 # Structural reconstruction artifacts
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real training exports need a passed G2, which needs a passed G1, so only test-only exports can reach this workflow. The tooling remains, tested on fixtures only.
+
 The additive Phase 6 codec preserves the released narrative-plan and corpus-export
 formats. `reconstruction-codec encode EXPORT --out DIRECTORY` validates the Phase 5
 export before reading its training annotations. `inspect DIRECTORY` repeats those

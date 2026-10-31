@@ -100,8 +100,9 @@ uv run nde corpus segment-compare data/corpus/lamp data/segments/lamp --gold gol
 ```
 
 Offsets are half-open Unicode-codepoint intervals on the exact canonical LF
-text, never UTF-8 byte or UTF-16 offsets. Explicit `CHAPTER`, `BOOK` and `PART`
-headings define chapters; lines of three or more stars, dashes or underscores
+text, never UTF-8 byte or UTF-16 offsets. Any line starting with the word `chapter`,
+`book` or `part`, in any case, defines a chapter, so a prose line such as "Part of
+the crowd turned away." also counts; lines of three or more stars, dashes or underscores
 define scene breaks. A story without such markers remains one uncertain scene;
 unmarked temporal or viewpoint transitions are not silently labelled as known
 breaks. Each scene has a parent chapter, confidence and reason. Bounds, ordering,

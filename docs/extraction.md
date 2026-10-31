@@ -1,5 +1,7 @@
 # Evidence-linked corpus extraction
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). The real pilot that runs extraction at scale is refused without a passed G1.
+
 `nde extract run WORK --segments SEGMENTS --config CONFIG --out OUTPUT` runs
 three versioned channel passes: structural/causal/information, character state,
 then interpretation. Each response is a tier-L plan. Earlier accepted channels
@@ -50,7 +52,8 @@ the story incomplete. Story caps cover all independent families together and
 remain enforced when a larger cohort cap is supplied by pilot orchestration.
 
 `nde extract families-report OUTPUT` revalidates source/config/schema identities
-and original responses, then recomputes agreement. Scenes align on exact source
+and original responses, recomputes agreement and prints one status line, writing
+nothing. `nde extract families` writes the saved agreement reports. Scenes align on exact source
 spans, entities on unique normalized names and reference claims on their normalized
 content. Generated record IDs are excluded. Duplicate names remain explicitly
 ambiguous. Exact normalized claims use multiset intersection/union: `agreed`
@@ -58,7 +61,7 @@ is intersection size, `total` is union size, `compared` is the smaller inventory
 and `unmatched` retains both inventories' missing or contradictory claims.
 Empty channels have no measured agreement, rather than a perfect score.
 
-Reports include core plot, causality, information, goal and belief channels,
+The saved reports include core plot, causality, information, goal and belief channels,
 state/interpretive channels and a grouped interpretation row. They retain
 disagreements; they never produce merged consensus labels or claim owner approval.
 Three or more families produce all pairwise comparisons. Aggregate durable story

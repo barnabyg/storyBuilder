@@ -2,7 +2,8 @@
 
 **Status:** Concept proposal — for technical planning and validation  
 **Date:** 18 October 2026  
-**Working name:** Narrative Diffusion Engine (NDE)
+**Working name:** Narrative Diffusion Engine (NDE)  
+**Outcome:** the first thesis test did not pass and the diffusion track stopped on 30 October 2026; see the [implementation plan](docs/IMPLEMENTATION_PLAN.md#current-position).
 
 ## 1. Executive summary
 

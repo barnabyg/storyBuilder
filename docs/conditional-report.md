@@ -1,5 +1,7 @@
 # Condition adherence, diversity and training similarity
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real Candidate E work needs a passed G3, so only fixture stories can reach this report. The tooling remains, tested on fixtures only.
+
 `nde conditional-report build REQUEST.json --out NEW_FOLDER` reports what Candidate E
 was asked for against what it produced, how different its outputs are across
 seeds, and how close they are to known training plans and to the reference

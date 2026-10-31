@@ -1,5 +1,7 @@
 # Conditional inpainting behind the revision contract
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real Candidate E work needs a passed G3, so the code refuses it. The tooling remains, tested on fixtures only.
+
 Candidate E can revise a saved plan through the same `uv run nde plan revise
 config.yaml` workflow, mask, locks and artifacts as [D's operator](revisions.md).
 Select it with an additive `backend` section beside the unchanged version-1

@@ -1,5 +1,7 @@
 # Candidate E story runs
 
+**Status:** G1 and its one retest did not pass, so [the diffusion track has stopped](g1-four-pairs.md). Real Candidate E runs need a passed G3, so the code refuses them. The tooling remains, tested on fixtures only.
+
 Use `pipeline: candidate_e` in an ordinary `nde run CONFIG.yaml` story
 experiment. E plans with a local conditional checkpoint and the established
 conditional workflows, then writes prose exactly as C and D do. It has no prose
@@ -28,7 +30,9 @@ stories:
         completion_max_tokens: 1024
 ```
 
-This example selects no model, checkpoint or scientific setting; supply real
+Use an absolute `checkpoint` path: the story pipeline resolves a relative one from the
+working directory, but the [evidence report](conditional-report.md) resolves it from
+the config's folder. This example selects no model, checkpoint or scientific setting; supply real
 identities, prices and hard caps. A real (non-fixture) checkpoint must be bound
 to a current genuine passed G3 decision, or preparation fails before any call.
 Tiny fixture checkpoints run only as test-only mechanics.
@@ -42,12 +46,12 @@ Tiny fixture checkpoints run only as test-only mechanics.
    `scene_range` means the brief's scene bounds are not requested.
 2. [Full generation](conditional-generation.md) samples a structural proposal
    with the configured guidance, locks and limits, using a seed derived from the
-   story's seed. Its request, every attempt, durable reservations and report
-   are kept under `conditional/generation/`.
+   story's seed. Its request is `conditional/generation-request.json`; every
+   attempt, durable reservations and report are kept under `conditional/generation/`.
 3. [Restricted completion](conditional-completion.md) fills the proposal's whole
    text manifest on the `planner` binding through the run's own gateway, so the
-   run's cache, prices, cost ledger and caps apply. Its records are under
-   `conditional/completion/`. Only a complete, validated completion becomes
+   run's cache, prices, cost ledger and caps apply. Its request is `conditional/completion-request.json`
+   and its records are under `conditional/completion/`. Only a complete, validated completion becomes
    the selected plan.
 4. The selected plan is saved as `plan.json`, `validation.json` and cards, with
    `conditional-selection.json` naming the checkpoint, proposal, completion and
