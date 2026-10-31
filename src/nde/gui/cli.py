@@ -2,6 +2,7 @@
 
 import argparse
 import contextlib
+import ctypes
 import os
 import socket
 import sys
@@ -80,6 +81,10 @@ def run(args: argparse.Namespace) -> int:
     if not args.no_browser:
         threading.Timer(_BROWSER_DELAY_S, webbrowser.open, [url]).start()
     server = uvicorn.Server(uvicorn.Config(create_app(studio), log_level="warning"))
+    if sys.platform == "win32":
+        # A program can inherit Ctrl+C switched off from whatever started it, and then
+        # only the program can switch it back on.
+        ctypes.windll.kernel32.SetConsoleCtrlHandler(None, False)
     # After shutting down, uvicorn raises the interrupt again for its caller to handle.
     with contextlib.suppress(KeyboardInterrupt):
         server.run(sockets=[listener])
