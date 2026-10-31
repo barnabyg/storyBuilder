@@ -8,7 +8,7 @@ uv run nde gui
 ```
 
 The page opens in your browser. Keep the window that started it open, and press Ctrl+C
-there to stop it. It needs `OPENAI_API_KEY` in the environment or in `.env`, and says so
+there to stop it. If a story is being written, stopping loses it, and the window says so. It needs `OPENAI_API_KEY` in the environment or in `.env`, and says so
 on the page if the key is missing.
 
 ## What it does

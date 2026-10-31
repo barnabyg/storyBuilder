@@ -1,6 +1,7 @@
 """`nde gui`: open the story builder in a local web page."""
 
 import argparse
+import contextlib
 import os
 import socket
 import sys
@@ -79,5 +80,9 @@ def run(args: argparse.Namespace) -> int:
     if not args.no_browser:
         threading.Timer(_BROWSER_DELAY_S, webbrowser.open, [url]).start()
     server = uvicorn.Server(uvicorn.Config(create_app(studio), log_level="warning"))
-    server.run(sockets=[listener])
+    # After shutting down, uvicorn raises the interrupt again for its caller to handle.
+    with contextlib.suppress(KeyboardInterrupt):
+        server.run(sockets=[listener])
+    unfinished = " The story being written was not finished." if studio.current else ""
+    print(f"Story Builder has stopped.{unfinished}")
     return EXIT_OK
