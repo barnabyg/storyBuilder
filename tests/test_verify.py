@@ -1,11 +1,16 @@
 import io
 import sys
 import zipfile
+from collections.abc import Sequence
 from pathlib import Path
 
-from nde.verify.gates import GATE_ORDER, canonical_profile
+import pytest
+
+from nde.verify import main
+from nde.verify.gates import GATE_ORDER, canonical_profile, quick_profile
 from nde.verify.runner import Command, Gate, run_gates
 from nde.verify.steps import missing_from_wheel
+from tests.conftest import REPO
 
 
 def _python(code: str) -> Command:
@@ -29,6 +34,51 @@ def test_canonical_profile_runs_the_seven_gates_in_standard_order() -> None:
         "build",
     ]
     assert tuple(names) == GATE_ORDER
+
+
+def test_quick_profile_is_every_gate_except_the_tests_in_the_same_order() -> None:
+    assert [gate.name for gate in quick_profile()] == [
+        name for name in GATE_ORDER if name != "tests"
+    ]
+
+
+def test_the_secret_scan_runs_before_anything_that_needs_uv() -> None:
+    [gate] = [g for g in canonical_profile() if g.name == "dependencies-and-secrets"]
+
+    assert gate.commands[0].args[-1] == "secrets"
+
+
+@pytest.mark.parametrize(
+    ("arguments", "tests_run", "note"),
+    [(["--no-dashboard"], True, False), (["--no-dashboard", "--quick"], False, True)],
+)
+def test_main_chooses_the_gates_and_says_when_tests_were_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    arguments: list[str],
+    tests_run: bool,
+    note: bool,
+) -> None:
+    chosen: list[str] = []
+
+    def fake_verify(gates: Sequence[Gate], **_: object) -> int:
+        chosen.extend(gate.name for gate in gates)
+        return 7
+
+    monkeypatch.setattr("nde.verify.verify", fake_verify)
+
+    # The gates' result stays the exit status: a quick pass or failure is not altered.
+    assert main(arguments) == 7
+
+    assert ("tests" in chosen) is tests_run
+    assert ("not full verification" in capsys.readouterr().out) is note
+
+
+def test_ci_runs_the_full_verification() -> None:
+    workflow = (REPO / ".github" / "workflows" / "verify.yml").read_text(encoding="utf-8")
+
+    assert "nde-verify" in workflow
+    assert "--quick" not in workflow
 
 
 def test_clean_gates_pass() -> None:

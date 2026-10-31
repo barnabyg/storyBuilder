@@ -4,6 +4,17 @@
 runs the seven gates in order (see the [README](../README.md#verification))
 and exits non-zero if any gate fails or prints a warning.
 
+## Quick check before pushing
+
+`uv run nde-verify --quick` runs every gate except the tests. The tests can take many
+minutes on Windows, and a full run cut short there never reaches the gates after them.
+Run the quick check, plus the tests your change affects, before pushing. It is not full
+verification and says so when it ends. CI always runs everything.
+
+Gates 6 and 7 need the `uv` version pinned in `pyproject.toml`. If the `uv` on your PATH
+is a different version, set the `UV` environment variable to the pinned one's path. In
+gate 6 the secret scan runs first, so a wrong `uv` version cannot hide a leaked secret.
+
 ## Live dashboard
 
 An interactive local run also starts a live dashboard and prints its address

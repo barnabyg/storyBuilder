@@ -18,6 +18,12 @@ Single-context layout: `GLOSSARY.md` and `docs/adr/` would sit at the repo root.
 
 For hygiene cycle status, retries, setup or disabling its startup trigger, see `docs/agents/project-hygiene.md`.
 
+## Before pushing
+
+Run `nde-verify --quick --no-dashboard` and the affected tests. A local full run often
+times out in the tests and misses the gates after them. For a `uv` version mismatch, see
+`docs/verification.md`.
+
 ## Guided owner review
 
 For manual testing or qualitative judgement that needs the owner, use the
