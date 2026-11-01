@@ -7,8 +7,9 @@ its own pages: another website open in the same browser must not be able to star
 import re
 from collections.abc import Awaitable, Callable, Mapping
 from html import escape
+from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
@@ -24,53 +25,16 @@ _REFRESH_SECONDS = 3
 _LENGTHS = (1000, 2000, 4000)
 _EXAMPLE_LABEL_CHARS = 80
 
-_STYLE = """
-:root { color-scheme: light; }
-* { box-sizing: border-box; }
-body { font-family: system-ui, sans-serif; margin: 0 auto; max-width: 72rem; padding: 1rem;
-       color: #1d1d1f; background: #fbfaf7; line-height: 1.45; }
-header { border-bottom: 1px solid #ccc; margin-bottom: 1.25rem; }
-header a { color: inherit; text-decoration: none; }
-header h1 { font-family: Georgia, serif; margin: 0.25rem 0 0.5rem; }
-.columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 2.5rem; }
-@media (max-width: 50rem) { .columns { grid-template-columns: minmax(0, 1fr); } }
-h2 { font-size: 1.15rem; margin: 0 0 0.75rem; }
-label { display: block; font-weight: 600; margin: 0.9rem 0 0.2rem; }
-.hint { display: block; font-weight: 400; font-size: 0.85rem; color: #555; }
-input, select, textarea { width: 100%; padding: 0.5rem; font: inherit; border: 1px solid #aaa;
-                          border-radius: 4px; background: #fff; color: inherit; }
-textarea { min-height: 4.5rem; resize: vertical; }
-.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1rem; }
-@media (max-width: 30rem) { .pair { grid-template-columns: minmax(0, 1fr); } }
-button, .button { display: inline-block; padding: 0.6rem 1.1rem; font: inherit; font-weight: 600;
-                  border: none; border-radius: 4px; background: #2f4f4f; color: #fff;
-                  cursor: pointer; text-decoration: none; }
-button.quiet, .button.quiet { background: #e6e2d8; color: #1d1d1f; }
-button.danger, .button.danger { background: #8b2e2e; color: #fff; }
-.inline { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: stretch; }
-.inline select { flex: 1 1 12rem; min-width: 0; }
-.inline p { flex: 1; margin: auto 0; }
-.examples li { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.example-idea { flex: 1 1 16rem; }
-.examples .actions { margin: 0; }
-.library.examples a { font-family: inherit; font-size: inherit; }
-.notice { background: #f6e7c8; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
-.problems { background: #f8d7d3; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
-.problems ul { margin: 0.25rem 0 0; padding-left: 1.25rem; }
-.cost { font-size: 0.9rem; color: #444; margin: 1rem 0; }
-.library { list-style: none; margin: 0; padding: 0; }
-.library li { padding: 0.6rem 0; border-bottom: 1px solid #e3e0d8; }
-.library a { font-family: Georgia, serif; font-size: 1.1rem; }
-.meta { display: block; font-size: 0.85rem; color: #555; }
-.reading { max-width: 42rem; margin: 0 auto; }
-.reading h1 { font-family: Georgia, serif; margin-bottom: 0.25rem; }
-article { font-family: Georgia, serif; font-size: 1.1rem; line-height: 1.6; margin: 1.5rem 0; }
-.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
-details { margin: 0.75rem 0; font-size: 0.95rem; }
-summary { cursor: pointer; font-weight: 600; }
-blockquote { margin: 0.25rem 0 0.75rem 1rem; color: #444; font-family: Georgia, serif; }
-.activity { font-size: 1.25rem; margin: 1rem 0 0.5rem; }
-"""
+_STYLE = Path(__file__).with_name("style.css").read_text(encoding="utf-8")
+
+# An open book, as the bar's mark and the browser tab's icon.
+_BOOK = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
+    'stroke="{colour}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+    'aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>'
+    '<path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
+)
+_TAB_ICON = "data:image/svg+xml," + quote(_BOOK.format(colour="#a4722b"))
 
 _PLACEHOLDERS = {
     "genre": "adventure",
@@ -103,9 +67,11 @@ def _page(title: str, body: str, *, status: int = 200, refresh: int | None = Non
     html = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         f'<meta name="viewport" content="width=device-width, initial-scale=1">{meta}'
-        f"<title>{escape(title)}</title><style>{_STYLE}</style></head>"
-        '<body><header><h1><a href="/">Story Builder</a></h1></header>'
-        f"{body}</body></html>"
+        f'<title>{escape(title)}</title><link rel="icon" href="{_TAB_ICON}">'
+        f"<style>{_STYLE}</style></head>"
+        '<body><header class="site"><div class="bar"><a class="brand" href="/">'
+        f"{_BOOK.format(colour='currentColor')}Story Builder</a></div></header>"
+        f"<main>{body}</main></body></html>"
     )
     return HTMLResponse(html, status_code=status)
 
@@ -169,14 +135,13 @@ def _problem(name: str, message: str) -> str:
     return f"{label}: {message}."
 
 
-def _field(
-    name: str, label: str, hint: str, values: Mapping[str, str], *, long: bool = False
-) -> str:
+def _field(name: str, label: str, hint: str, values: Mapping[str, str], *, rows: int = 1) -> str:
     value = escape(values.get(name, ""))
     example = escape(_PLACEHOLDERS[name])
     control = (
-        f'<textarea id="{name}" name="{name}" placeholder="{example}" required>{value}</textarea>'
-        if long
+        f'<textarea id="{name}" name="{name}" rows="{rows}" placeholder="{example}" required>'
+        f"{value}</textarea>"
+        if rows > 1
         else f'<input id="{name}" name="{name}" value="{value}" placeholder="{example}" required>'
     )
     return (
@@ -185,13 +150,14 @@ def _field(
     )
 
 
-def _select(name: str, label: str, options: list[tuple[str, str]], chosen: str) -> str:
+def _select(name: str, label: str, hint: str, options: list[tuple[str, str]], chosen: str) -> str:
     items = "".join(
         f'<option value="{escape(value)}"{" selected" if value == chosen else ""}>'
         f"{escape(text)}</option>"
         for value, text in options
     )
-    return f'<div><label for="{name}">{escape(label)}</label>' + (
+    return (
+        f'<div><label for="{name}">{escape(label)}<span class="hint">{escape(hint)}</span></label>'
         f'<select id="{name}" name="{name}">{items}</select></div>'
     )
 
@@ -230,31 +196,54 @@ def _idea_fields(values: Mapping[str, str]) -> str:
     endings = [(kind.value, kind.value.capitalize()) for kind in EndingKind]
     lengths = [(str(words), f"About {words:,} words") for words in _LENGTHS]
     return f"""
-      {_field("genre", "Genre", "What kind of story is it?", values)}
-      {_field("premise", "The situation", "Where does the story start?", values, long=True)}
-      <div class="pair">
-        {_field("protagonist_name", "Main character's name", "Their full name", values)}
-        {_field("protagonist_description", "Who they are", "In one sentence", values)}
-      </div>
-      {
+      <fieldset>
+        <legend>The story</legend>
+        <div class="pair even">
+          {_field("genre", "Genre", "What kind of story is it?", values)}
+          {
+        _select(
+            "target_words",
+            "Length",
+            "Longer stories cost more",
+            lengths,
+            values.get("target_words", str(DEFAULT_TARGET_WORDS)),
+        )
+    }
+        </div>
+        {_field("premise", "The situation", "Where does the story start?", values, rows=3)}
+        {_field("themes", "Themes", "One to four, separated by commas", values)}
+      </fieldset>
+      <fieldset>
+        <legend>The main character</legend>
+        <div class="pair">
+          {_field("protagonist_name", "Main character's name", "Their full name", values)}
+          {_field("protagonist_description", "Who they are", "In one sentence", values, rows=2)}
+        </div>
+        {
         _field(
             "central_conflict",
             "The central conflict",
             "What stands in their way?",
             values,
-            long=True,
+            rows=3,
         )
     }
-      {_field("themes", "Themes", "One to four, separated by commas", values)}
-      <div class="pair">
-        {_select("ending_kind", "Kind of ending", endings, values.get("ending_kind", "happy"))}
-        {_field("ending_detail", "What the ending must do", "In one sentence", values)}
-      </div>
-      {
+      </fieldset>
+      <fieldset>
+        <legend>The ending</legend>
+        <div class="pair">
+          {
         _select(
-            "target_words", "Length", lengths, values.get("target_words", str(DEFAULT_TARGET_WORDS))
+            "ending_kind",
+            "Kind of ending",
+            "How things turn out",
+            endings,
+            values.get("ending_kind", "happy"),
         )
     }
+          {_field("ending_detail", "What the ending must do", "In one sentence", values, rows=2)}
+        </div>
+      </fieldset>
     """
 
 
@@ -262,29 +251,39 @@ def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str
     cap = studio.cap_usd
     limit = "" if cap is None else f" It stops at {_usd(cap)} at the very most."
     return f"""
-    <h2>Write a new story</h2>
-    {_examples(studio.examples(), values.get("idea"))}
+    <h1>Write a new story</h1>
+    <p class="lede">Describe an idea. Story Builder plans it, writes it, then checks and
+    repairs it.</p>
     {_alert(problems)}
-    <form method="post" action="/stories">
-      {_idea_fields(values)}
-      <p class="cost">A 2,000-word story has taken 5 to 12 minutes and cost about US$0.25 to
-      US$0.60. Longer stories take longer and cost more.{limit}</p>
-      <button>Write this story</button>
-    </form>
+    <div class="panel">
+      <div class="starter">
+        <span class="eyebrow">Start from an example</span>
+        {_examples(studio.examples(), values.get("idea"))}
+      </div>
+      <form method="post" action="/stories">
+        {_idea_fields(values)}
+        <div class="submit">
+          <p class="cost">A 2,000-word story has taken 5 to 12 minutes and cost about US$0.25 to
+          US$0.60. Longer stories take longer and cost more.{limit}</p>
+          <button>Write this story</button>
+        </div>
+      </form>
+    </div>
     """
 
 
 def _library(stories: list[SavedStory]) -> str:
     if not stories:
-        return "<h2>Your stories</h2><p>Stories you write will appear here.</p>"
+        return '<h2>Your stories</h2><p class="empty">Stories you write will appear here.</p>'
     items = "".join(
         f'<li><a href="/stories/{escape(story.run)}/{escape(story.brief)}">'
         f"{escape(story.title)}</a>"
         f'<span class="meta">{escape(story.written_on)}, {story.words:,} words, '
-        f"{_usd(story.cost_usd)}{'' if story.finished else ', unfinished'}</span></li>"
+        f"{_usd(story.cost_usd)}"
+        f"{'' if story.finished else '<span class="badge">unfinished</span>'}</span></li>"
         for story in stories
     )
-    return f'<h2>Your stories</h2><ul class="library">{items}</ul>'
+    return f'<h2>Your stories</h2><ul class="library stories">{items}</ul>'
 
 
 def _home(
@@ -317,13 +316,14 @@ def _examples_page(
     banner = "" if notice is None else f'<div class="notice" role="status">{escape(notice)}</div>'
     alert = "" if problem is None else _alert([problem])
     items = "".join(
-        f'<li><span class="example-idea">{escape(_example_label(brief))}</span>'
+        f'<li><span class="example-idea"><span class="eyebrow">{escape(brief.genre)}</span>'
+        f"{escape(brief.premise)}</span>"
         '<span class="actions">'
-        f'<a class="button quiet" href="/?{urlencode({"idea": brief.id})}" '
+        f'<a class="button quiet small" href="/?{urlencode({"idea": brief.id})}" '
         f'aria-label="Use: {escape(_example_label(brief))}">Use</a>'
-        f'<a class="button quiet" href="/examples/{escape(brief.id)}/edit" '
+        f'<a class="button quiet small" href="/examples/{escape(brief.id)}/edit" '
         f'aria-label="Edit: {escape(_example_label(brief))}">Edit</a>'
-        f'<a class="button danger" href="/examples/{escape(brief.id)}/delete" '
+        f'<a class="button danger-quiet small" href="/examples/{escape(brief.id)}/delete" '
         f'aria-label="Delete: {escape(_example_label(brief))}">Delete</a>'
         "</span></li>"
         for brief in studio.examples()
@@ -339,8 +339,8 @@ def _examples_page(
     body = f"""
     <div class="reading">
       {banner}{alert}
-      <h2>Example ideas</h2>
-      <p>Changing an example does not change any story already written from it.</p>
+      <h1>Example ideas</h1>
+      <p class="lede">Changing an example does not change any story already written from it.</p>
       {listed}
       <div class="actions">
         <a class="button" href="/examples/new">Add an example</a>
@@ -362,9 +362,9 @@ def _example_form_page(
 ) -> HTMLResponse:
     body = f"""
     <div class="reading">
-      <h2>{escape(heading)}</h2>
+      <h1>{escape(heading)}</h1>
       {_alert(problems or [])}
-      <form method="post" action="{escape(action)}">
+      <form method="post" action="{escape(action)}" class="panel">
         {_idea_fields(values)}
         <div class="actions">
           <button>Save example</button>
@@ -384,8 +384,8 @@ def _delete_example_page(studio: Studio, example: Brief) -> HTMLResponse:
         else "It cannot be undone."
     )
     body = f"""
-    <div class="reading">
-      <h2>Delete this example?</h2>
+    <div class="reading panel">
+      <h1>Delete this example?</h1>
       <p>“{escape(label)}”</p>
       <p>{outcome} Stories already written from it are kept.</p>
       <form method="post" action="/examples/{escape(example.id)}/delete" class="actions">
@@ -421,7 +421,7 @@ def _repairs(story: SavedStory) -> str:
     return "".join(
         f"<p>Paragraph {change['paragraph']}, before:</p>"
         f"<blockquote>{escape(str(change['before']))}</blockquote><p>After:</p>"
-        f"<blockquote>{escape(str(change['after']))}</blockquote>"
+        f'<blockquote class="after">{escape(str(change["after"]))}</blockquote>'
         for change in story.repairs()
     )
 
@@ -459,22 +459,26 @@ def _story_page(studio: Studio, story: SavedStory) -> HTMLResponse:
     written = f"{escape(story.written_on)}, {story.words:,} words, {_usd(story.cost_usd)}"
     body = f"""
     <div class="reading">
-      <h1>{escape(story.title)}</h1>
-      <span class="meta">{written}</span>
+      <div class="title">
+        <h1>{escape(story.title)}</h1>
+        <span class="meta">{written}</span>
+      </div>
       {warning}
       <article>{paragraphs}</article>
       <div class="actions">
         <a class="button" href="{link}">Save as a file</a>
         {again}
         <a class="button quiet" href="/">Back to all stories</a>
-        <a class="button danger" href="{address}/delete">Delete this story</a>
+        <a class="button danger-quiet apart" href="{address}/delete">Delete this story</a>
       </div>
-      <h2>Behind the story</h2>
-      <p class="meta">{escape(QUALITY_NOTE)}</p>
-      {_section("The idea", _idea(idea))}
-      {_section("The characters", _characters(story))}
-      {_section(unresolved, _problem_list(story.unresolved))}
-      {_section("Passages repaired", _repairs(story))}
+      <section class="behind">
+        <h2>Behind the story</h2>
+        <p class="meta">{escape(QUALITY_NOTE)}</p>
+        {_section("The idea", _idea(idea))}
+        {_section("The characters", _characters(story))}
+        {_section(unresolved, _problem_list(story.unresolved))}
+        {_section("Passages repaired", _repairs(story))}
+      </section>
     </div>
     """
     return _page(story.title, body)
@@ -488,13 +492,15 @@ def _delete_page(
     body = f"""
     <div class="reading">
       {alert}
-      <h2>Delete “{escape(story.title)}”?</h2>
-      <p>This permanently deletes the story and everything saved with it. It cannot be undone.
-      The money it cost stays spent, and its idea stays available.</p>
-      <form method="post" action="{address}/delete" class="actions">
-        <button class="danger">Delete permanently</button>
-        <a class="button quiet" href="{address}">Keep this story</a>
-      </form>
+      <div class="panel">
+        <h1>Delete “{escape(story.title)}”?</h1>
+        <p>This permanently deletes the story and everything saved with it. It cannot be undone.
+        The money it cost stays spent, and its idea stays available.</p>
+        <form method="post" action="{address}/delete" class="actions">
+          <button class="danger">Delete permanently</button>
+          <a class="button quiet" href="{address}">Keep this story</a>
+        </form>
+      </div>
     </div>
     """
     return _page("Delete this story?", body, status=status)
@@ -503,14 +509,23 @@ def _delete_page(
 def _job_page(job: Job) -> HTMLResponse:
     cap = "" if job.cap_usd is None else f" of at most {_usd(job.cap_usd)}"
     minutes = "under a minute" if job.minutes < 1 else f"{job.minutes} min"
+    spend = (
+        ""
+        if not job.cap_usd
+        else '<div class="spend" aria-hidden="true">'
+        f'<span style="width: {min(job.spent_usd / job.cap_usd, 1):.1%}"></span></div>'
+    )
     body = f"""
-    <h2>Writing your story</h2>
-    <p class="activity" role="status">{escape(job.activity)}…</p>
-    <p class="meta">Running for {minutes}. Spent so far: {_usd(job.spent_usd)}{cap}.</p>
-    <p>This usually takes 5 to 12 minutes, and the story opens here when it is ready. You can
-    leave this page and come back, but keep the Story Builder window open, because closing it
-    stops the writing and loses the story.</p>
-    <a class="button quiet" href="/">Back to all stories</a>
+    <div class="reading panel waiting">
+      <h1>Writing your story</h1>
+      <p class="activity" role="status"><span class="pulse"></span>{escape(job.activity)}…</p>
+      {spend}
+      <p class="meta">Running for {minutes}. Spent so far: {_usd(job.spent_usd)}{cap}.</p>
+      <p>This usually takes 5 to 12 minutes, and the story opens here when it is ready. You can
+      leave this page and come back, but keep the Story Builder window open, because closing it
+      stops the writing and loses the story.</p>
+      <a class="button quiet" href="/">Back to all stories</a>
+    </div>
     """
     return _page("Writing your story", body, refresh=_REFRESH_SECONDS)
 
@@ -518,10 +533,12 @@ def _job_page(job: Job) -> HTMLResponse:
 def _failed_page(job: Job, reason: str | None) -> HTMLResponse:
     detail = _section("What went wrong", f"<p>{escape(reason)}</p>") if reason else ""
     body = f"""
-    <div class="problems" role="alert">The story could not be written. This cost
-    {_usd(job.spent_usd)}. You can try again.</div>
-    {detail}
-    <a class="button" href="/">Back to Story Builder</a>
+    <div class="reading">
+      <div class="problems" role="alert">The story could not be written. This cost
+      {_usd(job.spent_usd)}. You can try again.</div>
+      {detail}
+      <div class="actions"><a class="button" href="/">Back to Story Builder</a></div>
+    </div>
     """
     return _page("The story could not be written", body)
 
