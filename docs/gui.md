@@ -7,7 +7,7 @@ type `.\run` in PowerShell in that folder.
 The page opens in your browser. Story Builder runs in its own window: keep that window
 open, and press Ctrl+C there or close it to stop. If a story is being written, stopping loses it, and the window says so. It needs
 `OPENAI_API_KEY` in the environment or in `.env`, and says so on the page if the key is
-missing.
+missing. The page follows your computer's light or dark setting.
 
 `run.bat` needs the `.venv` folder that `uv sync` creates. It is the same as
 `uv run nde gui`, without needing the pinned version of `uv`. Started from PowerShell, it
