@@ -17,7 +17,8 @@ gives the prompt back straight away, and that terminal plays no further part.
 
 - **Write a new story.** Enter your idea, or choose an example, read its premise and press
   **Use this example**. If you have edited the form, choose **Keep my draft** or
-  **Replace draft**. Press **Write this story** when ready.
+  **Replace draft**. Press **Write this story** when ready. If a field needs correcting,
+  its error links directly to the field and your answers stay in the form.
 - **Manage the examples.** **Manage examples** lists them, starting with the development
   briefs. **Add an example** saves a new idea without writing a story, and each example
   has **Use**, **Edit** and **Delete**. Deleting asks you to confirm. Editing an original

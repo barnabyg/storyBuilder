@@ -91,7 +91,7 @@ def _values_of(brief: BriefContent) -> dict[str, str]:
     }
 
 
-def parse_idea(form: Mapping[str, str]) -> tuple[BriefContent | None, list[str]]:
+def parse_idea(form: Mapping[str, str]) -> tuple[BriefContent | None, dict[str, str]]:
     """The form as a brief, or the problems to show the person who filled it in."""
 
     def value(name: str) -> str:
@@ -117,8 +117,11 @@ def parse_idea(form: Mapping[str, str]) -> tuple[BriefContent | None, list[str]]
             }
         )
     except ValidationError as error:
-        return None, [_problem(name, message) for name, message in problems_in(error)]
-    return content, []
+        return None, {
+            name.replace("ending_constraint.", "ending_").replace(".", "_"): _problem(name, message)
+            for name, message in problems_in(error)
+        }
+    return content, {}
 
 
 def _problem(name: str, message: str) -> str:
@@ -132,28 +135,12 @@ def _problem(name: str, message: str) -> str:
     return f"{label}: {message}."
 
 
-def _field(name: str, label: str, hint: str, values: Mapping[str, str], *, rows: int = 1) -> str:
-    value = escape(values.get(name, ""))
-    control = (
-        f'<textarea id="{name}" name="{name}" rows="{rows}" required>{value}</textarea>'
-        if rows > 1
-        else f'<input id="{name}" name="{name}" value="{value}" required>'
-    )
+def _field_error(name: str, problems: Mapping[str, str]) -> tuple[str, str]:
+    if name not in problems:
+        return "", ""
     return (
-        f'<div><label for="{name}">{escape(label)}'
-        f'<span class="hint">{escape(hint)}</span></label>{control}</div>'
-    )
-
-
-def _select(name: str, label: str, hint: str, options: list[tuple[str, str]], chosen: str) -> str:
-    items = "".join(
-        f'<option value="{escape(value)}"{" selected" if value == chosen else ""}>'
-        f"{escape(text)}</option>"
-        for value, text in options
-    )
-    return (
-        f'<div><label for="{name}">{escape(label)}<span class="hint">{escape(hint)}</span></label>'
-        f'<select id="{name}" name="{name}">{items}</select></div>'
+        f' aria-invalid="true" aria-describedby="{name}-error"',
+        f'<p class="field-error" id="{name}-error">{escape(problems[name])}</p>',
     )
 
 
@@ -191,21 +178,70 @@ def _examples(examples: list[Brief], chosen: str | None) -> str:
     )
 
 
-def _alert(problems: list[str]) -> str:
-    listed = "".join(f"<li>{escape(problem)}</li>" for problem in problems)
-    return f'<div class="problems" role="alert"><ul>{listed}</ul></div>' if problems else ""
+def _alert(problems: Mapping[str, str]) -> str:
+    if not problems:
+        return ""
+    items: list[str] = []
+    for name, message in problems.items():
+        text = escape(message)
+        if name:
+            text = f'<a href="#{escape(name)}">{text}</a>'
+        items.append(f"<li>{text}</li>")
+    return (
+        '<div class="problems" role="alert" tabindex="-1" autofocus>'
+        f"<ul>{''.join(items)}</ul></div>"
+    )
 
 
-def _idea_fields(values: Mapping[str, str]) -> str:
+def _idea_fields(values: Mapping[str, str], problems: Mapping[str, str]) -> str:
+    def field(
+        name: str,
+        label: str,
+        hint: str,
+        *,
+        rows: int = 1,
+    ) -> str:
+        value = escape(values.get(name, ""))
+        attributes, error = _field_error(name, problems)
+        control = (
+            f'<textarea id="{name}" name="{name}" rows="{rows}"{attributes} required>'
+            f"{value}</textarea>"
+            if rows > 1
+            else f'<input id="{name}" name="{name}" value="{value}"{attributes} required>'
+        )
+        return (
+            f'<div><label for="{name}">{escape(label)}'
+            f'<span class="hint">{escape(hint)}</span></label>{control}{error}</div>'
+        )
+
+    def select(
+        name: str,
+        label: str,
+        hint: str,
+        options: list[tuple[str, str]],
+        chosen: str,
+    ) -> str:
+        attributes, error = _field_error(name, problems)
+        items = "".join(
+            f'<option value="{escape(value)}"{" selected" if value == chosen else ""}>'
+            f"{escape(text)}</option>"
+            for value, text in options
+        )
+        return (
+            f'<div><label for="{name}">{escape(label)}'
+            f'<span class="hint">{escape(hint)}</span></label>'
+            f'<select id="{name}" name="{name}"{attributes}>{items}</select>{error}</div>'
+        )
+
     endings = [(kind.value, kind.value.capitalize()) for kind in EndingKind]
     lengths = [(str(words), f"About {words:,} words") for words in _LENGTHS]
     return f"""
       <fieldset>
         <legend>The story</legend>
         <div class="pair even">
-          {_field("genre", "Genre", "What kind of story is it?", values)}
+          {field("genre", "Genre", "What kind of story is it?")}
           {
-        _select(
+        select(
             "target_words",
             "Length",
             "Longer stories cost more",
@@ -214,21 +250,20 @@ def _idea_fields(values: Mapping[str, str]) -> str:
         )
     }
         </div>
-        {_field("premise", "The situation", "Where does the story start?", values, rows=3)}
-        {_field("themes", "Themes", "One to four, separated by commas", values)}
+        {field("premise", "The situation", "Where does the story start?", rows=3)}
+        {field("themes", "Themes", "One to four, separated by commas")}
       </fieldset>
       <fieldset>
         <legend>The main character</legend>
         <div class="pair">
-          {_field("protagonist_name", "Main character's name", "Their full name", values)}
-          {_field("protagonist_description", "Who they are", "In one sentence", values, rows=2)}
+          {field("protagonist_name", "Main character's name", "Their full name")}
+          {field("protagonist_description", "Who they are", "In one sentence", rows=2)}
         </div>
         {
-        _field(
+        field(
             "central_conflict",
             "The central conflict",
             "What stands in their way?",
-            values,
             rows=3,
         )
     }
@@ -237,7 +272,7 @@ def _idea_fields(values: Mapping[str, str]) -> str:
         <legend>The ending</legend>
         <div class="pair">
           {
-        _select(
+        select(
             "ending_kind",
             "Kind of ending",
             "How things turn out",
@@ -245,13 +280,13 @@ def _idea_fields(values: Mapping[str, str]) -> str:
             values.get("ending_kind", "happy"),
         )
     }
-          {_field("ending_detail", "What the ending must do", "In one sentence", values, rows=2)}
+          {field("ending_detail", "What the ending must do", "In one sentence", rows=2)}
         </div>
       </fieldset>
     """
 
 
-def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str:
+def _form(studio: Studio, values: Mapping[str, str], problems: dict[str, str]) -> str:
     cap = studio.cap_usd
     limit = "" if cap is None else f" It stops at {_usd(cap)} at the very most."
     return f"""
@@ -265,7 +300,7 @@ def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str
       </div>
       <form id="story-draft" method="post" action="/stories"
             data-edited="{str(bool(problems)).lower()}">
-        {_idea_fields(values)}
+        {_idea_fields(values, problems)}
         <div class="submit">
           <p class="cost">A 2,000-word story has taken 5 to 12 minutes and cost about US$0.25 to
           US$0.60. Longer stories take longer and cost more.{limit}</p>
@@ -294,7 +329,7 @@ def _library(stories: list[SavedStory]) -> str:
 def _home(
     studio: Studio,
     values: Mapping[str, str] | None = None,
-    problems: list[str] | None = None,
+    problems: dict[str, str] | None = None,
     *,
     status: int = 200,
     deleted: str | None = None,
@@ -309,7 +344,7 @@ def _home(
     if deleted is not None:
         banner += f'<div class="notice" role="status">Deleted “{escape(deleted)}”.</div>'
     columns = (
-        f'<div class="columns"><section>{_form(studio, values or {}, problems or [])}</section>'
+        f'<div class="columns"><section>{_form(studio, values or {}, problems or {})}</section>'
         f"<section>{_library(studio.stories())}</section></div>"
     )
     return _page(
@@ -324,7 +359,7 @@ def _examples_page(
     studio: Studio, notice: str | None = None, problem: str | None = None, *, status: int = 200
 ) -> HTMLResponse:
     banner = "" if notice is None else f'<div class="notice" role="status">{escape(notice)}</div>'
-    alert = "" if problem is None else _alert([problem])
+    alert = "" if problem is None else _alert({"": problem})
     items = "".join(
         f'<li><span class="example-idea"><span class="eyebrow">{escape(brief.genre)}</span>'
         f"{escape(brief.premise)}</span>"
@@ -366,16 +401,16 @@ def _example_form_page(
     heading: str,
     action: str,
     values: Mapping[str, str],
-    problems: list[str] | None = None,
+    problems: dict[str, str] | None = None,
     *,
     status: int = 200,
 ) -> HTMLResponse:
     body = f"""
     <div class="reading">
       <h1>{escape(heading)}</h1>
-      {_alert(problems or [])}
+      {_alert(problems or {})}
       <form method="post" action="{escape(action)}" class="panel">
-        {_idea_fields(values)}
+        {_idea_fields(values, problems or {})}
         <div class="actions">
           <button>Save example</button>
           <a class="button quiet" href="/examples">Cancel</a>
@@ -610,7 +645,7 @@ def _example_routes(studio: Studio) -> APIRouter:
         try:
             saved = studio.add_example(content)
         except OSError as error:
-            problems = [f"The example could not be saved: {error}"]
+            problems = {"": f"The example could not be saved: {error}"}
             return _example_form_page("Add an example", "/examples", values, problems, status=500)
         return _after_example_change(f"Added “{_example_label(saved)}”.")
 
@@ -632,7 +667,7 @@ def _example_routes(studio: Studio) -> APIRouter:
         try:
             saved = studio.update_example(example.id, content)
         except OSError as error:
-            problems = [f"The example could not be saved: {error}"]
+            problems = {"": f"The example could not be saved: {error}"}
             return _example_form_page("Edit this example", action, values, problems, status=500)
         return _after_example_change(f"Saved “{_example_label(saved)}”.")
 
@@ -692,7 +727,7 @@ def create_app(studio: Studio) -> FastAPI:
         except StudioBusyError as busy:
             job = busy.job
         except ConfigError as error:
-            return _home(studio, values, [str(error)], status=422)
+            return _home(studio, values, {"": str(error)}, status=422)
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
     @app.get("/jobs/{job_id}")

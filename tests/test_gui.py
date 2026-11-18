@@ -157,7 +157,7 @@ def test_too_many_themes_are_explained() -> None:
     content, problems = parse_idea(IDEA | {"themes": "a, b, c, d, e"})
 
     assert content is None
-    assert problems == ["Themes: please give between one and four, separated by commas."]
+    assert problems == {"themes": "Themes: please give between one and four, separated by commas."}
 
 
 def test_a_missing_api_key_is_explained_before_any_spend(

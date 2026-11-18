@@ -142,6 +142,26 @@ def _choose_example_over_draft(page: Page) -> None:
     expect(page.get_by_label("The situation")).to_have_value(preview)
 
 
+def _correct_invalid_fields(page: Page, base: str) -> None:
+    # The browser itself stops an unanswered question, before the server sees it.
+    genre = page.locator('input[name="genre"]').input_value()
+    page.locator('input[name="genre"]').fill("")
+    page.get_by_role("button", name="Write this story").click()
+    expect(page).to_have_url(f"{base}/?idea=brief-09")
+    page.locator('input[name="genre"]').fill(genre)
+
+    themes = page.get_by_label("Themes")
+    themes.fill("one, two, three, four, five")
+    page.get_by_role("button", name="Write this story").click()
+    page.get_by_role("alert").get_by_role("link", name="Themes:").click()
+    expect(themes).to_be_focused()
+    expect(themes).to_have_value("one, two, three, four, five")
+    expect(themes).to_have_accessible_description(
+        "Themes: please give between one and four, separated by commas."
+    )
+    themes.fill("one, two")
+
+
 def _write_and_read(base: str, tmp_path: Path) -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
@@ -155,13 +175,7 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
             expect(page.get_by_label("Main character's name")).to_have_value("Kari Lund")
             expect(page.get_by_label("Example idea")).to_have_value("brief-09")
 
-            # The browser itself stops an unanswered question, before the server sees it.
-            genre = page.locator('input[name="genre"]').input_value()
-            page.locator('input[name="genre"]').fill("")
-            page.get_by_role("button", name="Write this story").click()
-            expect(page).to_have_url(f"{base}/?idea=brief-09")
-            page.locator('input[name="genre"]').fill(genre)
-
+            _correct_invalid_fields(page, base)
             page.get_by_role("button", name="Write this story").click()
             expect(page.get_by_role("heading", name="The Last Lamp")).to_be_visible(timeout=30_000)
             expect(page.locator("article")).to_contain_text("Scene1 first")
