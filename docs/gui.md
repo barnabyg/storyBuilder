@@ -29,7 +29,8 @@ gives the prompt back straight away, and that terminal plays no further part.
 - **Read it.** The story page shows the story, and under **Behind the story** the idea,
   the characters, the problems the checks could not fix and the passages they repaired.
   **Save as a file** downloads it, and **Use this idea again** returns to the form with
-  the idea filled in, ready to change.
+  the idea filled in, ready to change. **Your stories** in the header and **Back to all
+  stories** take you directly to the library.
 - **Delete it.** **Delete this story** asks you to confirm, then permanently removes the
   story and everything saved with it. There is no undo, and git cannot bring it back. What
   it cost stays in the cost ledger, and its idea stays available.

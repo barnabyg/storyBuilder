@@ -133,6 +133,7 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
         try:
             page = browser.new_page(accept_downloads=True)
             page.goto(base)
+            page.set_viewport_size({"width": 390, "height": 844})
             page.get_by_label("Example idea").select_option("brief-09")
             page.get_by_role("button", name="Fill in").click()
             expect(page.get_by_label("Main character's name")).to_have_value("Kari Lund")
@@ -164,6 +165,11 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
             library = page.get_by_role("link", name="The Last Lamp")
             expect(library).to_be_visible()
 
+            page.get_by_role("link", name="Your stories").click()
+            expect(library).to_be_in_viewport()
+            library.click()
+            page.get_by_role("link", name="Back to all stories").click()
+            expect(library).to_be_in_viewport()
             library.click()
             page.get_by_role("link", name="Delete this story").click()
             page.get_by_role("link", name="Keep this story").click()

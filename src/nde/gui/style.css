@@ -67,7 +67,16 @@ a { color: var(--accent); text-underline-offset: 0.15em; }
   background: var(--surface);
 }
 
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
 .bar { max-width: 72rem; margin: 0 auto; padding: 0.8rem 1.25rem; }
+
+#stories { scroll-margin-top: 1rem; }
 
 .brand {
   display: inline-flex;

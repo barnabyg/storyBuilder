@@ -62,7 +62,14 @@ _LABELS = {
 }
 
 
-def _page(title: str, body: str, *, status: int = 200, refresh: int | None = None) -> HTMLResponse:
+def _page(
+    title: str,
+    body: str,
+    *,
+    status: int = 200,
+    refresh: int | None = None,
+    library_href: str = "/#stories",
+) -> HTMLResponse:
     meta = "" if refresh is None else f'<meta http-equiv="refresh" content="{refresh}">'
     html = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -70,7 +77,8 @@ def _page(title: str, body: str, *, status: int = 200, refresh: int | None = Non
         f'<title>{escape(title)}</title><link rel="icon" href="{_TAB_ICON}">'
         f"<style>{_STYLE}</style></head>"
         '<body><header class="site"><div class="bar"><a class="brand" href="/">'
-        f"{_BOOK.format(colour='currentColor')}Story Builder</a></div></header>"
+        f"{_BOOK.format(colour='currentColor')}Story Builder</a>"
+        f'<nav aria-label="Main"><a href="{library_href}">Your stories</a></nav></div></header>'
         f"<main>{body}</main></body></html>"
     )
     return HTMLResponse(html, status_code=status)
@@ -273,8 +281,9 @@ def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str
 
 
 def _library(stories: list[SavedStory]) -> str:
+    heading = '<h2 id="stories" tabindex="-1">Your stories</h2>'
     if not stories:
-        return '<h2>Your stories</h2><p class="empty">Stories you write will appear here.</p>'
+        return heading + '<p class="empty">Stories you write will appear here.</p>'
     items = "".join(
         f'<li><a href="/stories/{escape(story.run)}/{escape(story.brief)}">'
         f"{escape(story.title)}</a>"
@@ -283,7 +292,7 @@ def _library(stories: list[SavedStory]) -> str:
         f"{'' if story.finished else '<span class="badge">unfinished</span>'}</span></li>"
         for story in stories
     )
-    return f'<h2>Your stories</h2><ul class="library stories">{items}</ul>'
+    return f'{heading}<ul class="library stories">{items}</ul>'
 
 
 def _home(
@@ -307,7 +316,7 @@ def _home(
         f'<div class="columns"><section>{_form(studio, values or {}, problems or [])}</section>'
         f"<section>{_library(studio.stories())}</section></div>"
     )
-    return _page("Story Builder", banner + columns, status=status)
+    return _page("Story Builder", banner + columns, status=status, library_href="#stories")
 
 
 def _examples_page(
@@ -468,7 +477,7 @@ def _story_page(studio: Studio, story: SavedStory) -> HTMLResponse:
       <div class="actions">
         <a class="button" href="{link}">Save as a file</a>
         {again}
-        <a class="button quiet" href="/">Back to all stories</a>
+        <a class="button quiet" href="/#stories">Back to all stories</a>
         <a class="button danger-quiet apart" href="{address}/delete">Delete this story</a>
       </div>
       <section class="behind">
@@ -524,7 +533,7 @@ def _job_page(job: Job) -> HTMLResponse:
       <p>This usually takes 5 to 12 minutes, and the story opens here when it is ready. You can
       leave this page and come back, but keep the Story Builder window open, because closing it
       stops the writing and loses the story.</p>
-      <a class="button quiet" href="/">Back to all stories</a>
+      <a class="button quiet" href="/#stories">Back to all stories</a>
     </div>
     """
     return _page("Writing your story", body, refresh=_REFRESH_SECONDS)
