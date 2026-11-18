@@ -402,6 +402,11 @@ blockquote.after { border-left-color: var(--accent); color: inherit; }
 /* Waiting for a story, and the pages that ask or apologise */
 
 .waiting h1 { margin-bottom: 1.25rem; }
+.waiting .activity { margin-bottom: 0; }
+.elapsed { margin: 0.25rem 0 1.5rem; }
+.budget { padding: 0.85rem 1rem; background: var(--tint); border-radius: 8px; }
+.budget strong { display: block; }
+.budget .spend { margin: 0.5rem 0 0; }
 
 .activity {
   display: flex;

@@ -528,8 +528,11 @@ def _job_page(job: Job) -> HTMLResponse:
     <div class="reading panel waiting">
       <h1>Writing your story</h1>
       <p class="activity" role="status"><span class="pulse"></span>{escape(job.activity)}…</p>
-      {spend}
-      <p class="meta">Running for {minutes}. Spent so far: {_usd(job.spent_usd)}{cap}.</p>
+      <p class="meta elapsed">Running for {minutes}.</p>
+      <div class="budget"><strong>Cost so far</strong>
+        <span>{_usd(job.spent_usd)}{cap}</span>
+        {spend}
+      </div>
       <p>This usually takes 5 to 12 minutes, and the story opens here when it is ready. You can
       leave this page and come back, but keep the Story Builder window open, because closing it
       stops the writing and loses the story.</p>

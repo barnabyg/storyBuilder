@@ -24,8 +24,9 @@ gives the prompt back straight away, and that terminal plays no further part.
   original, or replacing it by editing, can be undone with **Restore the original
   examples**, which keeps your own examples as they are. Deleting your own example is
   permanent. Stories already written keep their idea whatever happens to the example.
-- **Watch it being written.** The page shows the current step and what has been spent so
-  far. It opens the story when it is ready. Only one story is written at a time.
+- **Watch it being written.** The page shows the current step, elapsed time and cost so far.
+  The budget bar shows how much of the spending limit has been used. The story opens
+  when ready. Only one story is written at a time.
 - **Read it.** The story page shows the story, and under **Behind the story** the idea,
   the characters, the problems the checks could not fix and the passages they repaired.
   **Save as a file** downloads it, and **Use this idea again** returns to the form with
