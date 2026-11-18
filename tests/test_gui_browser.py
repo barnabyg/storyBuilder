@@ -17,7 +17,7 @@ from nde.gui.studio import Studio
 from nde.runs.runner import RunOptions
 from tests.conftest import write_config
 from tests.continuity_support import continuity_config, fake_continuity
-from tests.fake_openai import FakeOpenAI
+from tests.fake_openai import FakeOpenAI, Json, Reply
 
 _browser_only = pytest.mark.skipif(
     os.environ.get("NDE_BROWSER") != "1",
@@ -83,6 +83,7 @@ def _manage_examples(page: Page, base: str) -> None:
     page.goto(base)
     page.get_by_role("link", name="Manage examples").click()
 
+    expect(page.get_by_role("link", name="Add an example")).to_be_in_viewport()
     page.get_by_role("link", name="Add an example").click()
     page.get_by_label("Genre").fill("mystery")
     page.get_by_label("The situation").fill("A keeper finds the lamp lit.")
@@ -125,6 +126,81 @@ def _manage_examples(page: Page, base: str) -> None:
     expect(page.get_by_role("button", name="Restore the original")).to_have_count(0)
 
 
+def _choose_example_over_draft(page: Page) -> None:
+    choice = page.get_by_label("Example idea")
+    expect(choice).to_have_value("")
+    use = page.get_by_role("button", name="Use this example")
+    expect(use).to_be_disabled()
+    page.get_by_label("The situation").fill("My own idea.")
+    choice.select_option("brief-09")
+    preview = page.locator("#example-preview").inner_text()
+    use.click()
+    page.get_by_role("button", name="Keep my draft").click()
+    expect(page.get_by_label("The situation")).to_have_value("My own idea.")
+    use.click()
+    page.get_by_role("button", name="Replace draft").click()
+    expect(page.get_by_label("The situation")).to_have_value(preview)
+
+
+@_browser_only
+def test_another_tab_can_keep_editing_while_a_story_is_written(
+    fake_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    released = threading.Event()
+    reply = fake_continuity()
+
+    def wait_for_reader(body: Json) -> Reply:
+        released.wait(timeout=90)
+        return reply(body)
+
+    with _serving(fake_llm, tmp_path) as base, sync_playwright() as playwright:
+        fake_llm.default = wait_for_reader
+        browser = playwright.chromium.launch(
+            headless=True, channel=os.environ.get("NDE_BROWSER_CHANNEL", "chrome")
+        )
+        try:
+            context = browser.new_context()
+            writer = context.new_page()
+            draft = context.new_page()
+            draft.goto(f"{base}/?idea=brief-09")
+            draft.get_by_label("The situation").fill("A second story.")
+            writer.goto(f"{base}/?idea=brief-01")
+            writer.get_by_role("button", name="Write this story").click()
+            expect(writer.get_by_text("Cost so far")).to_be_visible()
+            submit = draft.get_by_role("button", name="Write this story")
+            expect(submit).to_be_disabled(timeout=30_000)
+            with draft.expect_popup() as opened:
+                draft.get_by_role("link", name="View story in progress").click()
+            expect(opened.value).to_have_url(writer.url)
+            opened.value.close()
+            released.set()
+            expect(submit).to_be_enabled(timeout=30_000)
+            expect(draft.get_by_label("The situation")).to_have_value("A second story.")
+        finally:
+            released.set()
+            browser.close()
+
+
+def _correct_invalid_fields(page: Page, base: str) -> None:
+    # The browser itself stops an unanswered question, before the server sees it.
+    genre = page.locator('input[name="genre"]').input_value()
+    page.locator('input[name="genre"]').fill("")
+    page.get_by_role("button", name="Write this story").click()
+    expect(page).to_have_url(f"{base}/?idea=brief-09")
+    page.locator('input[name="genre"]').fill(genre)
+
+    themes = page.get_by_label("Themes")
+    themes.fill("one, two, three, four, five")
+    page.get_by_role("button", name="Write this story").click()
+    page.get_by_role("alert").get_by_role("link", name="Themes:").click()
+    expect(themes).to_be_focused()
+    expect(themes).to_have_value("one, two, three, four, five")
+    expect(themes).to_have_accessible_description(
+        "Themes: please give between one and four, separated by commas."
+    )
+    themes.fill("one, two")
+
+
 def _write_and_read(base: str, tmp_path: Path) -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
@@ -133,18 +209,12 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
         try:
             page = browser.new_page(accept_downloads=True)
             page.goto(base)
-            page.get_by_label("Example idea").select_option("brief-09")
-            page.get_by_role("button", name="Fill in").click()
+            page.set_viewport_size({"width": 390, "height": 844})
+            _choose_example_over_draft(page)
             expect(page.get_by_label("Main character's name")).to_have_value("Kari Lund")
             expect(page.get_by_label("Example idea")).to_have_value("brief-09")
 
-            # The browser itself stops an unanswered question, before the server sees it.
-            genre = page.locator('input[name="genre"]').input_value()
-            page.locator('input[name="genre"]').fill("")
-            page.get_by_role("button", name="Write this story").click()
-            expect(page).to_have_url(f"{base}/?idea=brief-09")
-            page.locator('input[name="genre"]').fill(genre)
-
+            _correct_invalid_fields(page, base)
             page.get_by_role("button", name="Write this story").click()
             expect(page.get_by_role("heading", name="The Last Lamp")).to_be_visible(timeout=30_000)
             expect(page.locator("article")).to_contain_text("Scene1 first")
@@ -164,6 +234,11 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
             library = page.get_by_role("link", name="The Last Lamp")
             expect(library).to_be_visible()
 
+            page.get_by_role("link", name="Your stories").click()
+            expect(library).to_be_in_viewport()
+            library.click()
+            page.get_by_role("link", name="Back to all stories").click()
+            expect(library).to_be_in_viewport()
             library.click()
             page.get_by_role("link", name="Delete this story").click()
             page.get_by_role("link", name="Keep this story").click()

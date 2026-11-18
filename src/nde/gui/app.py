@@ -26,6 +26,7 @@ _LENGTHS = (1000, 2000, 4000)
 _EXAMPLE_LABEL_CHARS = 80
 
 _STYLE = Path(__file__).with_name("style.css").read_text(encoding="utf-8")
+_COMPOSER_SCRIPT = Path(__file__).with_name("composer.js").read_text(encoding="utf-8")
 
 # An open book, as the bar's mark and the browser tab's icon.
 _BOOK = (
@@ -35,18 +36,6 @@ _BOOK = (
     '<path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
 )
 _TAB_ICON = "data:image/svg+xml," + quote(_BOOK.format(colour="#a4722b"))
-
-_PLACEHOLDERS = {
-    "genre": "adventure",
-    "premise": "Two estranged sisters try to finish their late father's winter crossing "
-    "of a frozen lake.",
-    "protagonist_name": "Kari Lund",
-    "protagonist_description": "the younger sister, a reckless guide",
-    "central_conflict": "The ice is weaker than the maps say, and the sisters disagree "
-    "about turning back.",
-    "themes": "sibling rivalry, risk, inheritance",
-    "ending_detail": "They do not reach the far shore, but they are reconciled.",
-}
 
 # The brief's fields, as a person would name them in a message.
 _LABELS = {
@@ -62,7 +51,14 @@ _LABELS = {
 }
 
 
-def _page(title: str, body: str, *, status: int = 200, refresh: int | None = None) -> HTMLResponse:
+def _page(
+    title: str,
+    body: str,
+    *,
+    status: int = 200,
+    refresh: int | None = None,
+    library_href: str = "/#stories",
+) -> HTMLResponse:
     meta = "" if refresh is None else f'<meta http-equiv="refresh" content="{refresh}">'
     html = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -70,7 +66,8 @@ def _page(title: str, body: str, *, status: int = 200, refresh: int | None = Non
         f'<title>{escape(title)}</title><link rel="icon" href="{_TAB_ICON}">'
         f"<style>{_STYLE}</style></head>"
         '<body><header class="site"><div class="bar"><a class="brand" href="/">'
-        f"{_BOOK.format(colour='currentColor')}Story Builder</a></div></header>"
+        f"{_BOOK.format(colour='currentColor')}Story Builder</a>"
+        f'<nav aria-label="Main"><a href="{library_href}">Your stories</a></nav></div></header>'
         f"<main>{body}</main></body></html>"
     )
     return HTMLResponse(html, status_code=status)
@@ -94,7 +91,7 @@ def _values_of(brief: BriefContent) -> dict[str, str]:
     }
 
 
-def parse_idea(form: Mapping[str, str]) -> tuple[BriefContent | None, list[str]]:
+def parse_idea(form: Mapping[str, str]) -> tuple[BriefContent | None, dict[str, str]]:
     """The form as a brief, or the problems to show the person who filled it in."""
 
     def value(name: str) -> str:
@@ -120,8 +117,11 @@ def parse_idea(form: Mapping[str, str]) -> tuple[BriefContent | None, list[str]]
             }
         )
     except ValidationError as error:
-        return None, [_problem(name, message) for name, message in problems_in(error)]
-    return content, []
+        return None, {
+            name.replace("ending_constraint.", "ending_").replace(".", "_"): _problem(name, message)
+            for name, message in problems_in(error)
+        }
+    return content, {}
 
 
 def _problem(name: str, message: str) -> str:
@@ -135,30 +135,12 @@ def _problem(name: str, message: str) -> str:
     return f"{label}: {message}."
 
 
-def _field(name: str, label: str, hint: str, values: Mapping[str, str], *, rows: int = 1) -> str:
-    value = escape(values.get(name, ""))
-    example = escape(_PLACEHOLDERS[name])
-    control = (
-        f'<textarea id="{name}" name="{name}" rows="{rows}" placeholder="{example}" required>'
-        f"{value}</textarea>"
-        if rows > 1
-        else f'<input id="{name}" name="{name}" value="{value}" placeholder="{example}" required>'
-    )
+def _field_error(name: str, problems: Mapping[str, str]) -> tuple[str, str]:
+    if name not in problems:
+        return "", ""
     return (
-        f'<div><label for="{name}">{escape(label)}'
-        f'<span class="hint">{escape(hint)}</span></label>{control}</div>'
-    )
-
-
-def _select(name: str, label: str, hint: str, options: list[tuple[str, str]], chosen: str) -> str:
-    items = "".join(
-        f'<option value="{escape(value)}"{" selected" if value == chosen else ""}>'
-        f"{escape(text)}</option>"
-        for value, text in options
-    )
-    return (
-        f'<div><label for="{name}">{escape(label)}<span class="hint">{escape(hint)}</span></label>'
-        f'<select id="{name}" name="{name}">{items}</select></div>'
+        f' aria-invalid="true" aria-describedby="{name}-error"',
+        f'<p class="field-error" id="{name}-error">{escape(problems[name])}</p>',
     )
 
 
@@ -176,32 +158,90 @@ def _examples(examples: list[Brief], chosen: str | None) -> str:
     if not examples:
         return f'<div class="inline"><p class="meta">No example ideas.</p>{_MANAGE_EXAMPLES}</div>'
     options = "".join(
-        f'<option value="{escape(brief.id)}"{" selected" if brief.id == chosen else ""}>'
+        f'<option value="{escape(brief.id)}"{" selected" if brief.id == chosen else ""} '
+        f'data-premise="{escape(brief.premise)}">'
         f"{escape(_example_label(brief))}</option>"
         for brief in examples
     )
     return (
-        '<form method="get" action="/" class="inline" aria-label="Start from an example">'
-        f'<select name="idea" aria-label="Example idea">{options}</select>'
-        f'<button class="quiet">Fill in</button>{_MANAGE_EXAMPLES}</form>'
+        '<form id="example-picker" method="get" action="/" hidden>'
+        '<label class="eyebrow" for="example-idea">Start from an example</label>'
+        '<select id="example-idea" name="idea" aria-label="Example idea" required>'
+        f'<option value="">Choose an example</option>{options}</select>'
+        '<p id="example-preview" aria-live="polite"></p>'
+        '<div class="inline"><button class="quiet">Use this example</button>'
+        f"{_MANAGE_EXAMPLES}</div></form><noscript>{_MANAGE_EXAMPLES}</noscript>"
+        '<dialog id="replace-example" aria-labelledby="replace-heading">'
+        '<h2 id="replace-heading">Replace your draft with this example?</h2>'
+        '<form method="dialog" class="inline"><button value="keep" autofocus>Keep my draft</button>'
+        '<button value="replace" class="quiet">Replace draft</button></form></dialog>'
     )
 
 
-def _alert(problems: list[str]) -> str:
-    listed = "".join(f"<li>{escape(problem)}</li>" for problem in problems)
-    return f'<div class="problems" role="alert"><ul>{listed}</ul></div>' if problems else ""
+def _alert(problems: Mapping[str, str]) -> str:
+    if not problems:
+        return ""
+    items: list[str] = []
+    for name, message in problems.items():
+        text = escape(message)
+        if name:
+            text = f'<a href="#{escape(name)}">{text}</a>'
+        items.append(f"<li>{text}</li>")
+    return (
+        '<div class="problems" role="alert" tabindex="-1" autofocus>'
+        f"<ul>{''.join(items)}</ul></div>"
+    )
 
 
-def _idea_fields(values: Mapping[str, str]) -> str:
+def _idea_fields(values: Mapping[str, str], problems: Mapping[str, str]) -> str:
+    def field(
+        name: str,
+        label: str,
+        hint: str,
+        *,
+        rows: int = 1,
+    ) -> str:
+        value = escape(values.get(name, ""))
+        attributes, error = _field_error(name, problems)
+        control = (
+            f'<textarea id="{name}" name="{name}" rows="{rows}"{attributes} required>'
+            f"{value}</textarea>"
+            if rows > 1
+            else f'<input id="{name}" name="{name}" value="{value}"{attributes} required>'
+        )
+        return (
+            f'<div><label for="{name}">{escape(label)}'
+            f'<span class="hint">{escape(hint)}</span></label>{control}{error}</div>'
+        )
+
+    def select(
+        name: str,
+        label: str,
+        hint: str,
+        options: list[tuple[str, str]],
+        chosen: str,
+    ) -> str:
+        attributes, error = _field_error(name, problems)
+        items = "".join(
+            f'<option value="{escape(value)}"{" selected" if value == chosen else ""}>'
+            f"{escape(text)}</option>"
+            for value, text in options
+        )
+        return (
+            f'<div><label for="{name}">{escape(label)}'
+            f'<span class="hint">{escape(hint)}</span></label>'
+            f'<select id="{name}" name="{name}"{attributes}>{items}</select>{error}</div>'
+        )
+
     endings = [(kind.value, kind.value.capitalize()) for kind in EndingKind]
     lengths = [(str(words), f"About {words:,} words") for words in _LENGTHS]
     return f"""
       <fieldset>
         <legend>The story</legend>
         <div class="pair even">
-          {_field("genre", "Genre", "What kind of story is it?", values)}
+          {field("genre", "Genre", "What kind of story is it?")}
           {
-        _select(
+        select(
             "target_words",
             "Length",
             "Longer stories cost more",
@@ -210,21 +250,20 @@ def _idea_fields(values: Mapping[str, str]) -> str:
         )
     }
         </div>
-        {_field("premise", "The situation", "Where does the story start?", values, rows=3)}
-        {_field("themes", "Themes", "One to four, separated by commas", values)}
+        {field("premise", "The situation", "Where does the story start?", rows=3)}
+        {field("themes", "Themes", "One to four, separated by commas")}
       </fieldset>
       <fieldset>
         <legend>The main character</legend>
         <div class="pair">
-          {_field("protagonist_name", "Main character's name", "Their full name", values)}
-          {_field("protagonist_description", "Who they are", "In one sentence", values, rows=2)}
+          {field("protagonist_name", "Main character's name", "Their full name")}
+          {field("protagonist_description", "Who they are", "In one sentence", rows=2)}
         </div>
         {
-        _field(
+        field(
             "central_conflict",
             "The central conflict",
             "What stands in their way?",
-            values,
             rows=3,
         )
     }
@@ -233,7 +272,7 @@ def _idea_fields(values: Mapping[str, str]) -> str:
         <legend>The ending</legend>
         <div class="pair">
           {
-        _select(
+        select(
             "ending_kind",
             "Kind of ending",
             "How things turn out",
@@ -241,31 +280,42 @@ def _idea_fields(values: Mapping[str, str]) -> str:
             values.get("ending_kind", "happy"),
         )
     }
-          {_field("ending_detail", "What the ending must do", "In one sentence", values, rows=2)}
+          {field("ending_detail", "What the ending must do", "In one sentence", rows=2)}
         </div>
       </fieldset>
     """
 
 
-def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str:
+def _form(studio: Studio, values: Mapping[str, str], problems: dict[str, str]) -> str:
+    running = studio.current
+    job_link = f"/jobs/{running.id}" if running else ""
     cap = studio.cap_usd
     limit = "" if cap is None else f" It stops at {_usd(cap)} at the very most."
     return f"""
     <h1>Write a new story</h1>
     <p class="lede">Describe an idea. Story Builder plans it, writes it, then checks and
     repairs it.</p>
+    <p class="notice" id="active-story"{"" if running else " hidden"}>
+      A story is being written. <a href="{job_link}" target="_blank" rel="noopener">
+      See writing status</a> (opens in a new tab).
+    </p>
     {_alert(problems)}
     <div class="panel">
       <div class="starter">
-        <span class="eyebrow">Start from an example</span>
         {_examples(studio.examples(), values.get("idea"))}
       </div>
-      <form method="post" action="/stories">
-        {_idea_fields(values)}
+      <form id="story-draft" method="post" action="/stories"
+            data-edited="{str(bool(problems)).lower()}">
+        {_idea_fields(values, problems)}
         <div class="submit">
           <p class="cost">A 2,000-word story has taken 5 to 12 minutes and cost about US$0.25 to
           US$0.60. Longer stories take longer and cost more.{limit}</p>
-          <button>Write this story</button>
+          <button id="write-story">Write this story</button>
+          <div id="busy-notice" tabindex="-1" role="status"{"" if running else " hidden"}>
+            A story is being written. You can keep editing until it finishes.
+            <a href="{job_link}" target="_blank" rel="noopener">View story in progress</a>
+            (opens in a new tab).
+          </div>
         </div>
       </form>
     </div>
@@ -273,8 +323,9 @@ def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str
 
 
 def _library(stories: list[SavedStory]) -> str:
+    heading = '<h2 id="stories" tabindex="-1">Your stories</h2>'
     if not stories:
-        return '<h2>Your stories</h2><p class="empty">Stories you write will appear here.</p>'
+        return heading + '<p class="empty">Stories you write will appear here.</p>'
     items = "".join(
         f'<li><a href="/stories/{escape(story.run)}/{escape(story.brief)}">'
         f"{escape(story.title)}</a>"
@@ -283,38 +334,37 @@ def _library(stories: list[SavedStory]) -> str:
         f"{'' if story.finished else '<span class="badge">unfinished</span>'}</span></li>"
         for story in stories
     )
-    return f'<h2>Your stories</h2><ul class="library stories">{items}</ul>'
+    return f'{heading}<ul class="library stories">{items}</ul>'
 
 
 def _home(
     studio: Studio,
     values: Mapping[str, str] | None = None,
-    problems: list[str] | None = None,
+    problems: dict[str, str] | None = None,
     *,
     status: int = 200,
     deleted: str | None = None,
 ) -> HTMLResponse:
-    running = studio.current
-    banner = (
-        ""
-        if running is None
-        else f'<div class="notice">A story is being written. '
-        f'<a href="/jobs/{running.id}">See how it is going</a>.</div>'
-    )
+    banner = ""
     if deleted is not None:
         banner += f'<div class="notice" role="status">Deleted “{escape(deleted)}”.</div>'
     columns = (
-        f'<div class="columns"><section>{_form(studio, values or {}, problems or [])}</section>'
+        f'<div class="columns"><section>{_form(studio, values or {}, problems or {})}</section>'
         f"<section>{_library(studio.stories())}</section></div>"
     )
-    return _page("Story Builder", banner + columns, status=status)
+    return _page(
+        "Story Builder",
+        f"{banner}{columns}<script>{_COMPOSER_SCRIPT}</script>",
+        status=status,
+        library_href="#stories",
+    )
 
 
 def _examples_page(
     studio: Studio, notice: str | None = None, problem: str | None = None, *, status: int = 200
 ) -> HTMLResponse:
     banner = "" if notice is None else f'<div class="notice" role="status">{escape(notice)}</div>'
-    alert = "" if problem is None else _alert([problem])
+    alert = "" if problem is None else _alert({"": problem})
     items = "".join(
         f'<li><span class="example-idea"><span class="eyebrow">{escape(brief.genre)}</span>'
         f"{escape(brief.premise)}</span>"
@@ -339,11 +389,11 @@ def _examples_page(
     body = f"""
     <div class="reading">
       {banner}{alert}
-      <h1>Example ideas</h1>
+      <div class="heading-actions"><h1>Example ideas</h1>
+        <a class="button" href="/examples/new">Add an example</a></div>
       <p class="lede">Changing an example does not change any story already written from it.</p>
       {listed}
       <div class="actions">
-        <a class="button" href="/examples/new">Add an example</a>
         {restore}
         <a class="button quiet" href="/">Back to Story Builder</a>
       </div>
@@ -356,16 +406,16 @@ def _example_form_page(
     heading: str,
     action: str,
     values: Mapping[str, str],
-    problems: list[str] | None = None,
+    problems: dict[str, str] | None = None,
     *,
     status: int = 200,
 ) -> HTMLResponse:
     body = f"""
     <div class="reading">
       <h1>{escape(heading)}</h1>
-      {_alert(problems or [])}
+      {_alert(problems or {})}
       <form method="post" action="{escape(action)}" class="panel">
-        {_idea_fields(values)}
+        {_idea_fields(values, problems or {})}
         <div class="actions">
           <button>Save example</button>
           <a class="button quiet" href="/examples">Cancel</a>
@@ -468,7 +518,7 @@ def _story_page(studio: Studio, story: SavedStory) -> HTMLResponse:
       <div class="actions">
         <a class="button" href="{link}">Save as a file</a>
         {again}
-        <a class="button quiet" href="/">Back to all stories</a>
+        <a class="button quiet" href="/#stories">Back to all stories</a>
         <a class="button danger-quiet apart" href="{address}/delete">Delete this story</a>
       </div>
       <section class="behind">
@@ -519,12 +569,15 @@ def _job_page(job: Job) -> HTMLResponse:
     <div class="reading panel waiting">
       <h1>Writing your story</h1>
       <p class="activity" role="status"><span class="pulse"></span>{escape(job.activity)}…</p>
-      {spend}
-      <p class="meta">Running for {minutes}. Spent so far: {_usd(job.spent_usd)}{cap}.</p>
+      <p class="meta elapsed">Running for {minutes}.</p>
+      <div class="budget"><strong>Cost so far</strong>
+        <span>{_usd(job.spent_usd)}{cap}</span>
+        {spend}
+      </div>
       <p>This usually takes 5 to 12 minutes, and the story opens here when it is ready. You can
       leave this page and come back, but keep the Story Builder window open, because closing it
       stops the writing and loses the story.</p>
-      <a class="button quiet" href="/">Back to all stories</a>
+      <a class="button quiet" href="/#stories">Back to all stories</a>
     </div>
     """
     return _page("Writing your story", body, refresh=_REFRESH_SECONDS)
@@ -597,7 +650,7 @@ def _example_routes(studio: Studio) -> APIRouter:
         try:
             saved = studio.add_example(content)
         except OSError as error:
-            problems = [f"The example could not be saved: {error}"]
+            problems = {"": f"The example could not be saved: {error}"}
             return _example_form_page("Add an example", "/examples", values, problems, status=500)
         return _after_example_change(f"Added “{_example_label(saved)}”.")
 
@@ -619,7 +672,7 @@ def _example_routes(studio: Studio) -> APIRouter:
         try:
             saved = studio.update_example(example.id, content)
         except OSError as error:
-            problems = [f"The example could not be saved: {error}"]
+            problems = {"": f"The example could not be saved: {error}"}
             return _example_form_page("Edit this example", action, values, problems, status=500)
         return _after_example_change(f"Saved “{_example_label(saved)}”.")
 
@@ -668,6 +721,11 @@ def create_app(studio: Studio) -> FastAPI:
         values = None if chosen is None else {**_values_of(chosen), "idea": chosen.id}
         return _home(studio, values, deleted=deleted)
 
+    @app.get("/writing-status")
+    def writing_status() -> dict[str, str | None]:
+        job = studio.current
+        return {"job": job.id if job else None}
+
     @app.post("/stories")
     async def write(request: Request) -> Response:
         values = await _form_values(request)
@@ -676,10 +734,15 @@ def create_app(studio: Studio) -> FastAPI:
             return _home(studio, values, problems, status=422)
         try:
             job = studio.start(content)
-        except StudioBusyError as busy:
-            job = busy.job
+        except StudioBusyError:
+            return _home(
+                studio,
+                values,
+                {"": "Another story was already being written. Your draft is still here."},
+                status=409,
+            )
         except ConfigError as error:
-            return _home(studio, values, [str(error)], status=422)
+            return _home(studio, values, {"": str(error)}, status=422)
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
     @app.get("/jobs/{job_id}")

@@ -67,7 +67,17 @@ a { color: var(--accent); text-underline-offset: 0.15em; }
   background: var(--surface);
 }
 
+.bar, .heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
 .bar { max-width: 72rem; margin: 0 auto; padding: 0.8rem 1.25rem; }
+.heading-actions { margin-bottom: 0.75rem; }
+.heading-actions h1 { margin: 0; }
+#stories { scroll-margin-top: 1rem; }
 
 .brand {
   display: inline-flex;
@@ -161,7 +171,8 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-::placeholder { color: var(--muted); opacity: 0.75; }
+.field-error { margin: 0.3rem 0 0; color: var(--danger); font-size: 0.9rem; }
+[aria-invalid="true"] { border-color: var(--danger); }
 
 textarea { display: block; resize: vertical; }
 
@@ -197,6 +208,18 @@ select {
 .inline { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: stretch; }
 .inline select { flex: 1 1 12rem; min-width: 0; width: auto; }
 .inline p { flex: 1; margin: auto 0; }
+#example-picker label { margin-top: 0; }
+#example-preview { margin: 0.65rem 0; overflow-wrap: anywhere; }
+dialog {
+  max-width: min(28rem, 90vw);
+  padding: 1.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+}
+dialog::backdrop { background: rgb(0 0 0 / 45%); }
+#busy-notice { flex-basis: 100%; }
 
 .submit { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: center; }
 .submit .cost { flex: 1 1 18rem; margin: 0; }
@@ -222,6 +245,9 @@ button, .button {
 }
 
 button:hover, .button:hover { border-color: var(--accent-strong); background: var(--accent-strong); }
+button:disabled, button.quiet:disabled {
+  background: var(--tint); border-color: var(--line); color: var(--muted); cursor: default;
+}
 
 button.quiet, .button.quiet {
   border-color: var(--line-strong);
@@ -392,6 +418,11 @@ blockquote.after { border-left-color: var(--accent); color: inherit; }
 /* Waiting for a story, and the pages that ask or apologise */
 
 .waiting h1 { margin-bottom: 1.25rem; }
+.waiting .activity { margin-bottom: 0; }
+.elapsed { margin: 0.25rem 0 1.5rem; }
+.budget { padding: 0.85rem 1rem; background: var(--tint); border-radius: 8px; }
+.budget strong { display: block; }
+.budget .spend { margin: 0.5rem 0 0; }
 
 .activity {
   display: flex;

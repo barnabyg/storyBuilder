@@ -136,7 +136,7 @@ def test_an_example_fills_in_the_form_and_a_held_out_brief_is_never_offered(
 
     filled = client.get("/", params={"idea": "brief-09"})
     assert 'value="Kari Lund"' in filled.text
-    assert '<option value="brief-09" selected>' in filled.text
+    assert '<option value="brief-09" selected ' in filled.text
     held_out = client.get("/", params={"idea": "brief-11"})
     assert 'name="genre" value=""' in held_out.text
 
@@ -157,7 +157,7 @@ def test_too_many_themes_are_explained() -> None:
     content, problems = parse_idea(IDEA | {"themes": "a, b, c, d, e"})
 
     assert content is None
-    assert problems == ["Themes: please give between one and four, separated by commas."]
+    assert problems == {"themes": "Themes: please give between one and four, separated by commas."}
 
 
 def test_a_missing_api_key_is_explained_before_any_spend(
@@ -190,8 +190,11 @@ def test_a_second_story_waits_for_the_first(
 
     fake_llm.default = slow
     first = client.post("/stories", data=IDEA)
-    second = client.post("/stories", data=IDEA)
-    assert second.headers["location"] == first.headers["location"]
+    second = client.post("/stories", data=IDEA | {"premise": "A second idea."})
+    assert second.status_code == 409
+    assert "A second idea.</textarea>" in second.text
+    assert "Your draft is still here" in second.text
+    assert first.headers["location"] in second.text
     assert "A story is being written" in client.get("/").text
     page = client.get(first.headers["location"])
     assert 'http-equiv="refresh"' in page.text
@@ -417,10 +420,10 @@ def test_an_added_example_is_offered_edited_and_deleted(client: TestClient) -> N
     added = client.post("/examples", data=IDEA)
     assert added.status_code == 303
     assert "Added" in client.get(added.headers["location"]).text
-    assert '<option value="brief-1001">' in client.get("/").text
+    assert '<option value="brief-1001" ' in client.get("/").text
     filled = client.get("/", params={"idea": "brief-1001"})
     assert 'value="Elsie Marr"' in filled.text
-    assert '<option value="brief-1001" selected>' in filled.text
+    assert '<option value="brief-1001" selected ' in filled.text
 
     form = client.get("/examples/brief-1001/edit").text
     assert "lamp &lt;lit&gt;" in form
@@ -463,7 +466,7 @@ def test_changing_benchmark_examples_leaves_the_benchmark_alone_and_can_be_undon
     assert client.post("/examples/brief-09/edit", data=IDEA).status_code == 303
     home = client.get("/")
     assert 'value="brief-09"' not in home.text
-    assert '<option value="brief-1001">' in home.text
+    assert '<option value="brief-1001" ' in home.text
     assert client.get("/examples/brief-09/edit").status_code == 404
 
     assert client.post("/examples/brief-1001/delete").status_code == 303

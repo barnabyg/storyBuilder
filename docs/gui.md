@@ -15,8 +15,10 @@ gives the prompt back straight away, and that terminal plays no further part.
 
 ## What it does
 
-- **Write a new story.** Fill in the idea, or choose an example and press **Fill in** to
-  start from it. Then press **Write this story**.
+- **Write a new story.** Enter your idea, or choose an example, read its premise and press
+  **Use this example**. If you have edited the form, choose **Keep my draft** or
+  **Replace draft**. Press **Write this story** when ready. If a field needs correcting,
+  its error links directly to the field and your answers stay in the form.
 - **Manage the examples.** **Manage examples** lists them, starting with the development
   briefs. **Add an example** saves a new idea without writing a story, and each example
   has **Use**, **Edit** and **Delete**. Deleting asks you to confirm. Editing an original
@@ -24,12 +26,16 @@ gives the prompt back straight away, and that terminal plays no further part.
   original, or replacing it by editing, can be undone with **Restore the original
   examples**, which keeps your own examples as they are. Deleting your own example is
   permanent. Stories already written keep their idea whatever happens to the example.
-- **Watch it being written.** The page shows the current step and what has been spent so
-  far. It opens the story when it is ready. Only one story is written at a time.
+- **Watch it being written.** The page shows the current step, elapsed time and cost so far.
+  The budget bar shows how much of the spending limit has been used. The story opens
+  when ready. You can draft another idea while a story is writing. **View story in
+  progress** opens a separate tab, and **Write this story** becomes available when the
+  current run finishes.
 - **Read it.** The story page shows the story, and under **Behind the story** the idea,
   the characters, the problems the checks could not fix and the passages they repaired.
   **Save as a file** downloads it, and **Use this idea again** returns to the form with
-  the idea filled in, ready to change.
+  the idea filled in, ready to change. **Your stories** in the header and **Back to all
+  stories** take you directly to the library.
 - **Delete it.** **Delete this story** asks you to confirm, then permanently removes the
   story and everything saved with it. There is no undo, and git cannot bring it back. What
   it cost stays in the cost ledger, and its idea stays available.
