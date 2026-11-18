@@ -17,7 +17,7 @@ from nde.gui.studio import Studio
 from nde.runs.runner import RunOptions
 from tests.conftest import write_config
 from tests.continuity_support import continuity_config, fake_continuity
-from tests.fake_openai import FakeOpenAI
+from tests.fake_openai import FakeOpenAI, Json, Reply
 
 _browser_only = pytest.mark.skipif(
     os.environ.get("NDE_BROWSER") != "1",
@@ -140,6 +140,45 @@ def _choose_example_over_draft(page: Page) -> None:
     use.click()
     page.get_by_role("button", name="Replace draft").click()
     expect(page.get_by_label("The situation")).to_have_value(preview)
+
+
+@_browser_only
+def test_another_tab_can_keep_editing_while_a_story_is_written(
+    fake_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    released = threading.Event()
+    reply = fake_continuity()
+
+    def wait_for_reader(body: Json) -> Reply:
+        released.wait(timeout=90)
+        return reply(body)
+
+    with _serving(fake_llm, tmp_path) as base, sync_playwright() as playwright:
+        fake_llm.default = wait_for_reader
+        browser = playwright.chromium.launch(
+            headless=True, channel=os.environ.get("NDE_BROWSER_CHANNEL", "chrome")
+        )
+        try:
+            context = browser.new_context()
+            writer = context.new_page()
+            draft = context.new_page()
+            draft.goto(f"{base}/?idea=brief-09")
+            draft.get_by_label("The situation").fill("A second story.")
+            writer.goto(f"{base}/?idea=brief-01")
+            writer.get_by_role("button", name="Write this story").click()
+            expect(writer.get_by_text("Cost so far")).to_be_visible()
+            submit = draft.get_by_role("button", name="Write this story")
+            expect(submit).to_be_disabled(timeout=30_000)
+            with draft.expect_popup() as opened:
+                draft.get_by_role("link", name="View story in progress").click()
+            expect(opened.value).to_have_url(writer.url)
+            opened.value.close()
+            released.set()
+            expect(submit).to_be_enabled(timeout=30_000)
+            expect(draft.get_by_label("The situation")).to_have_value("A second story.")
+        finally:
+            released.set()
+            browser.close()
 
 
 def _correct_invalid_fields(page: Page, base: str) -> None:

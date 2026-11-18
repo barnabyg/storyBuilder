@@ -287,12 +287,18 @@ def _idea_fields(values: Mapping[str, str], problems: Mapping[str, str]) -> str:
 
 
 def _form(studio: Studio, values: Mapping[str, str], problems: dict[str, str]) -> str:
+    running = studio.current
+    job_link = f"/jobs/{running.id}" if running else ""
     cap = studio.cap_usd
     limit = "" if cap is None else f" It stops at {_usd(cap)} at the very most."
     return f"""
     <h1>Write a new story</h1>
     <p class="lede">Describe an idea. Story Builder plans it, writes it, then checks and
     repairs it.</p>
+    <p class="notice" id="active-story"{"" if running else " hidden"}>
+      A story is being written. <a href="{job_link}" target="_blank" rel="noopener">
+      See writing status</a> (opens in a new tab).
+    </p>
     {_alert(problems)}
     <div class="panel">
       <div class="starter">
@@ -304,7 +310,12 @@ def _form(studio: Studio, values: Mapping[str, str], problems: dict[str, str]) -
         <div class="submit">
           <p class="cost">A 2,000-word story has taken 5 to 12 minutes and cost about US$0.25 to
           US$0.60. Longer stories take longer and cost more.{limit}</p>
-          <button>Write this story</button>
+          <button id="write-story">Write this story</button>
+          <div id="busy-notice" tabindex="-1" role="status"{"" if running else " hidden"}>
+            A story is being written. You can keep editing until it finishes.
+            <a href="{job_link}" target="_blank" rel="noopener">View story in progress</a>
+            (opens in a new tab).
+          </div>
         </div>
       </form>
     </div>
@@ -334,13 +345,7 @@ def _home(
     status: int = 200,
     deleted: str | None = None,
 ) -> HTMLResponse:
-    running = studio.current
-    banner = (
-        ""
-        if running is None
-        else f'<div class="notice">A story is being written. '
-        f'<a href="/jobs/{running.id}">See how it is going</a>.</div>'
-    )
+    banner = ""
     if deleted is not None:
         banner += f'<div class="notice" role="status">Deleted “{escape(deleted)}”.</div>'
     columns = (
@@ -716,6 +721,11 @@ def create_app(studio: Studio) -> FastAPI:
         values = None if chosen is None else {**_values_of(chosen), "idea": chosen.id}
         return _home(studio, values, deleted=deleted)
 
+    @app.get("/writing-status")
+    def writing_status() -> dict[str, str | None]:
+        job = studio.current
+        return {"job": job.id if job else None}
+
     @app.post("/stories")
     async def write(request: Request) -> Response:
         values = await _form_values(request)
@@ -724,8 +734,13 @@ def create_app(studio: Studio) -> FastAPI:
             return _home(studio, values, problems, status=422)
         try:
             job = studio.start(content)
-        except StudioBusyError as busy:
-            job = busy.job
+        except StudioBusyError:
+            return _home(
+                studio,
+                values,
+                {"": "Another story was already being written. Your draft is still here."},
+                status=409,
+            )
         except ConfigError as error:
             return _home(studio, values, {"": str(error)}, status=422)
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)

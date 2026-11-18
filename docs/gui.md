@@ -28,7 +28,9 @@ gives the prompt back straight away, and that terminal plays no further part.
   permanent. Stories already written keep their idea whatever happens to the example.
 - **Watch it being written.** The page shows the current step, elapsed time and cost so far.
   The budget bar shows how much of the spending limit has been used. The story opens
-  when ready. Only one story is written at a time.
+  when ready. You can draft another idea while a story is writing. **View story in
+  progress** opens a separate tab, and **Write this story** becomes available when the
+  current run finishes.
 - **Read it.** The story page shows the story, and under **Behind the story** the idea,
   the characters, the problems the checks could not fix and the passages they repaired.
   **Save as a file** downloads it, and **Use this idea again** returns to the form with

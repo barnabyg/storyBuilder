@@ -35,3 +35,35 @@ if (picker) {
     if (dialog.returnValue === "replace") picker.submit();
   });
 }
+
+const notice = document.querySelector("#busy-notice");
+const activeStory = document.querySelector("#active-story");
+const writeButton = document.querySelector("#write-story");
+writeButton.disabled = !notice.hidden;
+
+// Update only the submit controls so editing and keyboard focus survive a status check.
+let checking = false;
+async function checkAvailability() {
+  if (document.hidden || checking) return;
+  checking = true;
+  try {
+    const response = await fetch("/writing-status", { cache: "no-store" });
+    if (!response.ok) return;
+    const { job } = await response.json();
+    if (job) {
+      const url = "/jobs/" + encodeURIComponent(job);
+      notice.querySelector("a").href = url;
+      activeStory.querySelector("a").href = url;
+    }
+    notice.hidden = !job;
+    activeStory.hidden = !job;
+    writeButton.disabled = Boolean(job);
+  } catch {
+    // The next poll retries. The server also checks availability on every submission.
+  } finally {
+    checking = false;
+  }
+}
+window.addEventListener("pageshow", checkAvailability);
+document.addEventListener("visibilitychange", checkAvailability);
+window.setInterval(checkAvailability, 3000);

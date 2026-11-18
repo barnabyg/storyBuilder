@@ -190,8 +190,11 @@ def test_a_second_story_waits_for_the_first(
 
     fake_llm.default = slow
     first = client.post("/stories", data=IDEA)
-    second = client.post("/stories", data=IDEA)
-    assert second.headers["location"] == first.headers["location"]
+    second = client.post("/stories", data=IDEA | {"premise": "A second idea."})
+    assert second.status_code == 409
+    assert "A second idea.</textarea>" in second.text
+    assert "Your draft is still here" in second.text
+    assert first.headers["location"] in second.text
     assert "A story is being written" in client.get("/").text
     page = client.get(first.headers["location"])
     assert 'http-equiv="refresh"' in page.text

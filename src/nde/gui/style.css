@@ -208,7 +208,6 @@ select {
 .inline { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: stretch; }
 .inline select { flex: 1 1 12rem; min-width: 0; width: auto; }
 .inline p { flex: 1; margin: auto 0; }
-
 #example-picker label { margin-top: 0; }
 #example-preview { margin: 0.65rem 0; overflow-wrap: anywhere; }
 dialog {
@@ -220,6 +219,7 @@ dialog {
   background: var(--surface);
 }
 dialog::backdrop { background: rgb(0 0 0 / 45%); }
+#busy-notice { flex-basis: 100%; }
 
 .submit { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: center; }
 .submit .cost { flex: 1 1 18rem; margin: 0; }
