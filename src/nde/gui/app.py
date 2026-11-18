@@ -348,11 +348,11 @@ def _examples_page(
     body = f"""
     <div class="reading">
       {banner}{alert}
-      <h1>Example ideas</h1>
+      <div class="heading-actions"><h1>Example ideas</h1>
+        <a class="button" href="/examples/new">Add an example</a></div>
       <p class="lede">Changing an example does not change any story already written from it.</p>
       {listed}
       <div class="actions">
-        <a class="button" href="/examples/new">Add an example</a>
         {restore}
         <a class="button quiet" href="/">Back to Story Builder</a>
       </div>

@@ -83,6 +83,7 @@ def _manage_examples(page: Page, base: str) -> None:
     page.goto(base)
     page.get_by_role("link", name="Manage examples").click()
 
+    expect(page.get_by_role("link", name="Add an example")).to_be_in_viewport()
     page.get_by_role("link", name="Add an example").click()
     page.get_by_label("Genre").fill("mystery")
     page.get_by_label("The situation").fill("A keeper finds the lamp lit.")
