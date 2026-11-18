@@ -26,6 +26,7 @@ _LENGTHS = (1000, 2000, 4000)
 _EXAMPLE_LABEL_CHARS = 80
 
 _STYLE = Path(__file__).with_name("style.css").read_text(encoding="utf-8")
+_COMPOSER_SCRIPT = Path(__file__).with_name("composer.js").read_text(encoding="utf-8")
 
 # An open book, as the bar's mark and the browser tab's icon.
 _BOOK = (
@@ -35,18 +36,6 @@ _BOOK = (
     '<path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
 )
 _TAB_ICON = "data:image/svg+xml," + quote(_BOOK.format(colour="#a4722b"))
-
-_PLACEHOLDERS = {
-    "genre": "adventure",
-    "premise": "Two estranged sisters try to finish their late father's winter crossing "
-    "of a frozen lake.",
-    "protagonist_name": "Kari Lund",
-    "protagonist_description": "the younger sister, a reckless guide",
-    "central_conflict": "The ice is weaker than the maps say, and the sisters disagree "
-    "about turning back.",
-    "themes": "sibling rivalry, risk, inheritance",
-    "ending_detail": "They do not reach the far shore, but they are reconciled.",
-}
 
 # The brief's fields, as a person would name them in a message.
 _LABELS = {
@@ -145,12 +134,10 @@ def _problem(name: str, message: str) -> str:
 
 def _field(name: str, label: str, hint: str, values: Mapping[str, str], *, rows: int = 1) -> str:
     value = escape(values.get(name, ""))
-    example = escape(_PLACEHOLDERS[name])
     control = (
-        f'<textarea id="{name}" name="{name}" rows="{rows}" placeholder="{example}" required>'
-        f"{value}</textarea>"
+        f'<textarea id="{name}" name="{name}" rows="{rows}" required>{value}</textarea>'
         if rows > 1
-        else f'<input id="{name}" name="{name}" value="{value}" placeholder="{example}" required>'
+        else f'<input id="{name}" name="{name}" value="{value}" required>'
     )
     return (
         f'<div><label for="{name}">{escape(label)}'
@@ -184,14 +171,23 @@ def _examples(examples: list[Brief], chosen: str | None) -> str:
     if not examples:
         return f'<div class="inline"><p class="meta">No example ideas.</p>{_MANAGE_EXAMPLES}</div>'
     options = "".join(
-        f'<option value="{escape(brief.id)}"{" selected" if brief.id == chosen else ""}>'
+        f'<option value="{escape(brief.id)}"{" selected" if brief.id == chosen else ""} '
+        f'data-premise="{escape(brief.premise)}">'
         f"{escape(_example_label(brief))}</option>"
         for brief in examples
     )
     return (
-        '<form method="get" action="/" class="inline" aria-label="Start from an example">'
-        f'<select name="idea" aria-label="Example idea">{options}</select>'
-        f'<button class="quiet">Fill in</button>{_MANAGE_EXAMPLES}</form>'
+        '<form id="example-picker" method="get" action="/" hidden>'
+        '<label class="eyebrow" for="example-idea">Start from an example</label>'
+        '<select id="example-idea" name="idea" aria-label="Example idea" required>'
+        f'<option value="">Choose an example</option>{options}</select>'
+        '<p id="example-preview" aria-live="polite"></p>'
+        '<div class="inline"><button class="quiet">Use this example</button>'
+        f"{_MANAGE_EXAMPLES}</div></form><noscript>{_MANAGE_EXAMPLES}</noscript>"
+        '<dialog id="replace-example" aria-labelledby="replace-heading">'
+        '<h2 id="replace-heading">Replace your draft with this example?</h2>'
+        '<form method="dialog" class="inline"><button value="keep" autofocus>Keep my draft</button>'
+        '<button value="replace" class="quiet">Replace draft</button></form></dialog>'
     )
 
 
@@ -265,10 +261,10 @@ def _form(studio: Studio, values: Mapping[str, str], problems: list[str]) -> str
     {_alert(problems)}
     <div class="panel">
       <div class="starter">
-        <span class="eyebrow">Start from an example</span>
         {_examples(studio.examples(), values.get("idea"))}
       </div>
-      <form method="post" action="/stories">
+      <form id="story-draft" method="post" action="/stories"
+            data-edited="{str(bool(problems)).lower()}">
         {_idea_fields(values)}
         <div class="submit">
           <p class="cost">A 2,000-word story has taken 5 to 12 minutes and cost about US$0.25 to
@@ -316,7 +312,12 @@ def _home(
         f'<div class="columns"><section>{_form(studio, values or {}, problems or [])}</section>'
         f"<section>{_library(studio.stories())}</section></div>"
     )
-    return _page("Story Builder", banner + columns, status=status, library_href="#stories")
+    return _page(
+        "Story Builder",
+        f"{banner}{columns}<script>{_COMPOSER_SCRIPT}</script>",
+        status=status,
+        library_href="#stories",
+    )
 
 
 def _examples_page(

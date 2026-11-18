@@ -136,7 +136,7 @@ def test_an_example_fills_in_the_form_and_a_held_out_brief_is_never_offered(
 
     filled = client.get("/", params={"idea": "brief-09"})
     assert 'value="Kari Lund"' in filled.text
-    assert '<option value="brief-09" selected>' in filled.text
+    assert '<option value="brief-09" selected ' in filled.text
     held_out = client.get("/", params={"idea": "brief-11"})
     assert 'name="genre" value=""' in held_out.text
 
@@ -417,10 +417,10 @@ def test_an_added_example_is_offered_edited_and_deleted(client: TestClient) -> N
     added = client.post("/examples", data=IDEA)
     assert added.status_code == 303
     assert "Added" in client.get(added.headers["location"]).text
-    assert '<option value="brief-1001">' in client.get("/").text
+    assert '<option value="brief-1001" ' in client.get("/").text
     filled = client.get("/", params={"idea": "brief-1001"})
     assert 'value="Elsie Marr"' in filled.text
-    assert '<option value="brief-1001" selected>' in filled.text
+    assert '<option value="brief-1001" selected ' in filled.text
 
     form = client.get("/examples/brief-1001/edit").text
     assert "lamp &lt;lit&gt;" in form
@@ -463,7 +463,7 @@ def test_changing_benchmark_examples_leaves_the_benchmark_alone_and_can_be_undon
     assert client.post("/examples/brief-09/edit", data=IDEA).status_code == 303
     home = client.get("/")
     assert 'value="brief-09"' not in home.text
-    assert '<option value="brief-1001">' in home.text
+    assert '<option value="brief-1001" ' in home.text
     assert client.get("/examples/brief-09/edit").status_code == 404
 
     assert client.post("/examples/brief-1001/delete").status_code == 303

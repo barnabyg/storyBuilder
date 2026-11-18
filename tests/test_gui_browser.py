@@ -126,6 +126,22 @@ def _manage_examples(page: Page, base: str) -> None:
     expect(page.get_by_role("button", name="Restore the original")).to_have_count(0)
 
 
+def _choose_example_over_draft(page: Page) -> None:
+    choice = page.get_by_label("Example idea")
+    expect(choice).to_have_value("")
+    use = page.get_by_role("button", name="Use this example")
+    expect(use).to_be_disabled()
+    page.get_by_label("The situation").fill("My own idea.")
+    choice.select_option("brief-09")
+    preview = page.locator("#example-preview").inner_text()
+    use.click()
+    page.get_by_role("button", name="Keep my draft").click()
+    expect(page.get_by_label("The situation")).to_have_value("My own idea.")
+    use.click()
+    page.get_by_role("button", name="Replace draft").click()
+    expect(page.get_by_label("The situation")).to_have_value(preview)
+
+
 def _write_and_read(base: str, tmp_path: Path) -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
@@ -135,8 +151,7 @@ def _write_and_read(base: str, tmp_path: Path) -> None:
             page = browser.new_page(accept_downloads=True)
             page.goto(base)
             page.set_viewport_size({"width": 390, "height": 844})
-            page.get_by_label("Example idea").select_option("brief-09")
-            page.get_by_role("button", name="Fill in").click()
+            _choose_example_over_draft(page)
             expect(page.get_by_label("Main character's name")).to_have_value("Kari Lund")
             expect(page.get_by_label("Example idea")).to_have_value("brief-09")
 

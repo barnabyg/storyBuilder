@@ -171,8 +171,6 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-::placeholder { color: var(--muted); opacity: 0.75; }
-
 textarea { display: block; resize: vertical; }
 
 select {
@@ -208,6 +206,18 @@ select {
 .inline select { flex: 1 1 12rem; min-width: 0; width: auto; }
 .inline p { flex: 1; margin: auto 0; }
 
+#example-picker label { margin-top: 0; }
+#example-preview { margin: 0.65rem 0; overflow-wrap: anywhere; }
+dialog {
+  max-width: min(28rem, 90vw);
+  padding: 1.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+}
+dialog::backdrop { background: rgb(0 0 0 / 45%); }
+
 .submit { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: center; }
 .submit .cost { flex: 1 1 18rem; margin: 0; }
 .submit button { flex: none; }
@@ -232,6 +242,9 @@ button, .button {
 }
 
 button:hover, .button:hover { border-color: var(--accent-strong); background: var(--accent-strong); }
+button:disabled, button.quiet:disabled {
+  background: var(--tint); border-color: var(--line); color: var(--muted); cursor: default;
+}
 
 button.quiet, .button.quiet {
   border-color: var(--line-strong);
