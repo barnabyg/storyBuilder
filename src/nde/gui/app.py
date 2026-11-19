@@ -14,8 +14,10 @@ from urllib.parse import quote, urlencode, urlsplit
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from nde.continuity.pipeline import QUALITY_NOTE
+from nde.gui.openai_models import ModelChoice, ModelSupport
 from nde.gui.studio import Job, SavedStory, Studio, StudioBusyError, problems_in
 from nde.runs.config import ConfigError
 from nde.schema.brief import DEFAULT_TARGET_WORDS, Brief, BriefContent, EndingKind
@@ -27,6 +29,16 @@ _EXAMPLE_LABEL_CHARS = 80
 
 _STYLE = Path(__file__).with_name("style.css").read_text(encoding="utf-8")
 _COMPOSER_SCRIPT = Path(__file__).with_name("composer.js").read_text(encoding="utf-8")
+_SETTINGS_SCRIPT = Path(__file__).with_name("settings.js").read_text(encoding="utf-8")
+_EFFORT_LABELS = {
+    "none": "None",
+    "minimal": "Minimal",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "xhigh": "Extra high",
+    "max": "Maximum",
+}
 
 # An open book, as the bar's mark and the browser tab's icon.
 _BOOK = (
@@ -67,7 +79,8 @@ def _page(
         f"<style>{_STYLE}</style></head>"
         '<body><header class="site"><div class="bar"><a class="brand" href="/">'
         f"{_BOOK.format(colour='currentColor')}Story Builder</a>"
-        f'<nav aria-label="Main"><a href="{library_href}">Your stories</a></nav></div></header>'
+        f'<nav aria-label="Main"><a href="{library_href}">Your stories</a>'
+        '<a href="/settings">Settings</a></nav></div></header>'
         f"<main>{body}</main></body></html>"
     )
     return HTMLResponse(html, status_code=status)
@@ -621,6 +634,132 @@ def _file_name(title: str) -> str:
     return f"{slug or 'story'}.md"
 
 
+def _settings_effort(efforts: tuple[str, ...], chosen: str) -> str:
+    items = "".join(
+        f'<option value="{level}"{" selected" if level == chosen else ""}>'
+        f"{_EFFORT_LABELS[level]}</option>"
+        for level in efforts
+    )
+    return (
+        '<label for="effort">Thinking level</label>'
+        f'<select id="effort" name="effort"{"" if efforts else " disabled"}>'
+        f'<option value="">{"Model default" if efforts else "Unavailable"}</option>'
+        f"{items}</select>"
+    )
+
+
+def _settings_page(
+    choices: Mapping[str, ModelSupport],
+    choice: ModelChoice | None,
+    *,
+    problem: str | None = None,
+    saved: bool = False,
+    status: int = 200,
+) -> HTMLResponse:
+    model = choice.model if choice else ""
+    effort = choice.effort if choice else ""
+    support = choices.get(model)
+    unavailable = bool(model and support is None)
+    options = "".join(
+        f'<option value="{escape(model_id)}" data-efforts="{" ".join(item.efforts)}"'
+        f"{' selected' if model_id == model else ''}>{escape(model_id)}</option>"
+        for model_id, item in choices.items()
+    )
+    if unavailable:
+        options = (
+            f'<option value="{escape(model)}" selected disabled>'
+            f"{escape(model)} (unavailable)</option>{options}"
+        )
+    labels = "".join(
+        f'<option value="{level}">{label}</option>' for level, label in _EFFORT_LABELS.items()
+    )
+    notice = '<p class="notice" role="status">Settings saved.</p>' if saved else ""
+    alert = _alert({"": problem}) if problem else ""
+    body = f"""
+    <div class="reading">
+      <h1>Settings</h1>
+      <p class="lede">Choose the OpenAI model and thinking level for new stories.</p>
+      {notice}{alert}
+      <form id="openai-settings" class="panel" method="post" action="/settings">
+        <fieldset>
+          <legend>OpenAI</legend>
+          <label for="model">Model</label>
+          <select id="model" name="model">
+            <option value="">Use configuration defaults</option>{options}
+          </select>
+          {_settings_effort(support.efforts if support else (), effort)}
+        </fieldset>
+        <div class="actions">
+          <button{" disabled" if unavailable else ""}>Save settings</button>
+          <a class="button quiet" href="/settings">Refresh model list</a>
+        </div>
+      </form>
+      <template id="thinking-levels">{labels}</template>
+    </div>
+    <script>{_SETTINGS_SCRIPT}</script>
+    """
+    return _page("Settings · Story Builder", body, status=status)
+
+
+def _save_settings(studio: Studio, values: Mapping[str, str]) -> Response:
+    model = values.get("model")
+    if model is None:
+        return _settings_page(
+            {}, None, problem="Choose a model or the configuration defaults.", status=422
+        )
+    choice = ModelChoice(model=model, effort=values.get("effort", "")) if model else None
+    choices = {}
+    if choice is not None:
+        try:
+            choices = studio.model_options()
+        except ConfigError as error:
+            return _settings_page({}, choice, problem=str(error), status=503)
+        support = choices.get(choice.model)
+        if support is None:
+            return _settings_page(
+                choices, choice, problem="Choose a model available in this list.", status=422
+            )
+        if choice.effort and choice.effort not in support.efforts:
+            return _settings_page(
+                choices,
+                choice,
+                problem="Choose a thinking level supported by this model.",
+                status=422,
+            )
+    try:
+        studio.save_model_choice(choice)
+    except OSError:
+        return _settings_page(choices, choice, problem="Could not save model settings.", status=500)
+    return RedirectResponse("/settings?saved=1", status_code=303)
+
+
+def _settings_routes(studio: Studio) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/settings", response_class=HTMLResponse)
+    def settings(saved: bool = False) -> HTMLResponse:
+        choice = None
+        choices = {}
+        problems: list[str] = []
+        try:
+            choice = studio.model_choice()
+        except ConfigError as error:
+            problems.append(str(error))
+        try:
+            choices = studio.model_options()
+            if not choices:
+                problems.append("OpenAI returned no compatible models for this API key.")
+        except ConfigError as error:
+            problems.append(str(error))
+        return _settings_page(choices, choice, problem=" ".join(problems), saved=saved)
+
+    @router.post("/settings")
+    async def save_settings(request: Request) -> Response:
+        return await run_in_threadpool(_save_settings, studio, await _form_values(request))
+
+    return router
+
+
 def _example_routes(studio: Studio) -> APIRouter:
     router = APIRouter()
 
@@ -714,6 +853,7 @@ def create_app(studio: Studio) -> FastAPI:
         return await call_next(request)
 
     app.include_router(_example_routes(studio))
+    app.include_router(_settings_routes(studio))
 
     @app.get("/", response_class=HTMLResponse)
     def home(idea: str | None = None, deleted: str | None = None) -> HTMLResponse:

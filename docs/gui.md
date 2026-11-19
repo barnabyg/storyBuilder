@@ -19,6 +19,11 @@ gives the prompt back straight away, and that terminal plays no further part.
   **Use this example**. If you have edited the form, choose **Keep my draft** or
   **Replace draft**. Press **Write this story** when ready. If a field needs correcting,
   its error links directly to the field and your answers stay in the form.
+- **Choose a model.** Open **Settings** in the header. Story Builder fetches the models
+  available to your OpenAI API key and shows supported text models, including dated
+  versions when available. Choose a model and a thinking level, then press **Save settings**.
+  Select **Use configuration defaults** to go back to the models and thinking levels in
+  the configuration file. Saving applies to stories you start after the change.
 - **Manage the examples.** **Manage examples** lists them, starting with the development
   briefs. **Add an example** saves a new idea without writing a story, and each example
   has **Use**, **Edit** and **Delete**. Deleting asks you to confirm. Editing an original
@@ -44,9 +49,10 @@ Every story in the runs folder is listed, including those written with `nde cont
 
 ## Cost and time
 
-Stories use the models and budget in
-[`configs/continuity-dev.yaml`](../configs/continuity-dev.yaml), so a story stops at that
-file's `budget.per_run_usd` (US$3). A 2,000-word story has taken 5 to 12 minutes and cost
+Stories use the budget in [`configs/continuity-dev.yaml`](../configs/continuity-dev.yaml)
+(US$3 per run by default). The model chosen in Settings is used for OpenAI planning, prose,
+and checks and repairs, with a known token price for spending limits. The cost and time
+can vary with the model and thinking level. A 2,000-word story has taken 5 to 12 minutes and cost
 about US$0.25 to US$0.60. There is no way to cancel from the page: closing the window
 stops the writing, loses the story and keeps what was spent. A story that stops at the
 budget is still shown if it got as far as its checks, marked as unfinished.
@@ -59,6 +65,7 @@ budget is still shown if it got as far as its checks, marked as unfinished.
 | Typed ideas | `.nde/gui-briefs/dev/brief-1001.yaml` and upward |
 | Your examples | `.nde/gui-briefs/examples/dev/`, numbered along with the typed ideas |
 | Original examples you removed | `.nde/gui-briefs/examples/removed-benchmark-examples.yaml` |
+| Model and thinking preferences | `.nde/gui-briefs/settings.json` |
 
 These folders are ignored by git, so keep your own copy of anything you want to last.
 
@@ -72,7 +79,7 @@ again gives a new story, at full cost.
 ## Options
 
 `nde gui --help` lists them: `--port` (8771 by default), `--no-browser`, `--config`,
-`--runs-dir`, `--ledger` and `--ideas-dir`, which also holds your examples.
+`--runs-dir`, `--ledger` and `--ideas-dir`, which also holds your examples and settings.
 
 ## Safety
 
@@ -80,6 +87,19 @@ The page is served only on `127.0.0.1`. Because writing a story spends money, it
 requests addressed to any other host name, and form submissions from any other site.
 
 ## Testing
+
+From the repository folder, use PowerShell with the local environment set up and
+`OPENAI_API_KEY` configured:
+
+```powershell
+.\run.bat
+```
+
+Open **Settings** and switch between two models. If both are available, `gpt-6.2-sol`
+offers **Maximum** and `gpt-5.4-mini` offers **None**. Save a model and thinking level,
+then revisit Settings to confirm both choices are still selected. To restore the settings
+from the configuration file, select **Use configuration defaults** and save. This check
+makes model-list calls only.
 
 `tests/test_gui.py` runs the whole path from the form to the saved story against a fake
 provider. `tests/test_gui_browser.py` does the same in real Chrome and only runs when

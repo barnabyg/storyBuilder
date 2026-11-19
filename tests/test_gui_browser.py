@@ -26,11 +26,11 @@ _browser_only = pytest.mark.skipif(
 
 
 @contextmanager
-def _serving(fake_llm: FakeOpenAI, tmp_path: Path) -> Generator[str]:
+def _serving(fake_llm: FakeOpenAI, tmp_path: Path, *, provider: str = "fake") -> Generator[str]:
     """The app on a free local port, using the fake provider; yields its address."""
     fake_llm.default = fake_continuity()
     studio = Studio(
-        write_config(tmp_path, continuity_config(fake_llm.base_url)),
+        write_config(tmp_path, continuity_config(fake_llm.base_url, provider=provider)),
         RunOptions(
             runs_dir=tmp_path / "runs",
             # pragma: allowlist nextline secret - a fake key for the fake server
@@ -55,6 +55,45 @@ def _serving(fake_llm: FakeOpenAI, tmp_path: Path) -> Generator[str]:
             server.should_exit = True
             thread.join(timeout=10)
             assert not thread.is_alive()
+
+
+@_browser_only
+def test_switching_openai_models_updates_thinking_levels_in_the_browser(
+    fake_llm: FakeOpenAI, tmp_path: Path
+) -> None:
+    fake_llm.models = Reply(
+        body={"data": [{"id": model} for model in ("gpt-6.2-sol", "gpt-5.4-mini", "gpt-4.1")]}
+    )
+    with _serving(fake_llm, tmp_path, provider="openai") as base, sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            headless=True, channel=os.environ.get("NDE_BROWSER_CHANNEL", "chrome")
+        )
+        try:
+            page = browser.new_page()
+            page.goto(base)
+            page.get_by_role("link", name="Settings").click()
+            model = page.get_by_label("Model", exact=True)
+            thinking = page.get_by_label("Thinking level")
+            expect(thinking).to_be_disabled()
+            model.select_option("gpt-6.2-sol")
+            expect(thinking.locator('option[value="none"]')).to_have_count(0)
+            thinking.select_option("max")
+
+            model.select_option("gpt-5.4-mini")
+            expect(thinking.locator('option[value="max"]')).to_have_count(0)
+            expect(thinking).to_have_value("")
+            thinking.select_option("none")
+
+            model.select_option("gpt-4.1")
+            expect(thinking).to_be_disabled()
+            model.select_option("gpt-5.4-mini")
+            thinking.select_option("high")
+            page.get_by_role("button", name="Save settings").click()
+            expect(page.get_by_role("status")).to_have_text("Settings saved.")
+            expect(model).to_have_value("gpt-5.4-mini")
+            expect(thinking).to_have_value("high")
+        finally:
+            browser.close()
 
 
 @_browser_only

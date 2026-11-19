@@ -1,4 +1,4 @@
-"""A fake OpenAI-compatible chat-completions server on 127.0.0.1 for tests.
+"""A fake OpenAI-compatible server on 127.0.0.1 for tests.
 
 Each request takes the next scripted reply; with no script left, it answers
 with a default completion. Every request body is recorded for assertions.
@@ -91,6 +91,7 @@ class FakeOpenAI:
         self.script: deque[Reply] = deque()
         self.requests: list[RecordedRequest] = []
         self.default: Callable[[Json], Reply] = self._echo
+        self.models = Reply(body={"data": []})
         self._lock = threading.Lock()
         self._server = _Server(("127.0.0.1", 0), self._handler_class())
         self._thread = threading.Thread(
@@ -124,6 +125,8 @@ class FakeOpenAI:
     def next_reply(self, request: RecordedRequest) -> Reply:
         with self._lock:
             self.requests.append(request)
+            if request.path == "/v1/models":
+                return self.models
             if self.script:
                 return self.script.popleft()
         return self.default(request.body)
@@ -136,7 +139,13 @@ class FakeOpenAI:
             # delayed ACKs stall every response on loopback by tens of milliseconds.
             disable_nagle_algorithm = True
 
+            def do_GET(self) -> None:
+                self._reply()
+
             def do_POST(self) -> None:
+                self._reply()
+
+            def _reply(self) -> None:
                 length = int(self.headers.get("Content-Length", "0"))
                 raw = self.rfile.read(length)
                 request = RecordedRequest(

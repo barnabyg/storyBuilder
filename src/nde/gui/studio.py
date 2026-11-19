@@ -22,9 +22,16 @@ from pydantic import ValidationError
 from nde.briefs import BriefError, load_briefs
 from nde.continuity.pipeline import RESULT_FILE
 from nde.files import write_text_lf
+from nde.gui.openai_models import (
+    ModelChoice,
+    ModelSupport,
+    apply_choice,
+    available_models,
+    story_provider,
+)
 from nde.runs.config import BriefSelection, ConfigError, load_config
 from nde.runs.records import read_manifest, read_stories
-from nde.runs.runner import PreparedRun, RunOptions, execute, prepare
+from nde.runs.runner import PreparedRun, RunOptions, execute, prepare_loaded
 from nde.runs.state import RunState
 from nde.schema.brief import Brief, BriefContent
 from nde.stories.normalise import word_count
@@ -35,6 +42,7 @@ FIRST_OWN_BRIEF = 1001
 SPLIT = "dev"
 EXAMPLES_FOLDER = "examples"
 REMOVED_EXAMPLES = "removed-benchmark-examples.yaml"
+SETTINGS_FILE = "settings.json"
 
 
 class StudioBusyError(Exception):
@@ -165,11 +173,14 @@ def _brief_yaml(brief: Brief) -> str:
 
 
 def _replace_text(path: Path, text: str) -> None:
-    """Write a file in one step, so a failure part way cannot leave a broken example."""
+    """Replace a file atomically, including when GUIs run on separate ports."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_suffix(".partial")
-    write_text_lf(partial, text)
-    partial.replace(path)
+    partial = path.with_suffix(f".{secrets.token_hex(8)}.partial")
+    try:
+        write_text_lf(partial, text)
+        partial.replace(path)
+    finally:
+        partial.unlink(missing_ok=True)
 
 
 class Studio:
@@ -197,6 +208,32 @@ class Studio:
     @property
     def cap_usd(self) -> float | None:
         return load_config(self.config).config.budget.per_run_usd
+
+    def model_options(self) -> dict[str, ModelSupport]:
+        provider = story_provider(load_config(self.config).config)
+        if provider is None:
+            raise ConfigError("This story configuration has no OpenAI roles.")
+        return available_models(provider, self.options.environ)
+
+    def model_choice(self) -> ModelChoice | None:
+        try:
+            return ModelChoice.model_validate_json(
+                (self.own_briefs / SETTINGS_FILE).read_text(encoding="utf-8")
+            )
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError) as error:
+            raise ConfigError(
+                "Could not read saved model settings. Choose and save them again."
+            ) from error
+
+    def save_model_choice(self, choice: ModelChoice | None) -> None:
+        path = self.own_briefs / SETTINGS_FILE
+        with self._lock:
+            if choice is None:
+                path.unlink(missing_ok=True)
+            else:
+                _replace_text(path, choice.model_dump_json(indent=2) + "\n")
 
     def _benchmark_examples(self) -> dict[str, Brief]:
         folder = load_config(self.config).briefs_dir
@@ -333,12 +370,12 @@ class Studio:
                 raise StudioBusyError(running)
             brief_id = self._save_idea(content)
             try:
-                prepared = prepare(
-                    self.config,
-                    self.options.environ,
-                    briefs=BriefSelection(split=SPLIT, ids=[brief_id]),
-                    briefs_dir=self.own_briefs,
+                loaded = load_config(self.config).with_briefs(
+                    BriefSelection(split=SPLIT, ids=[brief_id]), self.own_briefs
                 )
+                if story_provider(loaded.config) is not None and (choice := self.model_choice()):
+                    loaded = apply_choice(loaded, choice)
+                prepared = prepare_loaded(loaded, self.options.environ)
             except ConfigError:
                 (self.own_briefs / SPLIT / f"{brief_id}.yaml").unlink()
                 raise

@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from nde.gui.app import create_app, parse_idea
 from nde.gui.studio import SavedStory, Studio, describe_step
+from nde.runs.records import read_manifest
 from nde.runs.runner import RunOptions
 from tests.conftest import REPO, write_config
 from tests.continuity_support import continuity_config, fake_continuity
@@ -31,9 +32,9 @@ IDEA = {
 
 
 @pytest.fixture
-def studio(fake_llm: FakeOpenAI, tmp_path: Path) -> Studio:
+def studio(request: pytest.FixtureRequest, fake_llm: FakeOpenAI, tmp_path: Path) -> Studio:
     fake_llm.default = fake_continuity()
-    config = continuity_config(fake_llm.base_url)
+    config = continuity_config(fake_llm.base_url, provider=getattr(request, "param", "fake"))
     return Studio(
         write_config(tmp_path, config),
         RunOptions(
@@ -70,6 +71,67 @@ def _story_at(studio: Studio, address: str) -> SavedStory:
     story = studio.story(run, brief)
     assert story is not None
     return story
+
+
+@pytest.mark.parametrize("studio", ["openai"], indirect=True)
+def test_model_settings_persist_and_control_new_stories(
+    client: TestClient, studio: Studio, fake_llm: FakeOpenAI
+) -> None:
+    model = "gpt-5.4-mini-2026-03-17"
+    fake_llm.models = Reply(
+        body={
+            "data": [
+                {"id": model},
+                {"id": "gpt-6-35"},
+                {"id": "gpt-image-2.6-flare"},
+                {"id": "gpt-4o-audio-preview"},
+                {"id": "gpt-5.5-pro"},
+                {"id": "gpt-5.2", "shutdown_date": "2000-01-01"},
+            ]
+        }
+    )
+    page = client.get("/settings")
+    assert page.status_code == 200
+    assert f'value="{model}"' in page.text
+    assert 'data-efforts="none low medium high xhigh"' in page.text
+    assert all(
+        id_ not in page.text for id_ in ("gpt-6-35", "gpt-image", "gpt-4o", "gpt-5.5", "gpt-5.2")
+    )
+    [lookup] = fake_llm.requests
+    assert lookup.path == "/v1/models"
+    assert lookup.headers["authorization"].startswith("Bearer ")
+    assert (
+        lookup.headers["authorization"].removeprefix("Bearer ")
+        == studio.options.environ["FAKE_API_KEY"]
+    )
+
+    assert client.post("/settings", data={"model": model, "effort": "max"}).status_code == 422
+    assert client.post("/settings", data={"model": "gpt-5.4", "effort": "high"}).status_code == 422
+    assert studio.model_choice() is None
+
+    saved = client.post("/settings", data={"model": model, "effort": "high"})
+    assert saved.status_code == 303
+    restarted = Studio(studio.config, studio.options, studio.own_briefs)
+    client = TestClient(create_app(restarted), base_url=LOCAL, follow_redirects=False)
+    page = client.get(saved.headers["location"])
+    assert "Settings saved." in page.text
+    assert 'value="high" selected' in page.text
+    assert f'value="{model}" data-efforts="none low medium high xhigh" selected' in page.text
+
+    # An outage during a model refresh never prevents the saved choice being used.
+    fake_llm.models = error(401, "the API response may include sensitive details")
+    page = client.get("/settings")
+    assert "Check the API key" in page.text
+    assert "sensitive details" not in page.text
+    assert f"{model} (unavailable)" in page.text
+    story = _story_at(restarted, _write_story(client))
+    calls = [call.body for call in fake_llm.requests if call.path == "/v1/chat/completions"]
+    assert calls
+    assert {(call["model"], call["reasoning_effort"]) for call in calls} == {(model, "high")}
+    assert read_manifest(story.folder.parents[3]).cost.usd > 0
+
+    assert client.post("/settings", data={"model": ""}).status_code == 303
+    assert restarted.model_choice() is None
 
 
 def test_typing_an_idea_writes_a_story_that_can_be_read_and_saved(

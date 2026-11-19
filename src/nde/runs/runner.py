@@ -102,6 +102,11 @@ def prepare(
     loaded = load_config(config_path)
     if briefs is not None:
         loaded = loaded.with_briefs(briefs, briefs_dir)
+    return prepare_loaded(loaded, environ)
+
+
+def prepare_loaded(loaded: LoadedConfig, environ: Mapping[str, str]) -> PreparedRun:
+    """Validate a loaded config, including any in-memory overrides, before execution."""
     config = loaded.config
     templates: dict[str, PromptTemplate] = {}
     for call in config.calls:

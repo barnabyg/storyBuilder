@@ -3,10 +3,11 @@
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, TypedDict, cast
 
 import httpx
-from pydantic import JsonValue
+from pydantic import BaseModel, JsonValue, ValidationError
 
 from nde.llm.errors import (
     AuthenticationError,
@@ -54,6 +55,15 @@ class ChatResult:
     latency_s: float
 
 
+class ListedModel(BaseModel):
+    id: str
+    shutdown_date: date | None = None
+
+
+class _ModelList(BaseModel):
+    data: list[ListedModel]
+
+
 # Error codes providers use for content-policy refusals.
 _CONTENT_REFUSAL_CODES = {"content_filter", "content_policy_violation"}
 _RETRYABLE_CLIENT_STATUSES = {408, 409}
@@ -63,7 +73,7 @@ _AUTHENTICATION_STATUSES = {401, 403}
 
 
 class OpenAICompatibleClient:
-    """Makes one chat-completion request; every failure raises a common ProviderError."""
+    """Calls an OpenAI-compatible endpoint; failures raise a common ProviderError."""
 
     def __init__(self, base_url: str, *, api_key: str | None, timeout_s: float) -> None:
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -76,21 +86,33 @@ class OpenAICompatibleClient:
 
     def chat(self, request: ChatRequest) -> ChatResult:
         started = time.monotonic()
+        response = self._request("POST", "chat/completions", body=request.body())
+        result = _parse_completion(response, request.model, time.monotonic() - started)
+        if result.finish_reason == "content_filter":
+            raise ContentRefusedError("the provider's content filter stopped the response")
+        return result
+
+    def list_models(self) -> list[ListedModel]:
+        response = self._request("GET", "models")
         try:
-            response = self._http.post("chat/completions", json=request.body())
+            return _ModelList.model_validate_json(response.content).data
+        except ValidationError as error:
+            raise TransientError("malformed model list from provider") from error
+
+    def _request(
+        self, method: str, path: str, *, body: dict[str, Any] | None = None
+    ) -> httpx.Response:
+        try:
+            response = self._http.request(method, path, json=body)
         except httpx.TimeoutException as error:
             raise TransientError(f"request timed out: {error!r}") from error
         except (httpx.NetworkError, httpx.RemoteProtocolError) as error:
             raise TransientError(f"connection failed: {error!r}") from error
         except httpx.HTTPError as error:
             raise InvalidRequestError(f"request could not be sent: {error!r}") from error
-        latency = time.monotonic() - started
         if not response.is_success:
             raise _status_error(response)
-        result = _parse_completion(response, request.model, latency)
-        if result.finish_reason == "content_filter":
-            raise ContentRefusedError("the provider's content filter stopped the response")
-        return result
+        return response
 
 
 def _error_details(response: httpx.Response) -> tuple[str, str | None]:
