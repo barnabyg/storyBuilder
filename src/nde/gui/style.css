@@ -75,6 +75,7 @@ a { color: var(--accent); text-underline-offset: 0.15em; }
   gap: 0.5rem 1rem;
 }
 .bar { max-width: 72rem; margin: 0 auto; padding: 0.8rem 1.25rem; }
+.bar nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
 .heading-actions { margin-bottom: 0.75rem; }
 .heading-actions h1 { margin: 0; }
 #stories { scroll-margin-top: 1rem; }

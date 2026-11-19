@@ -103,10 +103,17 @@ def fake_continuity(audits: Audits | None = None) -> Callable[[Json], Reply]:
     return reply
 
 
-def continuity_config(base_url: str, *, repair_tries: int = 0) -> dict[str, Any]:
+def continuity_config(
+    base_url: str, *, repair_tries: int = 0, provider: str = "fake"
+) -> dict[str, Any]:
     condition = CONTINUITY | {"params": {"repair_tries": repair_tries}}
     config = story_config(base_url, [condition], briefs={"split": "dev", "ids": [BRIEF]})
     config["roles"]["critic"] = {"provider": "fake", "model": "fake-model", "params": {}}
+    if provider != "fake":
+        config["providers"][provider] = config["providers"].pop("fake")
+        config["prices"][f"{provider}/fake-model"] = config["prices"].pop("fake/fake-model")
+        for binding in config["roles"].values():
+            binding["provider"] = provider
     return config
 
 
